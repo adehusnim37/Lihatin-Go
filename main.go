@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("mysql", "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo")
+	db, err := sql.Open("mysql", "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?parseTime=true")
 	if err != nil {
 		log.Printf("Please check your database connection during hitting the server")
 		log.Printf("Error connecting to database: %v", err)

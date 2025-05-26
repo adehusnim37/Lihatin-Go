@@ -5,6 +5,7 @@ A modern REST API built with Go and Gin framework that provides comprehensive us
 ## 🚀 Features
 
 - **User Management**: Complete CRUD operations for user accounts
+- **Authentication System**: Secure login with bcrypt password hashing
 - **Enhanced Activity Logging**: Comprehensive logging with request bodies, parameters, and performance metrics
 - **Premium User Protection**: Special handling for premium users
 - **Input Validation**: Comprehensive validation with custom password complexity rules
@@ -63,6 +64,9 @@ A modern REST API built with Go and Gin framework that provides comprehensive us
 - `POST /v1/users` - Create new user
 - `PUT /v1/users/:id` - Update user
 - `DELETE /v1/users/:id` - Delete user (with confirmation)
+
+### Authentication
+- `POST /v1/auth/login` - User login with email/username and password
 
 ### Activity Logs
 - `GET /v1/logs` - Get all activity logs
@@ -179,6 +183,16 @@ The application automatically logs comprehensive user activities including:
 
 See [ACTIVITY_LOGGER.md](ACTIVITY_LOGGER.md) for detailed documentation on the enhanced logging system.
 
+## 🔐 Authentication
+
+The application includes a secure authentication system with:
+- **Password Hashing**: bcrypt encryption for all passwords
+- **Flexible Login**: Support for both email and username login
+- **Input Validation**: Comprehensive validation for credentials
+- **Security**: Protection against common attacks and secure error handling
+
+See [AUTH_SYSTEM.md](AUTH_SYSTEM.md) for detailed authentication documentation.
+
 ## 🚀 Usage Examples
 
 ### Create a new user
@@ -192,6 +206,16 @@ curl -X POST http://localhost:8880/v1/users \
     "email": "john@example.com",
     "password": "SecurePass123!",
     "avatar": "https://example.com/avatar.jpg"
+  }'
+```
+
+### Login with credentials
+```bash
+curl -X POST http://localhost:8880/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email_or_username": "john@example.com",
+    "password": "SecurePass123!"
   }'
 ```
 

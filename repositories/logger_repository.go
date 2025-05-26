@@ -84,6 +84,7 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUs
 	for rows.Next() {
 		var log models.LoggerUser
 		var deletedAt sql.NullTime
+		var createdAt, updatedAt sql.NullTime
 		var requestBody, queryParams, routeParams, contextLocals sql.NullString
 		var responseTime sql.NullInt64
 
@@ -92,7 +93,7 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUs
 			&log.IPAddress, &log.UserAgent, &log.BrowserInfo, &log.Action,
 			&log.Route, &log.Method, &log.StatusCode,
 			&requestBody, &queryParams, &routeParams, &contextLocals, &responseTime,
-			&log.CreatedAt, &log.UpdatedAt, &deletedAt,
+			&createdAt, &updatedAt, &deletedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -113,6 +114,14 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUs
 		}
 		if responseTime.Valid {
 			log.ResponseTime = responseTime.Int64
+		}
+		if createdAt.Valid {
+			createdTime := createdAt.Time
+			log.CreatedAt = &createdTime
+		}
+		if updatedAt.Valid {
+			updatedTime := updatedAt.Time
+			log.UpdatedAt = &updatedTime
 		}
 		if deletedAt.Valid {
 			deletedTime := deletedAt.Time
@@ -147,6 +156,7 @@ func (r *LoggerRepository) GetAllLogs() ([]models.LoggerUser, error) {
 	for rows.Next() {
 		var log models.LoggerUser
 		var deletedAt sql.NullTime
+		var createdAt, updatedAt sql.NullTime
 		var requestBody, queryParams, routeParams, contextLocals sql.NullString
 		var responseTime sql.NullInt64
 
@@ -155,7 +165,7 @@ func (r *LoggerRepository) GetAllLogs() ([]models.LoggerUser, error) {
 			&log.IPAddress, &log.UserAgent, &log.BrowserInfo, &log.Action,
 			&log.Route, &log.Method, &log.StatusCode,
 			&requestBody, &queryParams, &routeParams, &contextLocals, &responseTime,
-			&log.CreatedAt, &log.UpdatedAt, &deletedAt,
+			&createdAt, &updatedAt, &deletedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -176,6 +186,14 @@ func (r *LoggerRepository) GetAllLogs() ([]models.LoggerUser, error) {
 		}
 		if responseTime.Valid {
 			log.ResponseTime = responseTime.Int64
+		}
+		if createdAt.Valid {
+			createdTime := createdAt.Time
+			log.CreatedAt = &createdTime
+		}
+		if updatedAt.Valid {
+			updatedTime := updatedAt.Time
+			log.UpdatedAt = &updatedTime
 		}
 		if deletedAt.Valid {
 			deletedTime := deletedAt.Time
