@@ -12,11 +12,11 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("mysql", "root:rootpassword123@tcp(localhost:3306)/LihatinGo")
+	db, err := sql.Open("mysql", "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo")
 	if err != nil {
-		panic(err)
 		log.Printf("Please check your database connection during hitting the server")
 		log.Printf("Error connecting to database: %v", err)
+		panic(err)
 	}
 	defer db.Close()
 

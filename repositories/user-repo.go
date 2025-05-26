@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/google/uuid"
 )
 
 // UserRepository defines the methods for user-related database operations
@@ -107,8 +108,9 @@ func (ur *userRepository) GetUserByEmailOrUsername(input string) (*models.User, 
 
 func (ur *userRepository) CreateUser(user *models.User) error {
 	now := time.Now()
-	_, err := ur.db.Exec("INSERT INTO users (first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		user.FirstName, user.LastName, user.Email, user.Password, now, now, nil, user.IsPremium, user.Avatar, user.Username)
+	u := uuid.Must(uuid.NewRandom())
+	_, err := ur.db.Exec("INSERT INTO users (id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		u ,user.FirstName, user.LastName, user.Email, user.Password, now, now, nil, user.IsPremium, user.Avatar, user.Username)
 	if err != nil {
 		log.Printf("CreateUser error: %v", err)
 	}
