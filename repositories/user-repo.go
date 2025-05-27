@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
@@ -18,7 +19,7 @@ type UserRepository interface {
 	GetUserForLogin(emailOrUsername string) (*models.User, error)
 	CheckPremiumByUsernameOrEmail(inputs string) (*models.User, error)
 	CreateUser(user *models.User) error
-	UpdateUser(id string, user *models.User) error
+	UpdateUser(id string, user *models.UpdateUser) error
 	DeleteUserPermanent(id string) error
 }
 
@@ -126,20 +127,103 @@ func (ur *userRepository) CreateUser(user *models.User) error {
 	return err
 }
 
-func (ur *userRepository) UpdateUser(id string, user *models.User) error {
-	// Hash password if it's being updated
-	hashedPassword := user.Password
+func (ur *userRepository) UpdateUser(id string, user *models.UpdateUser) error {
+	// First, get the current user data to compare
+	currentUser, err := ur.GetUserByID(id)
+	if err != nil {
+		log.Printf("UpdateUser: Error getting current user: %v", err)
+		return err
+	}
+
+	// Build dynamic update query based on what's changed
+	/*
+		setParts: slice of string yang akan menampung potongan–potongan SQL SET, misalnya "first_name = ?".
+	*/
+	var setParts []string
+	/*
+		args: slice of interface{} (empty interface) — aliasnya “any type” — yang akan menampung nilai-nilai parameter untuk setiap ? di query.
+		— Karena kita tidak tahu tipe apa saja yang akan dikirim (string, time.Time, bool, dll), kita gunakan interface{} agar bisa menampung semuanya.
+	*/
+	var args []interface{}
+
+	// Check each field and only update if different
+	if user.FirstName != currentUser.FirstName {
+		setParts = append(setParts, "first_name = ?")
+		args = append(args, user.FirstName)
+	}
+
+	if user.LastName != currentUser.LastName {
+		setParts = append(setParts, "last_name = ?")
+		args = append(args, user.LastName)
+	}
+
+	// Only update email if it's different from current email
+	if user.Email != "" && user.Email != currentUser.Email {
+		// Check if the new email already exists for another user
+		existingUser, err := ur.GetUserByEmailOrUsername(user.Email)
+		if err == nil && existingUser != nil && existingUser.ID != id {
+			// Email already exists for another user
+			return fmt.Errorf("email already exists")
+		}
+		setParts = append(setParts, "email = ?")
+		args = append(args, user.Email)
+	}
+
+	if user.Avatar != "" && user.Avatar != currentUser.Avatar {
+		setParts = append(setParts, "avatar = ?")
+		args = append(args, user.Avatar)
+	}
+
+	// Handle password separately since it needs hashing
 	if user.Password != "" {
-		var err error
-		hashedPassword, err = utils.HashPassword(user.Password)
+		hashedPassword, err := utils.HashPassword(user.Password)
 		if err != nil {
 			log.Printf("UpdateUser: Error hashing password: %v", err)
 			return err
 		}
+		setParts = append(setParts, "password = ?")
+		args = append(args, hashedPassword)
 	}
 
-	_, err := ur.db.Exec("UPDATE users SET first_name = ?, last_name = ?, email = ?, password = ?, updated_at = ?, is_premium = ?, avatar = ? WHERE id = ?",
-		user.FirstName, user.LastName, user.Email, hashedPassword, time.Now(), user.IsPremium, user.Avatar, id)
+	// If no fields to update, return early
+	if len(setParts) == 0 {
+		log.Printf("UpdateUser: No fields to update for user ID %s", id)
+		return nil
+	}
+
+	// Always update the updated_at timestamp when there are changes
+	setParts = append(setParts, "updated_at = ?")
+	args = append(args, time.Now())
+
+	// Add the WHERE clause parameter
+	args = append(args, id)
+
+	/*
+		Ringkasnya tentang append dan []interface{}
+		append(slice, value)
+		– Menambahkan value di ujung slice.
+		– Jika kapasitas (cap) tidak cukup, Go membuat backing array baru di belakang layar.
+		– Oleh karena itu kita tulis slice = append(slice, value).
+
+		interface{}
+		– Tipe kosong yang bisa memuat apa pun (int, string, struct, time.Time, dll).
+		– Berguna untuk kumpulkan argumen dinamis ketika memanggil fungsi variadik seperti Exec(query, args ...).
+	*/
+
+	// Build the final query - manually join the setParts
+	query := "UPDATE users SET "
+	for i, part := range setParts {
+		if i > 0 {
+			query += ", "
+		}
+		query += part
+	}
+	query += " WHERE id = ?"
+
+	_, err = ur.db.Exec(query, args...)
+	if err != nil {
+		log.Printf("UpdateUser error for ID %s: %v", id, err)
+	}
 	return err
 }
 
