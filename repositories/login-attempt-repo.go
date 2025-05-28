@@ -41,7 +41,7 @@ func (r *LoginAttemptRepository) RecordLoginAttempt(userID, ipAddress, userAgent
 func (r *LoginAttemptRepository) GetLoginAttemptsByUserID(userID string, limit int) ([]models.LoginAttempt, error) {
 	var attempts []models.LoginAttempt
 	query := r.db.Where("user_id = ?", userID).Order("attempted_at DESC")
-	
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

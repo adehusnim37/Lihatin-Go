@@ -4,8 +4,8 @@ import (
 	"database/sql"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
-	"github.com/adehusnim37/lihatin-go/controllers/user"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
+	"github.com/adehusnim37/lihatin-go/controllers/user"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
@@ -27,7 +27,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 
 	// Buat base controller yang akan digunakan oleh semua controller
 	baseController := controllers.NewBaseController(db, validate)
-	
+
 	// Create base controller with GORM for auth
 	baseAuthController := controllers.NewBaseControllerWithGorm(db, gormDB, validate)
 
@@ -38,7 +38,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 
 	// Setup logger repository for middleware
 	loggerRepo := repositories.NewLoggerRepository(db)
-	
+
 	// Setup user repository for auth middleware
 	userRepo := repositories.NewUserRepository(db)
 

@@ -76,9 +76,9 @@ func (r *APIKeyRepository) GetAPIKeyByID(id string) (*models.APIKey, error) {
 // ValidateAPIKey validates an API key and returns the associated user
 func (r *APIKeyRepository) ValidateAPIKey(keyString string) (*models.User, *models.APIKey, error) {
 	var apiKeys []models.APIKey
-	
+
 	// Get all active API keys (we need to check hash for each)
-	if err := r.db.Where("is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)", 
+	if err := r.db.Where("is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
 		true, time.Now()).Find(&apiKeys).Error; err != nil {
 		return nil, nil, fmt.Errorf("failed to query API keys: %w", err)
 	}
@@ -155,7 +155,7 @@ func (r *APIKeyRepository) GetAPIKeyStats(userID string) (map[string]interface{}
 
 	// Expired API keys
 	var expired int64
-	if err := r.db.Model(&models.APIKey{}).Where("user_id = ? AND expires_at IS NOT NULL AND expires_at < ? AND deleted_at IS NULL", 
+	if err := r.db.Model(&models.APIKey{}).Where("user_id = ? AND expires_at IS NOT NULL AND expires_at < ? AND deleted_at IS NULL",
 		userID, time.Now()).Count(&expired).Error; err != nil {
 		return nil, fmt.Errorf("failed to count expired API keys: %w", err)
 	}

@@ -13,7 +13,7 @@ func GenerateVerificationToken() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	// Convert to hex string (64 characters)
 	return hex.EncodeToString(bytes), nil
 }
@@ -25,7 +25,7 @@ func GeneratePasswordResetToken() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	// Convert to hex string (64 characters)
 	return hex.EncodeToString(bytes), nil
 }
@@ -37,7 +37,7 @@ func GenerateRecoveryCode() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	// Convert to hex and format as XXXX-XXXX
 	hexStr := hex.EncodeToString(bytes)
 	return fmt.Sprintf("%s-%s", hexStr[:8], hexStr[8:]), nil
@@ -50,7 +50,7 @@ func GenerateAPIKey() (string, error) {
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	
+
 	// Convert to hex string (48 characters)
 	return hex.EncodeToString(bytes), nil
 }

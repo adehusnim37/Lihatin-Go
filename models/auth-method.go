@@ -17,17 +17,17 @@ const (
 // AuthMethod represents a specific authentication method enabled for a user's account.
 // This allows for multiple factors like TOTP, FIDO2 keys, OAuth, etc.
 type AuthMethod struct {
-	ID         string `json:"id"`          // Primary Key
-	UserAuthID string `json:"user_auth_id"` // Foreign Key to UserAuth.ID
+	ID         string    `json:"id"`                             // Primary Key
+	UserAuthID string    `json:"user_auth_id"`                   // Foreign Key to UserAuth.ID
 	UserAuth   *UserAuth `json:"-" gorm:"foreignKey:UserAuthID"` // Optional: for eager loading
 
 	Type AuthMethodType `json:"type" validate:"required"` // Type of authentication method (e.g., "totp", "oauth_google")
 
 	// Common fields for various auth methods
-	IsEnabled    bool       `json:"is_enabled" default:"true"`           // Whether this method is currently active
-	IsVerified   bool       `json:"is_verified" default:"false"`         // e.g., TOTP setup confirmed, OAuth successful
-	VerifiedAt   *time.Time `json:"verified_at,omitempty"`             // Timestamp when this method was verified/added
-	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`            // Timestamp when this method was last used for login
+	IsEnabled    bool       `json:"is_enabled" default:"true"`                  // Whether this method is currently active
+	IsVerified   bool       `json:"is_verified" default:"false"`                // e.g., TOTP setup confirmed, OAuth successful
+	VerifiedAt   *time.Time `json:"verified_at,omitempty"`                      // Timestamp when this method was verified/added
+	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`                     // Timestamp when this method was last used for login
 	FriendlyName string     `json:"friendly_name,omitempty" validate:"max=100"` // User-defined name (e.g., "My YubiKey", "Authenticator App")
 
 	// Method-specific data (should be encrypted at rest if sensitive)

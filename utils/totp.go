@@ -64,7 +64,7 @@ func ValidateTOTPCodeWithWindow(secret, code string, window uint) bool {
 		Digits:    otp.DigitsSix,
 		Algorithm: otp.AlgorithmSHA1,
 	}
-	
+
 	valid, err := totp.ValidateCustom(code, secret, time.Now(), opts)
 	return err == nil && valid
 }
@@ -72,7 +72,7 @@ func ValidateTOTPCodeWithWindow(secret, code string, window uint) bool {
 // GenerateRecoveryCodes generates backup recovery codes
 func GenerateRecoveryCodes(count int) ([]string, error) {
 	codes := make([]string, count)
-	
+
 	for i := 0; i < count; i++ {
 		code, err := generateRandomCode(8)
 		if err != nil {
@@ -80,7 +80,7 @@ func GenerateRecoveryCodes(count int) ([]string, error) {
 		}
 		codes[i] = code
 	}
-	
+
 	return codes, nil
 }
 
@@ -90,20 +90,20 @@ func ValidateRecoveryCode(inputCode string, hashedCodes []string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	for _, hashedCode := range hashedCodes {
 		if subtle.ConstantTimeCompare([]byte(inputHash), []byte(hashedCode)) == 1 {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // HashRecoveryCodes hashes recovery codes for storage
 func HashRecoveryCodes(codes []string) []string {
 	hashedCodes := make([]string, len(codes))
-	
+
 	for i, code := range codes {
 		hash, err := HashPassword(code)
 		if err != nil {
@@ -112,7 +112,7 @@ func HashRecoveryCodes(codes []string) []string {
 		}
 		hashedCodes[i] = hash
 	}
-	
+
 	return hashedCodes
 }
 
@@ -120,21 +120,21 @@ func HashRecoveryCodes(codes []string) []string {
 func generateRandomCode(length int) (string, error) {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
-	
+
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	
+
 	for i := range b {
 		b[i] = charset[b[i]%byte(len(charset))]
 	}
-	
+
 	// Format as groups of 4 characters
 	code := string(b)
 	if length == 8 {
 		return code[:4] + "-" + code[4:], nil
 	}
-	
+
 	return code, nil
 }
 
@@ -163,15 +163,15 @@ func RemoveRecoveryCode(codes []string, usedCode string) []string {
 	if err != nil {
 		return codes // Return original codes if hashing fails
 	}
-	
+
 	var updatedCodes []string
-	
+
 	for _, hashedCode := range codes {
 		if subtle.ConstantTimeCompare([]byte(usedHash), []byte(hashedCode)) != 1 {
 			updatedCodes = append(updatedCodes, hashedCode)
 		}
 	}
-	
+
 	return updatedCodes
 }
 

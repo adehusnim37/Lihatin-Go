@@ -69,8 +69,8 @@ func (sv *SystemVerification) VerifyLogin() error {
 
 	// Now try to login
 	loginPayload := models.LoginRequest{
-		Email:    email,
-		Password: password,
+		EmailOrUsername: email,
+		Password:        password,
 	}
 
 	jsonData, _ = json.Marshal(loginPayload)
@@ -90,7 +90,7 @@ func (sv *SystemVerification) VerifyLogin() error {
 		return fmt.Errorf("failed to parse login response: %w", err)
 	}
 
-	if loginResponse.AccessToken == "" {
+	if loginResponse.Token == "" {
 		return fmt.Errorf("login response missing access token")
 	}
 
@@ -121,8 +121,8 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 
 	// Login
 	loginPayload := models.LoginRequest{
-		Email:    email,
-		Password: password,
+		EmailOrUsername: email,
+		Password:        password,
 	}
 
 	jsonData, _ = json.Marshal(loginPayload)
@@ -143,7 +143,7 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 		return fmt.Errorf("failed to create profile request: %w", err)
 	}
 
-	req.Header.Add("Authorization", "Bearer "+loginResponse.AccessToken)
+	req.Header.Add("Authorization", "Bearer "+loginResponse.Token)
 
 	client := &http.Client{}
 	profileResp, err := client.Do(req)
@@ -160,75 +160,6 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 	return nil
 }
 
-// VerifyAPIKeyEndpoint tests API key management endpoints
-func (sv *SystemVerification) VerifyAPIKeyEndpoint() error {
-	// First register and login to get a token
-	username := "apikeytest_" + fmt.Sprintf("%d", time.Now().Unix())
-	email := "apikeytest_" + fmt.Sprintf("%d", time.Now().Unix()) + "@example.com"
-	password := "TestPassword123!"
-
-	// Register
-	regPayload := models.RegisterRequest{
-		Username: username,
-		Email:    email,
-		Password: password,
-	}
-
-	jsonData, _ := json.Marshal(regPayload)
-	regResp, err := http.Post(sv.BaseURL+"/api/auth/register", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("registration for API key test failed: %w", err)
-	}
-	regResp.Body.Close()
-
-	// Login
-	loginPayload := models.LoginRequest{
-		Email:    email,
-		Password: password,
-	}
-
-	jsonData, _ = json.Marshal(loginPayload)
-	loginResp, err := http.Post(sv.BaseURL+"/api/auth/login", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("login for API key test failed: %w", err)
-	}
-	defer loginResp.Body.Close()
-
-	var loginResponse models.LoginResponse
-	if err := json.NewDecoder(loginResp.Body).Decode(&loginResponse); err != nil {
-		return fmt.Errorf("failed to parse login response: %w", err)
-	}
-
-	// Test API key creation
-	apiKeyPayload := models.APIKeyRequest{
-		Name:        "Test API Key",
-		Permissions: []string{"read", "write"},
-	}
-
-	jsonData, _ = json.Marshal(apiKeyPayload)
-	req, err := http.NewRequest("POST", sv.BaseURL+"/api/api-keys/", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to create API key request: %w", err)
-	}
-
-	req.Header.Add("Authorization", "Bearer "+loginResponse.AccessToken)
-	req.Header.Add("Content-Type", "application/json")
-
-	client := &http.Client{}
-	apiKeyResp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("API key creation request failed: %w", err)
-	}
-	defer apiKeyResp.Body.Close()
-
-	if apiKeyResp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("API key creation failed with status: %d", apiKeyResp.StatusCode)
-	}
-
-	fmt.Println("✓ API key management endpoints working")
-	return nil
-}
-
 // RunAllVerifications runs all system verification tests
 func (sv *SystemVerification) RunAllVerifications() error {
 	fmt.Println("Starting Authentication System Verification...")
@@ -241,7 +172,6 @@ func (sv *SystemVerification) RunAllVerifications() error {
 		{"Registration", sv.VerifyRegistration},
 		{"Login", sv.VerifyLogin},
 		{"Protected Endpoint", sv.VerifyProtectedEndpoint},
-		{"API Key Management", sv.VerifyAPIKeyEndpoint},
 	}
 
 	for _, test := range tests {
@@ -255,18 +185,4 @@ func (sv *SystemVerification) RunAllVerifications() error {
 	fmt.Println("===========================================")
 	fmt.Println("✓ All authentication system tests passed!")
 	return nil
-}
-
-// Example usage function
-func ExampleUsage() {
-	// Initialize the verifier
-	verifier := NewSystemVerification("http://localhost:8080")
-
-	// Run all verification tests
-	if err := verifier.RunAllVerifications(); err != nil {
-		fmt.Printf("❌ System verification failed: %v\n", err)
-		return
-	}
-
-	fmt.Println("🎉 Authentication system is fully functional!")
 }

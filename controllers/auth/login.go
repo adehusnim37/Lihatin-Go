@@ -58,7 +58,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 		if user != nil {
 			c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
 		}
-		
+
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusUnauthorized, models.APIResponse{
 				Success: false,
@@ -115,7 +115,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	if err := utils.CheckPassword(userAuth.PasswordHash, loginReq.Password); err != nil {
 		// Increment failed login attempts
 		c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
-		
+
 		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
 			Success: false,
 			Data:    nil,

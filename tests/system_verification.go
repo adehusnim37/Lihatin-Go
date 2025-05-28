@@ -1,5 +1,5 @@
 // Enhanced Activity Logger & Authentication System Test
-package main
+package tests
 
 import (
 	"bytes"

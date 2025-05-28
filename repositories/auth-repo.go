@@ -2,21 +2,22 @@ package repositories
 
 import (
 	"database/sql"
+
 	"gorm.io/gorm"
 )
 
 // AuthRepository handles authentication-related database operations
 type AuthRepository struct {
-	db                    *gorm.DB
-	sqlDB                 *sql.DB
-	userAuthRepo          *UserAuthRepository
-	authMethodRepo        *AuthMethodRepository
-	apiKeyRepo            *APIKeyRepository
-	loginAttemptRepo      *LoginAttemptRepository
-	
+	db               *gorm.DB
+	sqlDB            *sql.DB
+	userAuthRepo     *UserAuthRepository
+	authMethodRepo   *AuthMethodRepository
+	apiKeyRepo       *APIKeyRepository
+	loginAttemptRepo *LoginAttemptRepository
+
 	// Public accessors for commonly used repositories
-	APIKeyRepo           *APIKeyRepository
-	LoginAttemptRepo     *LoginAttemptRepository
+	APIKeyRepo       *APIKeyRepository
+	LoginAttemptRepo *LoginAttemptRepository
 }
 
 // NewAuthRepository creates a new auth repository
@@ -26,21 +27,21 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 	if err != nil {
 		panic("Failed to get SQL DB from GORM: " + err.Error())
 	}
-	
+
 	apiKeyRepo := NewAPIKeyRepository(gormDB)
 	loginAttemptRepo := NewLoginAttemptRepository(gormDB)
-	
+
 	return &AuthRepository{
-		db:                    gormDB,
-		sqlDB:                 sqlDB,
-		userAuthRepo:          NewUserAuthRepository(gormDB),
-		authMethodRepo:        NewAuthMethodRepository(gormDB),
-		apiKeyRepo:            apiKeyRepo,
-		loginAttemptRepo:      loginAttemptRepo,
-		
+		db:               gormDB,
+		sqlDB:            sqlDB,
+		userAuthRepo:     NewUserAuthRepository(gormDB),
+		authMethodRepo:   NewAuthMethodRepository(gormDB),
+		apiKeyRepo:       apiKeyRepo,
+		loginAttemptRepo: loginAttemptRepo,
+
 		// Public accessors
-		APIKeyRepo:           apiKeyRepo,
-		LoginAttemptRepo:     loginAttemptRepo,
+		APIKeyRepo:       apiKeyRepo,
+		LoginAttemptRepo: loginAttemptRepo,
 	}
 }
 

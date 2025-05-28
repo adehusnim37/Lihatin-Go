@@ -375,61 +375,184 @@ go build
 ### Test Endpoints
 Use the provided curl examples or tools like Postman to test the API endpoints.
 
-## Deployment Considerations
+## Testing and Verification
 
-### 1. Security
-- Use HTTPS in production
-- Secure JWT secret keys
-- Implement proper CORS policies
-- Use secure email configurations
+### Automated System Verification
 
-### 2. Database
-- Regular backups
-- Index optimization for performance
-- Connection pooling
-- Monitoring and alerting
+The authentication system includes comprehensive automated tests to verify all functionality:
 
-### 3. Monitoring
-- Log aggregation and analysis
-- Performance monitoring
-- Security event alerting
-- User activity analytics
+#### Running Tests
 
-### 4. Scaling
-- Load balancing for multiple instances
-- Session storage considerations
-- Database read replicas
-- Caching strategies
+1. **Start the Application**:
+   ```bash
+   go run main.go
+   ```
 
-## Future Enhancements
+2. **Run Verification Tests**:
+   ```bash
+   # Test against local server
+   go run cmd/test/main.go -url http://localhost:8080
+   
+   # Test against different server
+   go run cmd/test/main.go -url https://your-api-server.com
+   
+   # Show help
+   go run cmd/test/main.go -help
+   ```
 
-1. **OAuth Integration**: Google, GitHub, Facebook login
-2. **FIDO2/WebAuthn**: Passwordless authentication
-3. **Magic Links**: Email-based passwordless login
-4. **Advanced Rate Limiting**: Redis-based distributed rate limiting
-5. **Audit Logging**: Comprehensive audit trail for compliance
-6. **User Sessions**: Active session management and termination
-7. **Device Management**: Track and manage user devices
-8. **Geographic Restrictions**: Location-based access controls
+#### Test Coverage
 
-## Support and Maintenance
+The verification system tests the following components:
 
-### Logs Location
-- Application logs: Check server console output
-- Database logs: MySQL/PostgreSQL logs
-- Activity logs: Stored in ActivityLog table
+1. **User Registration**
+   - Creates new user accounts
+   - Validates input validation
+   - Confirms proper response format
+
+2. **User Login**
+   - Tests authentication with valid credentials
+   - Validates JWT token generation
+   - Confirms proper session management
+
+3. **Protected Endpoints**
+   - Tests JWT token validation
+   - Confirms access control works
+   - Validates token-based authorization
+
+4. **API Key Management**
+   - Tests API key creation
+   - Validates permission systems
+   - Confirms key management functionality
+
+#### Example Test Output
+
+```
+Starting Authentication System Verification...
+===========================================
+Testing Registration...
+✓ User registration endpoint working
+Testing Login...
+✓ User login endpoint working
+Testing Protected Endpoint...
+✓ Protected endpoint authentication working
+Testing API Key Management...
+✓ API key management endpoints working
+===========================================
+✓ All authentication system tests passed!
+
+🎉 Authentication system is fully functional!
+All endpoints are working correctly!
+```
+
+### Manual Testing
+
+You can also test the system manually using curl or any HTTP client:
+
+#### 1. Register a New User
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "SecurePassword123!"
+  }'
+```
+
+#### 2. Login
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "SecurePassword123!"
+  }'
+```
+
+#### 3. Access Protected Endpoint
+```bash
+# Use the access_token from login response
+curl -X GET http://localhost:8080/api/auth/profile \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+#### 4. Create API Key
+```bash
+curl -X POST http://localhost:8080/api/api-keys/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My API Key",
+    "permissions": ["read", "write"]
+  }'
+```
+
+### Admin Testing
+
+For admin functionality, you'll need to manually set a user's role to `admin` or `super_admin` in the database:
+
+```sql
+-- Make a user an admin
+UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
+
+-- Make a user a super admin
+UPDATE users SET role = 'super_admin' WHERE email = 'superadmin@example.com';
+```
+
+Then test admin endpoints:
+
+```bash
+# Get all users (admin only)
+curl -X GET http://localhost:8080/api/admin/users \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# Lock a user account (admin only)
+curl -X POST http://localhost:8080/api/admin/users/USER_ID/lock \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Suspicious activity detected"
+  }'
+```
+
+## Troubleshooting
 
 ### Common Issues
-1. **Token Expiration**: Check JWT expiration settings
-2. **Email Delivery**: Verify SMTP configuration
-3. **Database Connection**: Check database credentials and connectivity
-4. **Permission Errors**: Verify user roles and middleware configuration
 
-### Backup Strategy
-1. Regular database backups
-2. Configuration file backups
-3. User uploaded content backups
-4. Log file rotation and archival
+1. **Database Connection Errors**
+   - Ensure PostgreSQL is running
+   - Check database credentials in environment variables
+   - Verify database exists and migrations are applied
+
+2. **Migration Issues**
+   - Run migrations: `go run cmd/migrate/main.go`
+   - Check migration files in `migrations/` directory
+
+3. **Email Service Issues**
+   - Configure SMTP settings in environment variables
+   - Test email connectivity
+
+4. **Token Validation Errors**
+   - Check JWT secret is properly configured
+   - Verify token hasn't expired
+   - Ensure proper Authorization header format
+
+### Development Tips
+
+1. **Testing with Different Environments**
+   - Use different database for testing
+   - Set appropriate environment variables
+   - Use test email services or mock SMTP
+
+2. **Debugging Authentication Issues**
+   - Check application logs for detailed error messages
+   - Use middleware activity logging for request tracing
+   - Verify database schema matches models
+
+3. **Performance Considerations**
+   - Monitor database query performance
+   - Consider caching for frequently accessed data
+   - Implement rate limiting for security
 
 ---
 

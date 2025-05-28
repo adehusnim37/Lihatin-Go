@@ -21,9 +21,9 @@ type UserAuth struct {
 
 	// Account status & security
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
-	FailedLoginAttempts int        `json:"-" default:"0"`            // Counter for failed login attempts
-	LockoutUntil        *time.Time `json:"-"`                        // Timestamp until which the account is locked
-	IsActive            bool       `json:"is_active" default:"true"` // General account active status
+	FailedLoginAttempts int        `json:"-" default:"0"`                   // Counter for failed login attempts
+	LockoutUntil        *time.Time `json:"-"`                               // Timestamp until which the account is locked
+	IsActive            bool       `json:"is_active" default:"true"`        // General account active status
 	IsTOTPEnabled       bool       `json:"is_totp_enabled" default:"false"` // Whether TOTP is enabled for this user
 
 	CreatedAt time.Time  `json:"created_at"`

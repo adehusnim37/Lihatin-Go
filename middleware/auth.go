@@ -14,7 +14,7 @@ import (
 func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		
+
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, models.APIResponse{
 				Success: false,
@@ -134,7 +134,7 @@ func RequireRole(requiredRole string) gin.HandlerFunc {
 func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		
+
 		if authHeader != "" {
 			token := utils.ExtractTokenFromHeader(authHeader)
 			if token != "" {
@@ -147,7 +147,7 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 					c.Set("role", claims.Role)
 					c.Set("is_premium", claims.IsPremium)
 					c.Set("is_verified", claims.IsVerified)
-					
+
 					// Optionally get full user object
 					if user, err := userRepo.GetUserByID(claims.UserID); err == nil {
 						c.Set("user", user)
@@ -155,7 +155,7 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 				}
 			}
 		}
-		
+
 		c.Next()
 	}
 }
@@ -165,10 +165,10 @@ func RateLimitMiddleware() gin.HandlerFunc {
 	// Simple in-memory rate limiting
 	// In production, use Redis or similar
 	requestCounts := make(map[string]int)
-	
+
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		
+
 		// Reset counter every minute (simplified)
 		if requestCounts[clientIP] > 100 { // 100 requests per minute
 			c.JSON(http.StatusTooManyRequests, models.APIResponse{
@@ -180,7 +180,7 @@ func RateLimitMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		
+
 		requestCounts[clientIP]++
 		c.Next()
 	}
@@ -203,32 +203,32 @@ func SecurityHeaders() gin.HandlerFunc {
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// In production, maintain a whitelist of allowed origins
 		allowedOrigins := []string{
 			"http://localhost:3000",
-			"http://localhost:3001", 
+			"http://localhost:3001",
 			"http://localhost:8080",
 			"https://yourdomain.com",
 		}
-		
+
 		for _, allowedOrigin := range allowedOrigins {
 			if origin == allowedOrigin {
 				c.Header("Access-Control-Allow-Origin", origin)
 				break
 			}
 		}
-		
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -237,14 +237,14 @@ func CORSMiddleware() gin.HandlerFunc {
 func IPWhitelistMiddleware(whitelist []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		
+
 		for _, allowedIP := range whitelist {
 			if clientIP == allowedIP || allowedIP == "*" {
 				c.Next()
 				return
 			}
 		}
-		
+
 		c.JSON(http.StatusForbidden, models.APIResponse{
 			Success: false,
 			Data:    nil,

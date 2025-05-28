@@ -23,7 +23,7 @@ type EmailConfig struct {
 type EmailTemplateType string
 
 const (
-	EmailTemplateVerification EmailTemplateType = "verification"
+	EmailTemplateVerification  EmailTemplateType = "verification"
 	EmailTemplatePasswordReset EmailTemplateType = "password_reset"
 	EmailTemplateTOTPSetup     EmailTemplateType = "totp_setup"
 	EmailTemplateLoginAlert    EmailTemplateType = "login_alert"
@@ -52,7 +52,7 @@ func NewEmailService() *EmailService {
 func (es *EmailService) SendVerificationEmail(toEmail, userName, token string) error {
 	subject := "Verify Your Email Address"
 	verificationURL := fmt.Sprintf("http://localhost:8880/v1/auth/verify-email?token=%s", token)
-	
+
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
@@ -111,7 +111,7 @@ The Lihatin Team
 func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) error {
 	subject := "Reset Your Password"
 	resetURL := fmt.Sprintf("http://localhost:8880/v1/auth/reset-password?token=%s", token)
-	
+
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
@@ -172,7 +172,7 @@ The Lihatin Team
 // SendTOTPSetupEmail sends TOTP setup confirmation email
 func (es *EmailService) SendTOTPSetupEmail(toEmail, userName string) error {
 	subject := "Two-Factor Authentication Enabled"
-	
+
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
@@ -230,7 +230,7 @@ The Lihatin Team
 func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAgent string) error {
 	subject := "New Login to Your Account"
 	loginTime := time.Now().Format("January 2, 2006 at 3:04 PM MST")
-	
+
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>

@@ -15,15 +15,15 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Basic authentication
 		authGroup.POST("/login", authController.Login)
 		authGroup.POST("/register", authController.Register)
-		
+
 		// Password reset flow
 		authGroup.POST("/forgot-password", authController.ForgotPassword)
 		authGroup.POST("/reset-password", authController.ResetPassword)
-		
+
 		// Email verification
 		authGroup.GET("/verify-email", authController.VerifyEmail)
 		authGroup.POST("/resend-verification", authController.ResendVerification)
-		
+
 		// Token refresh
 		authGroup.POST("/refresh-token", authController.RefreshToken)
 	}
@@ -36,7 +36,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.POST("/logout", authController.Logout)
 		protectedAuth.POST("/change-password", authController.ChangePassword)
 		protectedAuth.GET("/profile", authController.GetProfile)
-		
+
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")
 		{
@@ -46,7 +46,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 			totpGroup.GET("/recovery-codes", authController.GetRecoveryCodes)
 			totpGroup.POST("/regenerate-recovery-codes", authController.RegenerateRecoveryCodes)
 		}
-		
+
 		// Email verification for authenticated users
 		protectedAuth.POST("/send-verification-email", authController.SendVerificationEmail)
 	}

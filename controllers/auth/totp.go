@@ -129,10 +129,10 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
-			"secret":          utils.FormatTOTPSecret(totpConfig.Secret),
-			"qr_code_url":     qrCodeURL,
-			"recovery_codes":  recoveryCodes,
-			"backup_codes":    recoveryCodes, // Alternative name
+			"secret":         utils.FormatTOTPSecret(totpConfig.Secret),
+			"qr_code_url":    qrCodeURL,
+			"recovery_codes": recoveryCodes,
+			"backup_codes":   recoveryCodes, // Alternative name
 		},
 		Message: "TOTP setup initiated. Please verify with your authenticator app.",
 		Error:   nil,
@@ -494,10 +494,10 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 		if err == nil {
 			recoveryCodes, _ := c.repo.GetAuthMethodRepository().GetRecoveryCodes(userAuth.ID)
 			totpData = map[string]interface{}{
-				"enabled":            true,
-				"verified":           totpMethod.IsVerified,
-				"friendly_name":      totpMethod.FriendlyName,
-				"last_used":          totpMethod.LastUsedAt,
+				"enabled":             true,
+				"verified":            totpMethod.IsVerified,
+				"friendly_name":       totpMethod.FriendlyName,
+				"last_used":           totpMethod.LastUsedAt,
 				"recovery_codes_left": len(recoveryCodes),
 			}
 		}

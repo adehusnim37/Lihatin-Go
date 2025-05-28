@@ -125,7 +125,7 @@ func (ur *userRepository) CreateUser(user *models.User) error {
 	now := time.Now()
 	u := uuid.Must(uuid.NewRandom())
 	user.ID = u.String() // Set the generated ID back to the user struct
-	
+
 	_, err = ur.db.Exec("INSERT INTO users (id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		user.ID, user.FirstName, user.LastName, user.Email, hashedPassword, now, now, nil, user.IsPremium, user.Avatar, user.Username)
 	if err != nil {
@@ -282,7 +282,7 @@ func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]models
 	          locked_at, COALESCE(locked_reason, ''), COALESCE(role, 'user')
 	          FROM users WHERE deleted_at IS NULL 
 	          ORDER BY created_at DESC LIMIT ? OFFSET ?`
-	
+
 	rows, err := ur.db.Query(query, limit, offset)
 	if err != nil {
 		log.Printf("GetAllUsersWithPagination: Error executing query: %v", err)
@@ -294,7 +294,7 @@ func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]models
 	for rows.Next() {
 		var user models.User
 		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
-			&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar, 
+			&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar,
 			&user.Username, &user.IsLocked, &user.LockedAt, &user.LockedReason, &user.Role); err != nil {
 			log.Printf("GetAllUsersWithPagination: Error scanning user: %v", err)
 			return nil, 0, err
@@ -309,8 +309,8 @@ func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]models
 func (ur *userRepository) LockUser(userID, reason string) error {
 	now := time.Now()
 	_, err := ur.db.Exec(`UPDATE users SET is_locked = ?, locked_at = ?, locked_reason = ?, updated_at = ? 
-	                      WHERE id = ? AND deleted_at IS NULL`, 
-	                      true, now, reason, now, userID)
+	                      WHERE id = ? AND deleted_at IS NULL`,
+		true, now, reason, now, userID)
 	if err != nil {
 		log.Printf("LockUser: Error locking user %s: %v", userID, err)
 	}
@@ -324,10 +324,10 @@ func (ur *userRepository) UnlockUser(userID, reason string) error {
 	if reason != "" {
 		unlockReason = reason
 	}
-	
+
 	_, err := ur.db.Exec(`UPDATE users SET is_locked = ?, locked_at = NULL, locked_reason = ?, updated_at = ? 
-	                      WHERE id = ? AND deleted_at IS NULL`, 
-	                      false, unlockReason, now, userID)
+	                      WHERE id = ? AND deleted_at IS NULL`,
+		false, unlockReason, now, userID)
 	if err != nil {
 		log.Printf("UnlockUser: Error unlocking user %s: %v", userID, err)
 	}

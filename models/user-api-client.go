@@ -11,19 +11,19 @@ import (
 // APIClient represents an external application or service that is authorized
 // to access your API. It can be associated with a User who manages it.
 type APIClient struct {
-	ID        string `json:"id"`      // Primary Key (e.g., UUID)
-	UserID    string `json:"user_id"` // Foreign Key to User.ID - the user who owns/manages this client
-	User      *User  `json:"user,omitempty" gorm:"foreignKey:UserID"` // Optional: for eager loading
+	ID     string `json:"id"`                                      // Primary Key (e.g., UUID)
+	UserID string `json:"user_id"`                                 // Foreign Key to User.ID - the user who owns/manages this client
+	User   *User  `json:"user,omitempty" gorm:"foreignKey:UserID"` // Optional: for eager loading
 
-	Name         string     `json:"name" validate:"required,min=3,max=100"` // User-friendly name for the client (e.g., "Partner X Integration", "Mobile App Backend")
-	Description  string     `json:"description,omitempty" validate:"max=500"`
-	IsEnabled    bool       `json:"is_enabled" default:"true"` // Whether this client and its keys are active
-	RateLimit    int        `json:"rate_limit,omitempty"`      // Optional: custom rate limit (requests per period)
-	AllowedIPs   []string   `json:"allowed_ips,omitempty"`     // Optional: restrict API access to specific IP addresses (store as JSON array or comma-separated string)
-	WebhookURL   string     `json:"webhook_url,omitempty" validate:"omitempty,url"` // Optional: for sending notifications to the client
-	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`    // Timestamp of the last successful API call by any key of this client
-	RevokedAt    *time.Time `json:"revoked_at,omitempty"`      // If the entire client access is revoked
-	Scopes       []string   `json:"scopes,omitempty"`          // List of permissions/scopes granted to this client (e.g., "read:products", "write:orders")
+	Name        string     `json:"name" validate:"required,min=3,max=100"` // User-friendly name for the client (e.g., "Partner X Integration", "Mobile App Backend")
+	Description string     `json:"description,omitempty" validate:"max=500"`
+	IsEnabled   bool       `json:"is_enabled" default:"true"`                      // Whether this client and its keys are active
+	RateLimit   int        `json:"rate_limit,omitempty"`                           // Optional: custom rate limit (requests per period)
+	AllowedIPs  []string   `json:"allowed_ips,omitempty"`                          // Optional: restrict API access to specific IP addresses (store as JSON array or comma-separated string)
+	WebhookURL  string     `json:"webhook_url,omitempty" validate:"omitempty,url"` // Optional: for sending notifications to the client
+	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`                         // Timestamp of the last successful API call by any key of this client
+	RevokedAt   *time.Time `json:"revoked_at,omitempty"`                           // If the entire client access is revoked
+	Scopes      []string   `json:"scopes,omitempty"`                               // List of permissions/scopes granted to this client (e.g., "read:products", "write:orders")
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -33,8 +33,8 @@ type APIClient struct {
 // APIClientKey holds the actual credentials for an APIClient.
 // An APIClient can have multiple keys (e.g., for rotation).
 type APIClientKey struct {
-	ID          string `json:"id"`           // Primary Key (e.g., UUID) - This is often the "Client ID" or "Access Key ID" part
-	APIClientID string `json:"api_client_id"` // Foreign Key to APIClient.ID
+	ID          string     `json:"id"`                              // Primary Key (e.g., UUID) - This is often the "Client ID" or "Access Key ID" part
+	APIClientID string     `json:"api_client_id"`                   // Foreign Key to APIClient.ID
 	APIClient   *APIClient `json:"-" gorm:"foreignKey:APIClientID"` // Optional: for eager loading
 
 	// The SecretKeyHash stores the HASH of the secret key.
@@ -51,9 +51,9 @@ type APIClientKey struct {
 	KeyPreview string `json:"key_preview,omitempty" validate:"max=10"`
 
 	IsEnabled  bool       `json:"is_enabled" default:"true"` // Whether this specific key is active
-	ExpiresAt  *time.Time `json:"expires_at,omitempty"`    // Optional: for keys that automatically expire
-	LastUsedAt *time.Time `json:"last_used_at,omitempty"`  // Timestamp of the last successful API call with this specific key
-	RevokedAt  *time.Time `json:"revoked_at,omitempty"`    // If this specific key is revoked
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`      // Optional: for keys that automatically expire
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`    // Timestamp of the last successful API call with this specific key
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`      // If this specific key is revoked
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -77,11 +77,12 @@ const (
 // The HASH of the Secret Key is what you should store.
 //
 // Returns:
-//   keyID (string): The full API Key ID (e.g., "sk_live_xxxxxxxxxxxx"). To be stored and used by the client.
-//   secretKey (string): The plaintext secret key. SHOW THIS TO THE USER ONCE. DO NOT STORE.
-//   secretKeyHash (string): The SHA256 hash of the secret key. STORE THIS in APIClientKey.SecretKeyHash.
-//   keyPreview (string): Last few characters of keyID for display.
-//   error: Any error during generation.
+//
+//	keyID (string): The full API Key ID (e.g., "sk_live_xxxxxxxxxxxx"). To be stored and used by the client.
+//	secretKey (string): The plaintext secret key. SHOW THIS TO THE USER ONCE. DO NOT STORE.
+//	secretKeyHash (string): The SHA256 hash of the secret key. STORE THIS in APIClientKey.SecretKeyHash.
+//	keyPreview (string): Last few characters of keyID for display.
+//	error: Any error during generation.
 func GenerateAPIKeyPair(prefix string) (keyID, secretKey, secretKeyHash, keyPreview string, err error) {
 	if prefix == "" {
 		prefix = DefaultKeyPrefix
@@ -101,7 +102,6 @@ func GenerateAPIKeyPair(prefix string) (keyID, secretKey, secretKeyHash, keyPrev
 	} else {
 		keyPreview = keyID
 	}
-
 
 	// Generate Secret Key part
 	secretBytes := make([]byte, SecretByteLength)

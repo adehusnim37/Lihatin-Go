@@ -108,14 +108,14 @@ func (c *Controller) Register(ctx *gin.Context) {
 
 	// Create user auth record for email verification
 	userAuth := &models.UserAuth{
-		ID:                              uuid.New().String(), // Generate proper ID
-		UserID:                          user.ID,
-		PasswordHash:                    hashedPassword, // Use the same hashed password
-		IsEmailVerified:                 false,
-		EmailVerificationToken:          "verification-token", // TODO: Generate proper token
-		IsActive:                        true,
+		ID:                     uuid.New().String(), // Generate proper ID
+		UserID:                 user.ID,
+		PasswordHash:           hashedPassword, // Use the same hashed password
+		IsEmailVerified:        false,
+		EmailVerificationToken: "verification-token", // TODO: Generate proper token
+		IsActive:               true,
 	}
-	
+
 	if err := c.repo.GetUserAuthRepository().CreateUserAuth(userAuth); err != nil {
 		// Log error but don't fail registration
 		// User can verify email later
@@ -282,15 +282,15 @@ func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
 
 	// Create premium status response
 	premiumStatus := map[string]interface{}{
-		"user_id":          user.ID,
-		"is_premium":       user.IsPremium,
-		"premium_since":    nil, // TODO: Add premium_since field to user model
+		"user_id":           user.ID,
+		"is_premium":        user.IsPremium,
+		"premium_since":     nil, // TODO: Add premium_since field to user model
 		"subscription_type": map[bool]string{true: "premium", false: "free"}[user.IsPremium],
 		"features": map[string]interface{}{
-			"unlimited_uploads": user.IsPremium,
-			"priority_support": user.IsPremium,
+			"unlimited_uploads":  user.IsPremium,
+			"priority_support":   user.IsPremium,
 			"advanced_analytics": user.IsPremium,
-			"custom_branding": user.IsPremium,
+			"custom_branding":    user.IsPremium,
 		},
 	}
 
@@ -307,21 +307,21 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	// Parse pagination parameters
 	page := 1
 	limit := 20
-	
+
 	if pageStr := ctx.Query("page"); pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
 		}
 	}
-	
+
 	if limitStr := ctx.Query("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 	}
-	
+
 	offset := (page - 1) * limit
-	
+
 	// Get users with pagination
 	users, totalCount, err := c.repo.GetUserRepository().GetAllUsersWithPagination(limit, offset)
 	if err != nil {
@@ -333,7 +333,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Convert to admin response format (remove passwords)
 	adminUsers := make([]models.AdminUserResponse, len(users))
 	for i, user := range users {
@@ -352,9 +352,9 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 			Role:         user.Role,
 		}
 	}
-	
+
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
-	
+
 	response := models.PaginatedUsersResponse{
 		Users:      adminUsers,
 		TotalCount: totalCount,
@@ -362,7 +362,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		Limit:      limit,
 		TotalPages: totalPages,
 	}
-	
+
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    response,
@@ -383,7 +383,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	var req models.AdminLockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, models.APIResponse{
@@ -394,7 +394,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Validate request
 	if err := c.Validate.Struct(req); err != nil {
 		ctx.JSON(http.StatusBadRequest, models.APIResponse{
@@ -405,7 +405,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check if user exists
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
@@ -417,7 +417,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check if user is already locked
 	if user.IsLocked {
 		ctx.JSON(http.StatusConflict, models.APIResponse{
@@ -428,7 +428,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Lock the user
 	if err := c.repo.GetUserRepository().LockUser(userID, req.Reason); err != nil {
 		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
@@ -439,7 +439,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    nil,
@@ -460,13 +460,13 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	var req models.AdminUnlockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// Allow empty body for unlock requests
 		req = models.AdminUnlockUserRequest{}
 	}
-	
+
 	// Validate request if reason is provided
 	if req.Reason != "" {
 		if err := c.Validate.Struct(req); err != nil {
@@ -479,7 +479,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 			return
 		}
 	}
-	
+
 	// Check if user exists
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
@@ -491,7 +491,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check if user is actually locked
 	if !user.IsLocked {
 		ctx.JSON(http.StatusConflict, models.APIResponse{
@@ -502,7 +502,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Unlock the user
 	if err := c.repo.GetUserRepository().UnlockUser(userID, req.Reason); err != nil {
 		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
@@ -513,7 +513,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    nil,
@@ -527,21 +527,21 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 	// Parse pagination parameters
 	page := 1
 	limit := 50
-	
+
 	if pageStr := ctx.Query("page"); pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
 		}
 	}
-	
+
 	if limitStr := ctx.Query("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 500 {
 			limit = l
 		}
 	}
-	
+
 	offset := (page - 1) * limit
-	
+
 	// Get login attempts
 	attempts, totalCount, err := c.repo.GetLoginAttemptRepository().GetAllLoginAttempts(limit, offset)
 	if err != nil {
@@ -553,9 +553,9 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
-	
+
 	response := map[string]interface{}{
 		"attempts":    attempts,
 		"total_count": totalCount,
@@ -563,7 +563,7 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 		"limit":       limit,
 		"total_pages": totalPages,
 	}
-	
+
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    response,
@@ -585,7 +585,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Get user's API keys
 	apiKeys, err := c.repo.GetAPIKeyRepository().GetAPIKeysByUserID(userID.(string))
 	if err != nil {
@@ -597,7 +597,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Convert to response format (hide sensitive data)
 	responses := make([]models.APIKeyResponse, len(apiKeys))
 	for i, key := range apiKeys {
@@ -612,7 +612,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 			CreatedAt:   key.CreatedAt,
 		}
 	}
-	
+
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    responses,
@@ -634,7 +634,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	var req models.APIKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, models.APIResponse{
@@ -645,7 +645,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Validate request
 	if err := c.Validate.Struct(req); err != nil {
 		ctx.JSON(http.StatusBadRequest, models.APIResponse{
@@ -656,12 +656,12 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Create API key
 	apiKey, keyString, err := c.repo.GetAPIKeyRepository().CreateAPIKey(
-		userID.(string), 
-		req.Name, 
-		req.ExpiresAt, 
+		userID.(string),
+		req.Name,
+		req.ExpiresAt,
 		req.Permissions,
 	)
 	if err != nil {
@@ -673,7 +673,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Return the key with the full key string (this is the only time it's shown)
 	response := map[string]interface{}{
 		"id":          apiKey.ID,
@@ -684,7 +684,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		"created_at":  apiKey.CreatedAt,
 		"warning":     "This is the only time the full API key will be shown. Please save it securely.",
 	}
-	
+
 	ctx.JSON(http.StatusCreated, models.APIResponse{
 		Success: true,
 		Data:    response,
@@ -706,7 +706,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	keyID := ctx.Param("key_id")
 	if keyID == "" {
 		ctx.JSON(http.StatusBadRequest, models.APIResponse{
@@ -717,7 +717,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check if API key exists and belongs to the user
 	apiKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(keyID)
 	if err != nil {
@@ -729,7 +729,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Check ownership
 	if apiKey.UserID != userID.(string) {
 		ctx.JSON(http.StatusForbidden, models.APIResponse{
@@ -740,7 +740,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Revoke the API key
 	if err := c.repo.GetAPIKeyRepository().RevokeAPIKey(keyID); err != nil {
 		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
@@ -751,7 +751,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 		})
 		return
 	}
-	
+
 	ctx.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
 		Data:    nil,
@@ -823,11 +823,11 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 
 	// Prepare updates map
 	updates := make(map[string]interface{})
-	
+
 	if req.Name != nil {
 		updates["name"] = *req.Name
 	}
-	
+
 	if req.ExpiresAt != nil {
 		// Validate expiration date is in the future
 		if req.ExpiresAt.Before(time.Now()) {
@@ -841,7 +841,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		}
 		updates["expires_at"] = *req.ExpiresAt
 	}
-	
+
 	if req.Permissions != nil {
 		// Validate permissions (you can add custom validation logic here)
 		validPermissions := []string{"read", "write", "admin"}
@@ -865,7 +865,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		}
 		updates["permissions"] = req.Permissions
 	}
-	
+
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
 	}
