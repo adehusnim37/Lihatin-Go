@@ -12,8 +12,4 @@ func RegisterUserRoutes(rg *gin.RouterGroup, userController *user.Controller) {
 	users.POST("/", userController.Create)
 	users.PUT("/:id", userController.Update)
 	users.DELETE("/:id", userController.Delete)
-
-	// Authentication routes
-	auth := rg.Group("/auth")
-	auth.POST("/login", userController.Login)
 }
