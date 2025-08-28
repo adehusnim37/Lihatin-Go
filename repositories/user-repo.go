@@ -6,23 +6,23 @@ import (
 	"log"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
 )
 
 // UserRepository defines the methods for user-related database operations
 type UserRepository interface {
-	GetAllUsers() ([]models.User, error)
-	GetUserByID(id string) (*models.User, error)
-	GetUserByEmailOrUsername(input string) (*models.User, error)
-	GetUserForLogin(emailOrUsername string) (*models.User, error)
-	CheckPremiumByUsernameOrEmail(inputs string) (*models.User, error)
-	CreateUser(user *models.User) error
-	UpdateUser(id string, user *models.User) error
+	GetAllUsers() ([]user.User, error)
+	GetUserByID(id string) (*user.User, error)
+	GetUserByEmailOrUsername(input string) (*user.User, error)
+	GetUserForLogin(emailOrUsername string) (*user.User, error)
+	CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error)
+	CreateUser(user *user.User) error
+	UpdateUser(id string, user *user.UpdateUser) error
 	DeleteUserPermanent(id string) error
 	// Admin methods
-	GetAllUsersWithPagination(limit, offset int) ([]models.User, int64, error)
+	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
 	LockUser(userID, reason string) error
 	UnlockUser(userID, reason string) error
 	IsUserLocked(userID string) (bool, error)
@@ -38,7 +38,7 @@ func NewUserRepository(db *sql.DB) UserRepository {
 	}
 }
 
-func (ur *userRepository) GetAllUsers() ([]models.User, error) {
+func (ur *userRepository) GetAllUsers() ([]user.User, error) {
 	rows, err := ur.db.Query("SELECT id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username FROM users")
 	if err != nil {
 		log.Printf(`Error executing query: %v`, err)
@@ -46,9 +46,9 @@ func (ur *userRepository) GetAllUsers() ([]models.User, error) {
 	}
 	defer rows.Close()
 
-	var users []models.User
+	var users []user.User
 	for rows.Next() {
-		var user models.User
+		var user user.User
 
 		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
 			&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar, &user.Username); err != nil {
@@ -62,13 +62,13 @@ func (ur *userRepository) GetAllUsers() ([]models.User, error) {
 	return users, nil
 }
 
-func (ur *userRepository) GetUserByID(id string) (*models.User, error) {
+func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
 	// First log the query we're about to execute for debugging
 	log.Printf("GetUserByID: Executing query for ID: %s", id)
 
 	row := ur.db.QueryRow("SELECT id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username FROM users WHERE id = ?", id)
 
-	var user models.User
+	var user user.User
 
 	if err := row.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
 		&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar, &user.Username); err != nil {
@@ -80,10 +80,10 @@ func (ur *userRepository) GetUserByID(id string) (*models.User, error) {
 	return &user, nil
 }
 
-func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (*models.User, error) {
+func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error) {
 	row := ur.db.QueryRow("SELECT is_premium FROM users WHERE username = ? OR email = ?", inputs, inputs)
 
-	var user models.User
+	var user user.User
 	if err := row.Scan(&user.IsPremium); err != nil {
 		if err == sql.ErrNoRows {
 			// No user found with this username/email
@@ -95,11 +95,11 @@ func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (*models.
 	return &user, nil
 }
 
-func (ur *userRepository) GetUserByEmailOrUsername(input string) (*models.User, error) {
+func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {
 	// Check if it's an email or username
 	row := ur.db.QueryRow("SELECT id, email, username FROM users WHERE email = ? OR username = ?", input, input)
 
-	var user models.User
+	var user user.User
 	err := row.Scan(&user.ID, &user.Email, &user.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -114,7 +114,7 @@ func (ur *userRepository) GetUserByEmailOrUsername(input string) (*models.User, 
 	return &user, nil
 }
 
-func (ur *userRepository) CreateUser(user *models.User) error {
+func (ur *userRepository) CreateUser(user *user.User) error {
 	// Hash the password before storing
 	hashedPassword, err := utils.HashPassword(user.Password)
 	if err != nil {
@@ -134,7 +134,7 @@ func (ur *userRepository) CreateUser(user *models.User) error {
 	return err
 }
 
-func (ur *userRepository) UpdateUser(id string, user *models.User) error {
+func (ur *userRepository) UpdateUser(id string, user *user.UpdateUser) error {
 	// First, get the current user data to compare
 	currentUser, err := ur.GetUserByID(id)
 	if err != nil {
@@ -234,7 +234,7 @@ func (ur *userRepository) UpdateUser(id string, user *models.User) error {
 	return err
 }
 
-func (ur *userRepository) GetUserForLogin(emailOrUsername string) (*models.User, error) {
+func (ur *userRepository) GetUserForLogin(emailOrUsername string) (*user.User, error) {
 	log.Printf("GetUserForLogin: Attempting login for: %s", emailOrUsername)
 
 	row := ur.db.QueryRow(`
@@ -244,7 +244,7 @@ func (ur *userRepository) GetUserForLogin(emailOrUsername string) (*models.User,
 		WHERE (email = ? OR username = ?) AND deleted_at IS NULL`,
 		emailOrUsername, emailOrUsername)
 
-	var user models.User
+	var user user.User
 	if err := row.Scan(&user.ID, &user.Username, &user.FirstName, &user.LastName,
 		&user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt,
 		&user.DeletedAt, &user.IsPremium, &user.Avatar); err != nil {
@@ -267,7 +267,7 @@ func (ur *userRepository) DeleteUserPermanent(id string) error {
 }
 
 // GetAllUsersWithPagination retrieves all users with pagination (admin only)
-func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]models.User, int64, error) {
+func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error) {
 	// Get total count
 	var totalCount int64
 	row := ur.db.QueryRow("SELECT COUNT(*) FROM users WHERE deleted_at IS NULL")
@@ -290,9 +290,9 @@ func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]models
 	}
 	defer rows.Close()
 
-	var users []models.User
+	var users []user.User
 	for rows.Next() {
-		var user models.User
+		var user user.User
 		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
 			&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar,
 			&user.Username, &user.IsLocked, &user.LockedAt, &user.LockedReason, &user.Role); err != nil {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
@@ -16,7 +16,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Authorization header required",
@@ -28,7 +28,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 
 		token := utils.ExtractTokenFromHeader(authHeader)
 		if token == "" {
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid authorization header format",
@@ -40,7 +40,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 
 		claims, err := utils.ValidateJWT(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid or expired token",
@@ -53,7 +53,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 		// Optionally verify user still exists and is active
 		user, err := userRepo.GetUserByID(claims.UserID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "User not found",
@@ -81,7 +81,7 @@ func RequireEmailVerification() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		isVerified, exists := c.Get("is_verified")
 		if !exists || !isVerified.(bool) {
-			c.JSON(http.StatusForbidden, models.APIResponse{
+			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Email verification required",
@@ -99,7 +99,7 @@ func RequirePremium() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		isPremium, exists := c.Get("is_premium")
 		if !exists || !isPremium.(bool) {
-			c.JSON(http.StatusForbidden, models.APIResponse{
+			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Premium access required",
@@ -117,7 +117,7 @@ func RequireRole(requiredRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
 		if !exists || role.(string) != requiredRole {
-			c.JSON(http.StatusForbidden, models.APIResponse{
+			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Insufficient permissions",
@@ -171,7 +171,7 @@ func RateLimitMiddleware() gin.HandlerFunc {
 
 		// Reset counter every minute (simplified)
 		if requestCounts[clientIP] > 100 { // 100 requests per minute
-			c.JSON(http.StatusTooManyRequests, models.APIResponse{
+			c.JSON(http.StatusTooManyRequests, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Rate limit exceeded",
@@ -245,7 +245,7 @@ func IPWhitelistMiddleware(whitelist []string) gin.HandlerFunc {
 			}
 		}
 
-		c.JSON(http.StatusForbidden, models.APIResponse{
+		c.JSON(http.StatusForbidden, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Access denied",
@@ -260,7 +260,7 @@ func APIKeyMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey == "" {
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "API key required",
@@ -274,7 +274,7 @@ func APIKeyMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 		// This is a placeholder - implement based on your UserAPIClient model
 		valid := validateAPIKey(apiKey, userRepo)
 		if !valid {
-			c.JSON(http.StatusUnauthorized, models.APIResponse{
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid API key",

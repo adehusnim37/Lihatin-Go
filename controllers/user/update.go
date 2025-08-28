@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
@@ -12,9 +13,9 @@ import (
 // Update memperbarui user yang ada
 func (c *Controller) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
-	var user models.UpdateUser
+	var user user.UpdateUser
 	if err := ctx.ShouldBindJSON(&user); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -46,7 +47,7 @@ func (c *Controller) Update(ctx *gin.Context) {
 			}
 		}
 
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -58,7 +59,7 @@ func (c *Controller) Update(ctx *gin.Context) {
 	_, err := c.repo.GetUserByID(id) // Check if user exists
 	if err != nil {
 		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusNotFound, models.APIResponse{
+			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "User not found",
@@ -66,7 +67,7 @@ func (c *Controller) Update(ctx *gin.Context) {
 			})
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to retrieve user",
@@ -78,7 +79,7 @@ func (c *Controller) Update(ctx *gin.Context) {
 	if err := c.repo.UpdateUser(id, &user); err != nil {
 		// Check if it's an email duplication error
 		if err.Error() == "email already exists" {
-			ctx.JSON(http.StatusConflict, models.APIResponse{
+			ctx.JSON(http.StatusConflict, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Email already exists",
@@ -87,7 +88,7 @@ func (c *Controller) Update(ctx *gin.Context) {
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to update user",
@@ -95,7 +96,7 @@ func (c *Controller) Update(ctx *gin.Context) {
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    user,
 		Message: "User updated successfully",
