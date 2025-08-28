@@ -3,7 +3,8 @@ package auth
 import (
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -12,7 +13,7 @@ import (
 func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -24,7 +25,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Get user information
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -36,7 +37,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get auth data",
@@ -48,7 +49,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Check if TOTP is already enabled
 	hasTOTP, err := c.repo.GetAuthMethodRepository().HasTOTPEnabled(userAuth.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to check TOTP status",
@@ -58,7 +59,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	}
 
 	if hasTOTP {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "TOTP already enabled",
@@ -70,7 +71,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Generate TOTP secret
 	totpConfig, err := utils.GenerateTOTPSecret("Lihatin", user.Email)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate TOTP secret",
@@ -82,7 +83,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Encrypt secret for storage
 	encryptedSecret, err := utils.EncryptTOTPSecret(totpConfig.Secret)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to encrypt secret",
@@ -94,7 +95,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Generate recovery codes
 	recoveryCodes, err := utils.GenerateRecoveryCodes(8)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate recovery codes",
@@ -114,7 +115,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 		"Authenticator App",
 	)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to setup TOTP",
@@ -126,7 +127,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Generate QR code URL
 	qrCodeURL := utils.GenerateQRCodeURL(totpConfig)
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
 			"secret":         utils.FormatTOTPSecret(totpConfig.Secret),
@@ -143,7 +144,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -157,7 +158,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -167,7 +168,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	}
 
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -179,7 +180,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get auth data",
@@ -191,7 +192,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	// Get TOTP secret
 	encryptedSecret, err := c.repo.GetAuthMethodRepository().GetTOTPSecret(userAuth.ID)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "TOTP not found",
@@ -203,7 +204,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	// Decrypt secret
 	secret, err := utils.DecryptTOTPSecret(encryptedSecret)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to decrypt secret",
@@ -214,7 +215,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 
 	// Validate TOTP code
 	if !utils.ValidateTOTPCodeWithWindow(secret, req.Code, 1) {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid TOTP code",
@@ -224,9 +225,9 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	}
 
 	// Get TOTP auth method to verify it
-	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, models.AuthMethodTypeTOTP)
+	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, user.AuthMethodTypeTOTP)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get TOTP method",
@@ -237,7 +238,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 
 	// Mark TOTP as verified
 	if err := c.repo.GetAuthMethodRepository().VerifyAuthMethod(totpMethod.ID); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to verify TOTP",
@@ -253,7 +254,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 		go c.emailService.SendTOTPSetupEmail(user.Email, user.FirstName)
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "Two-factor authentication enabled successfully",
@@ -269,7 +270,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -279,7 +280,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	}
 
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -291,7 +292,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	// Validate JWT token
 	claims, err := utils.ValidateJWT(req.Token)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid token",
@@ -303,7 +304,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(claims.UserID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get auth data",
@@ -315,7 +316,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	// Get TOTP secret
 	encryptedSecret, err := c.repo.GetAuthMethodRepository().GetTOTPSecret(userAuth.ID)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "TOTP not enabled",
@@ -327,7 +328,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	// Decrypt secret
 	secret, err := utils.DecryptTOTPSecret(encryptedSecret)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to decrypt secret",
@@ -345,7 +346,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 			updatedCodes := utils.RemoveRecoveryCode(recoveryCodes, req.Code)
 			c.repo.GetAuthMethodRepository().UpdateRecoveryCodes(userAuth.ID, updatedCodes)
 		} else {
-			ctx.JSON(http.StatusBadRequest, models.APIResponse{
+			ctx.JSON(http.StatusBadRequest, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid code",
@@ -356,12 +357,12 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	}
 
 	// Update last used timestamp
-	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, models.AuthMethodTypeTOTP)
+	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, user.AuthMethodTypeTOTP)
 	if err == nil {
 		c.repo.GetAuthMethodRepository().UpdateLastUsed(totpMethod.ID)
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    map[string]interface{}{"authenticated": true},
 		Message: "Two-factor authentication successful",
@@ -373,7 +374,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -387,7 +388,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -399,7 +400,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get auth data",
@@ -410,7 +411,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 
 	// Verify password
 	if err := utils.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid password",
@@ -420,9 +421,9 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	}
 
 	// Get TOTP method
-	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, models.AuthMethodTypeTOTP)
+	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, user.AuthMethodTypeTOTP)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "TOTP not enabled",
@@ -433,7 +434,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 
 	// Delete TOTP method
 	if err := c.repo.GetAuthMethodRepository().DeleteAuthMethod(totpMethod.ID); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to disable TOTP",
@@ -442,7 +443,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "Two-factor authentication disabled successfully",
@@ -454,7 +455,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -466,7 +467,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get auth data",
@@ -478,7 +479,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 	// Check if TOTP is enabled
 	hasTOTP, err := c.repo.GetAuthMethodRepository().HasTOTPEnabled(userAuth.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to check TOTP status",
@@ -490,7 +491,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 	var totpData map[string]interface{}
 	if hasTOTP {
 		// Get TOTP method details
-		totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, models.AuthMethodTypeTOTP)
+		totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, user.AuthMethodTypeTOTP)
 		if err == nil {
 			recoveryCodes, _ := c.repo.GetAuthMethodRepository().GetRecoveryCodes(userAuth.ID)
 			totpData = map[string]interface{}{
@@ -507,7 +508,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    totpData,
 		Message: "TOTP status retrieved successfully",
@@ -519,7 +520,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -533,7 +534,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -545,7 +546,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get auth data",
@@ -556,7 +557,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 
 	// Verify password
 	if err := utils.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid password",
@@ -568,7 +569,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	// Check if TOTP is enabled
 	hasTOTP, err := c.repo.GetAuthMethodRepository().HasTOTPEnabled(userAuth.ID)
 	if err != nil || !hasTOTP {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "TOTP not enabled",
@@ -580,7 +581,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	// Generate new recovery codes
 	recoveryCodes, err := utils.GenerateRecoveryCodes(8)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate recovery codes",
@@ -594,7 +595,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 
 	// Update recovery codes in database
 	if err := c.repo.GetAuthMethodRepository().UpdateRecoveryCodes(userAuth.ID, hashedRecoveryCodes); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to update recovery codes",
@@ -603,7 +604,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
 			"recovery_codes": recoveryCodes,

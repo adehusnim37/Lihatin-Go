@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +13,7 @@ import (
 func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -25,7 +25,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 	// Get user information
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -37,7 +37,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 	// Check if user is already verified
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to check verification status",
@@ -47,7 +47,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 	}
 
 	if userAuth.IsEmailVerified {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Email already verified",
@@ -59,7 +59,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 	// Generate verification token
 	token, err := utils.GenerateVerificationToken()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate verification token",
@@ -73,7 +73,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 
 	// Save token to database
 	if err := c.repo.GetUserAuthRepository().SetEmailVerificationToken(user.ID, token, expiresAt); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to save verification token",
@@ -84,7 +84,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 
 	// Send verification email
 	if err := c.emailService.SendVerificationEmail(user.Email, user.FirstName, token); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to send verification email",
@@ -93,7 +93,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    map[string]interface{}{"sent_to": user.Email},
 		Message: "Verification email sent successfully",
@@ -105,7 +105,7 @@ func (c *Controller) SendVerificationEmail(ctx *gin.Context) {
 func (c *Controller) VerifyEmail(ctx *gin.Context) {
 	token := ctx.Query("token")
 	if token == "" {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Verification token required",
@@ -116,7 +116,7 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 
 	// Verify email with token
 	if err := c.repo.GetUserAuthRepository().VerifyEmail(token); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Email verification failed",
@@ -125,7 +125,7 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "Email verified successfully",
@@ -140,7 +140,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -150,7 +150,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	}
 
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -163,7 +163,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	user, err := c.repo.GetUserRepository().GetUserByEmailOrUsername(req.Email)
 	if err != nil {
 		// Always return success to prevent email enumeration
-		ctx.JSON(http.StatusOK, models.APIResponse{
+		ctx.JSON(http.StatusOK, common.APIResponse{
 			Success: true,
 			Data:    nil,
 			Message: "If an account with that email exists, a password reset link has been sent",
@@ -175,7 +175,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	// Generate reset token
 	token, err := utils.GeneratePasswordResetToken()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate reset token",
@@ -189,7 +189,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 
 	// Save token to database
 	if err := c.repo.GetUserAuthRepository().SetPasswordResetToken(user.ID, token, expiresAt); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to save reset token",
@@ -200,7 +200,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 
 	// Send reset email
 	if err := c.emailService.SendPasswordResetEmail(user.Email, user.FirstName, token); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to send reset email",
@@ -209,7 +209,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "If an account with that email exists, a password reset link has been sent",
@@ -225,7 +225,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -235,7 +235,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 	}
 
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -247,7 +247,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 	// Validate reset token
 	_, err := c.repo.GetUserAuthRepository().ValidatePasswordResetToken(req.Token)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Password reset failed",
@@ -259,7 +259,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 	// Hash new password
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Password reset failed",
@@ -270,7 +270,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 
 	// Reset password
 	if err := c.repo.GetUserAuthRepository().ResetPassword(req.Token, hashedPassword); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Password reset failed",
@@ -279,7 +279,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "Password reset successfully",
@@ -294,7 +294,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -306,7 +306,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	// Validate refresh token
 	userID, err := utils.ValidateRefreshToken(req.RefreshToken)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid refresh token",
@@ -318,7 +318,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	// Get user data
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -330,7 +330,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User auth not found",
@@ -343,7 +343,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	role := map[bool]string{true: "premium", false: "regular"}[user.IsPremium]
 	newToken, err := utils.GenerateJWT(user.ID, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate token",
@@ -352,7 +352,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
 			"token": newToken,
@@ -369,7 +369,7 @@ func (c *Controller) Logout(ctx *gin.Context) {
 	// 2. Clear any session data
 	// 3. Optionally revoke refresh tokens
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "Logged out successfully",
@@ -381,7 +381,7 @@ func (c *Controller) Logout(ctx *gin.Context) {
 func (c *Controller) ChangePassword(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -396,7 +396,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -406,7 +406,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	}
 
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -418,7 +418,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	// Get user auth data
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get user data",
@@ -429,7 +429,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 
 	// Verify current password
 	if err := utils.CheckPassword(userAuth.PasswordHash, req.CurrentPassword); err != nil {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid current password",
@@ -441,7 +441,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	// Hash new password
 	hashedPassword, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Password change failed",
@@ -452,7 +452,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 
 	// Update password
 	if err := c.repo.GetUserAuthRepository().UpdatePassword(userID.(string), hashedPassword); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Password change failed",
@@ -461,7 +461,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "Password changed successfully",
@@ -473,7 +473,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 func (c *Controller) ResendVerification(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -485,7 +485,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 	// Get user information
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -497,7 +497,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 	// Check if user is already verified
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to check verification status",
@@ -507,7 +507,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 	}
 
 	if userAuth.IsEmailVerified {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Email already verified",
@@ -518,7 +518,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 
 	// Check rate limiting - prevent too frequent resend requests
 	if userAuth.EmailVerificationTokenExpiresAt != nil && time.Until(*userAuth.EmailVerificationTokenExpiresAt) > 23*time.Hour {
-		ctx.JSON(http.StatusTooManyRequests, models.APIResponse{
+		ctx.JSON(http.StatusTooManyRequests, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Please wait before requesting another verification email",
@@ -530,7 +530,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 	// Generate new verification token
 	token, err := utils.GenerateVerificationToken()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to generate verification token",
@@ -544,7 +544,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 
 	// Save new token to database
 	if err := c.repo.GetUserAuthRepository().SetEmailVerificationToken(user.ID, token, expiresAt); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to save verification token",
@@ -555,7 +555,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 
 	// Send verification email
 	if err := c.emailService.SendVerificationEmail(user.Email, user.FirstName, token); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to send verification email",
@@ -564,7 +564,7 @@ func (c *Controller) ResendVerification(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    map[string]interface{}{"sent_to": user.Email},
 		Message: "Verification email sent successfully",

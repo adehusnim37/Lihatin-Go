@@ -3,7 +3,8 @@ package user
 import (
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,12 +12,12 @@ import (
 func (c *Controller) Delete(ctx *gin.Context) {
 	id := ctx.Param("id")
 	var err error
-	var user *models.User
+	var user *user.User
 
 	// Check if the user exists
 	user, err = c.repo.GetUserByID(id)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -28,7 +29,7 @@ func (c *Controller) Delete(ctx *gin.Context) {
 	// Check if the user is premium
 	premium, err := c.repo.CheckPremiumByUsernameOrEmail(user.Username)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to check user premium status",
@@ -38,7 +39,7 @@ func (c *Controller) Delete(ctx *gin.Context) {
 	}
 
 	if premium.IsPremium {
-		ctx.JSON(http.StatusForbidden, models.APIResponse{
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Cannot delete premium user",
@@ -54,7 +55,7 @@ func (c *Controller) Delete(ctx *gin.Context) {
 
 	var confirmation DeleteConfirmation
 	if err := ctx.ShouldBindJSON(&confirmation); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -64,7 +65,7 @@ func (c *Controller) Delete(ctx *gin.Context) {
 	}
 
 	if confirmation.Username != user.Username {
-		ctx.JSON(http.StatusForbidden, models.APIResponse{
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Username does not match",
@@ -74,7 +75,7 @@ func (c *Controller) Delete(ctx *gin.Context) {
 	}
 
 	if err = c.repo.DeleteUserPermanent(id); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to delete user",
@@ -82,7 +83,7 @@ func (c *Controller) Delete(ctx *gin.Context) {
 		})
 		return
 	}
-	ctx.JSON(http.StatusNoContent, models.APIResponse{
+	ctx.JSON(http.StatusNoContent, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "User deleted successfully. Thank you for using our service and have a great day! Any refund will not be processed if you delete your account",

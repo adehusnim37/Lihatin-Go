@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
@@ -38,11 +39,11 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 
 // Register creates a new user account
 func (c *Controller) Register(ctx *gin.Context) {
-	var req models.RegisterRequest
+	var req user.RegisterRequest
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -53,7 +54,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 
 	// Validate the request
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -65,7 +66,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	// Check if user already exists
 	existingUser, _ := c.repo.GetUserRepository().GetUserByEmailOrUsername(req.Email)
 	if existingUser != nil {
-		ctx.JSON(http.StatusConflict, models.APIResponse{
+		ctx.JSON(http.StatusConflict, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Registration failed",
@@ -77,7 +78,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	// Hash password
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Registration failed",
@@ -87,7 +88,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	// Create user
-	user := &models.User{
+	user := &user.User{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Email:     req.Email,
@@ -97,7 +98,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	if err := c.repo.GetUserRepository().CreateUser(user); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Registration failed",
@@ -107,8 +108,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	// Create user auth record for email verification
-	userAuth := &models.UserAuth{
-		ID:                     uuid.New().String(), // Generate proper ID
+	userAuth := &user.UserAuth{
 		UserID:                 user.ID,
 		PasswordHash:           hashedPassword, // Use the same hashed password
 		IsEmailVerified:        false,
@@ -124,7 +124,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	// Send verification email (optional, continue even if fails)
 	_ = c.emailService.SendVerificationEmail(user.Email, user.FirstName, "verification-token")
 
-	ctx.JSON(http.StatusCreated, models.APIResponse{
+	ctx.JSON(http.StatusCreated, common.APIResponse{
 		Success: true,
 		Data: gin.H{
 			"user_id": user.ID,
@@ -141,7 +141,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 func (c *Controller) GetProfile(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -153,7 +153,7 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 	// Get user information
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -165,7 +165,7 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 	// Get user auth information
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to get user authentication data",
@@ -189,7 +189,7 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 		"last_login_at":     userAuth.LastLoginAt,
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    profile,
 		Message: "Profile retrieved successfully",
@@ -201,7 +201,7 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -213,7 +213,7 @@ func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 	// Get user auth record first
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User authentication data not found",
@@ -223,9 +223,9 @@ func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 	}
 
 	// Get TOTP auth method
-	authMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, models.AuthMethodTypeTOTP)
+	authMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, user.AuthMethodTypeTOTP)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "No TOTP setup found",
@@ -235,7 +235,7 @@ func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 	}
 
 	if !authMethod.IsEnabled {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "TOTP not enabled",
@@ -244,7 +244,7 @@ func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: gin.H{
 			"recovery_codes": authMethod.RecoveryCodes,
@@ -259,7 +259,7 @@ func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -271,7 +271,7 @@ func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
 	// Get user information
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -294,7 +294,7 @@ func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
 		},
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    premiumStatus,
 		Message: "Premium status retrieved successfully",
@@ -325,7 +325,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	// Get users with pagination
 	users, totalCount, err := c.repo.GetUserRepository().GetAllUsersWithPagination(limit, offset)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to retrieve users",
@@ -335,9 +335,9 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	}
 
 	// Convert to admin response format (remove passwords)
-	adminUsers := make([]models.AdminUserResponse, len(users))
+	adminUsers := make([]user.AdminUserResponse, len(users))
 	for i, user := range users {
-		adminUsers[i] = models.AdminUserResponse{
+		adminUsers[i] = user.AdminUserResponse{
 			ID:           user.ID,
 			Username:     user.Username,
 			FirstName:    user.FirstName,
@@ -355,7 +355,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	response := models.PaginatedUsersResponse{
+	response := user.PaginatedUsersResponse{
 		Users:      adminUsers,
 		TotalCount: totalCount,
 		Page:       page,
@@ -363,7 +363,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		TotalPages: totalPages,
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    response,
 		Message: "Users retrieved successfully",
@@ -375,7 +375,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 func (c *Controller) LockUser(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 	if userID == "" {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User ID is required",
@@ -384,9 +384,9 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		return
 	}
 
-	var req models.AdminLockUserRequest
+	var req user.AdminLockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -397,7 +397,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 
 	// Validate request
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -409,7 +409,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 	// Check if user exists
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -420,7 +420,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 
 	// Check if user is already locked
 	if user.IsLocked {
-		ctx.JSON(http.StatusConflict, models.APIResponse{
+		ctx.JSON(http.StatusConflict, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User already locked",
@@ -431,7 +431,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 
 	// Lock the user
 	if err := c.repo.GetUserRepository().LockUser(userID, req.Reason); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to lock user",
@@ -440,7 +440,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "User account locked successfully",
@@ -452,7 +452,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 func (c *Controller) UnlockUser(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
 	if userID == "" {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User ID is required",
@@ -461,16 +461,16 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		return
 	}
 
-	var req models.AdminUnlockUserRequest
+	var req user.AdminUnlockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// Allow empty body for unlock requests
-		req = models.AdminUnlockUserRequest{}
+		req = user.AdminUnlockUserRequest{}
 	}
 
 	// Validate request if reason is provided
 	if req.Reason != "" {
 		if err := c.Validate.Struct(req); err != nil {
-			ctx.JSON(http.StatusBadRequest, models.APIResponse{
+			ctx.JSON(http.StatusBadRequest, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Validation failed",
@@ -483,7 +483,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	// Check if user exists
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -494,7 +494,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 
 	// Check if user is actually locked
 	if !user.IsLocked {
-		ctx.JSON(http.StatusConflict, models.APIResponse{
+		ctx.JSON(http.StatusConflict, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not locked",
@@ -505,7 +505,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 
 	// Unlock the user
 	if err := c.repo.GetUserRepository().UnlockUser(userID, req.Reason); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to unlock user",
@@ -514,7 +514,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "User account unlocked successfully",
@@ -545,7 +545,7 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 	// Get login attempts
 	attempts, totalCount, err := c.repo.GetLoginAttemptRepository().GetAllLoginAttempts(limit, offset)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to retrieve login attempts",
@@ -564,7 +564,7 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 		"total_pages": totalPages,
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    response,
 		Message: "Login attempts retrieved successfully",
@@ -577,7 +577,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 	// Get user ID from JWT token context
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -589,7 +589,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 	// Get user's API keys
 	apiKeys, err := c.repo.GetAPIKeyRepository().GetAPIKeysByUserID(userID.(string))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to retrieve API keys",
@@ -599,9 +599,9 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 	}
 
 	// Convert to response format (hide sensitive data)
-	responses := make([]models.APIKeyResponse, len(apiKeys))
+	responses := make([]user.APIKeyResponse, len(apiKeys))
 	for i, key := range apiKeys {
-		responses[i] = models.APIKeyResponse{
+		responses[i] = user.APIKeyResponse{
 			ID:          key.ID,
 			Name:        key.Name,
 			KeyPreview:  key.KeyPreview(), // Use method to get preview
@@ -613,7 +613,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    responses,
 		Message: "API keys retrieved successfully",
@@ -626,7 +626,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 	// Get user ID from JWT token context
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -635,9 +635,9 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	var req models.APIKeyRequest
+	var req user.APIKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -648,7 +648,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 
 	// Validate request
 	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -665,7 +665,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		req.Permissions,
 	)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to create API key",
@@ -685,7 +685,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		"warning":     "This is the only time the full API key will be shown. Please save it securely.",
 	}
 
-	ctx.JSON(http.StatusCreated, models.APIResponse{
+	ctx.JSON(http.StatusCreated, common.APIResponse{
 		Success: true,
 		Data:    response,
 		Message: "API key created successfully",
@@ -698,7 +698,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 	// Get user ID from JWT token context
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Authentication required",
@@ -709,7 +709,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 
 	keyID := ctx.Param("key_id")
 	if keyID == "" {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "API key ID is required",
@@ -721,7 +721,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 	// Check if API key exists and belongs to the user
 	apiKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(keyID)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "API key not found",
@@ -732,7 +732,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 
 	// Check ownership
 	if apiKey.UserID != userID.(string) {
-		ctx.JSON(http.StatusForbidden, models.APIResponse{
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Access denied",
@@ -743,7 +743,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 
 	// Revoke the API key
 	if err := c.repo.GetAPIKeyRepository().RevokeAPIKey(keyID); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to revoke API key",
@@ -752,7 +752,7 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    nil,
 		Message: "API key revoked successfully",
@@ -765,7 +765,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	// Get user ID from context
 	userID, exists := ctx.Get("user_id")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Unauthorized",
@@ -777,7 +777,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	// Get API key ID from URL
 	keyID := ctx.Param("id")
 	if keyID == "" {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid request",
@@ -787,9 +787,9 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	}
 
 	// Bind and validate request
-	var req models.UpdateAPIKeyRequest
+	var req user.UpdateAPIKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -801,7 +801,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	// Check if API key exists and belongs to user
 	apiKey, err := c.repo.APIKeyRepo.GetAPIKeyByID(keyID)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "API key not found",
@@ -812,7 +812,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 
 	// Verify ownership
 	if apiKey.UserID != userID.(string) {
-		ctx.JSON(http.StatusForbidden, models.APIResponse{
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Access denied",
@@ -831,7 +831,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	if req.ExpiresAt != nil {
 		// Validate expiration date is in the future
 		if req.ExpiresAt.Before(time.Now()) {
-			ctx.JSON(http.StatusBadRequest, models.APIResponse{
+			ctx.JSON(http.StatusBadRequest, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid expiration date",
@@ -854,7 +854,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 				}
 			}
 			if !valid {
-				ctx.JSON(http.StatusBadRequest, models.APIResponse{
+				ctx.JSON(http.StatusBadRequest, common.APIResponse{
 					Success: false,
 					Data:    nil,
 					Message: "Invalid permission",
@@ -875,7 +875,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 
 	// Update the API key
 	if err := c.repo.APIKeyRepo.UpdateAPIKey(keyID, updates); err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to update API key",
@@ -887,7 +887,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	// Fetch the updated API key to return
 	updatedKey, err := c.repo.APIKeyRepo.GetAPIKeyByID(keyID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "API key updated but failed to fetch updated data",
@@ -897,7 +897,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	}
 
 	// Convert to response model
-	response := models.APIKeyResponse{
+	response := user.APIKeyResponse{
 		ID:          updatedKey.ID,
 		Name:        updatedKey.Name,
 		KeyPreview:  updatedKey.KeyPreview(),
@@ -908,7 +908,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		CreatedAt:   updatedKey.CreatedAt,
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    response,
 		Message: "API key updated successfully",

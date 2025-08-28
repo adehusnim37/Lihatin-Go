@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -12,11 +13,11 @@ import (
 
 // Login authenticates a user with email/username and password
 func (c *Controller) Login(ctx *gin.Context) {
-	var loginReq models.LoginRequest
+	var loginReq user.LoginRequest
 
 	// Bind and validate the request body
 	if err := ctx.ShouldBindJSON(&loginReq); err != nil {
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
@@ -42,7 +43,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 			}
 		}
 
-		ctx.JSON(http.StatusBadRequest, models.APIResponse{
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Validation failed",
@@ -60,7 +61,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 		}
 
 		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid credentials",
@@ -69,7 +70,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Login failed",
@@ -81,7 +82,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	// Check if account is locked
 	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Login failed",
@@ -91,7 +92,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	}
 
 	if isLocked {
-		ctx.JSON(http.StatusTooManyRequests, models.APIResponse{
+		ctx.JSON(http.StatusTooManyRequests, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Account temporarily locked",
@@ -102,7 +103,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Check if account is active
 	if !userAuth.IsActive {
-		ctx.JSON(http.StatusForbidden, models.APIResponse{
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Account deactivated",
@@ -116,7 +117,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 		// Increment failed login attempts
 		c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
 
-		ctx.JSON(http.StatusUnauthorized, models.APIResponse{
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid credentials",
@@ -128,7 +129,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	// Check if TOTP is enabled for the user
 	hasTOTP, err := c.repo.GetAuthMethodRepository().HasTOTPEnabled(userAuth.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Login failed",
@@ -141,7 +142,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	role := map[bool]string{true: "premium", false: "regular"}[user.IsPremium]
 	token, err := utils.GenerateJWT(user.ID, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Login failed",
@@ -153,7 +154,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	// Generate refresh token
 	refreshToken, err := utils.GenerateRefreshToken(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Login failed",
@@ -164,26 +165,15 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Update last login and reset failed attempts
 	if err := c.repo.GetUserAuthRepository().UpdateLastLogin(user.ID); err != nil {
-		// Log error but don't fail the login
-		// logger.Error("Failed to update last login", err)
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Login failed",
+			Error:   map[string]string{"error": "Failed to update last login"},
+		})
+		return
 	}
 
-	// Create user profile (without sensitive information)
-	userProfile := models.UserProfile{
-		ID:        user.ID,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		IsPremium: user.IsPremium,
-		CreatedAt: user.CreatedAt,
-	}
-
-	// Set user context for logging
-	ctx.Set("username", user.Username)
-	ctx.Set("user_id", user.ID)
-	ctx.Set("role", role)
 
 	// Send login alert email (async)
 	go func() {
@@ -194,7 +184,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Prepare response data
 	responseData := map[string]interface{}{
-		"user":          userProfile,
+		"user":          user,
 		"token":         token,
 		"refresh_token": refreshToken,
 		"requires_2fa":  hasTOTP,
@@ -207,7 +197,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 		responseData["message"] = "Login successful"
 	}
 
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    responseData,
 		Message: "Login successful",

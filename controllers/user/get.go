@@ -3,7 +3,7 @@ package user
 import (
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,7 +11,7 @@ import (
 func (c *Controller) GetAll(ctx *gin.Context) {
 	users, err := c.repo.GetAllUsers()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, models.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Failed to retrieve users",
@@ -19,7 +19,7 @@ func (c *Controller) GetAll(ctx *gin.Context) {
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    users,
 		Message: "Users retrieved successfully",
@@ -32,7 +32,7 @@ func (c *Controller) GetByID(ctx *gin.Context) {
 	id := ctx.Param("id")
 	user, err := c.repo.GetUserByID(id)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, models.APIResponse{
+		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "User not found",
@@ -40,7 +40,7 @@ func (c *Controller) GetByID(ctx *gin.Context) {
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, models.APIResponse{
+	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    user,
 		Message: "User found",

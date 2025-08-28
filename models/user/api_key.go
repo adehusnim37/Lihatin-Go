@@ -43,6 +43,13 @@ type APIKeyRequest struct {
 	Permissions []string   `json:"permissions,omitempty"`
 }
 
+type UpdateAPIKeyRequest struct {
+	Name        *string    `json:"name,omitempty" validate:"omitempty,min=3,max=100"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	Permissions []string   `json:"permissions,omitempty"`
+	IsActive    *bool      `json:"is_active,omitempty"`
+}
+
 // APIKeyResponse represents the API key response (without sensitive data)
 type APIKeyResponse struct {
 	ID          string     `json:"id"`

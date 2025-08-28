@@ -41,20 +41,20 @@ type AdminUnlockUserRequest struct {
 	Reason string `json:"reason,omitempty" validate:"max=500"`
 }
 
-// AdminUserResponse represents user data for admin views
+// AdminUserResponse represents the response format for admin user data
 type AdminUserResponse struct {
-	ID           string     `json:"id"`
-	Username     string     `json:"username"`
-	FirstName    string     `json:"first_name"`
-	LastName     string     `json:"last_name"`
-	Email        string     `json:"email"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	IsPremium    bool       `json:"is_premium"`
-	IsLocked     bool       `json:"is_locked"`
-	LockedAt     *time.Time `json:"locked_at,omitempty"`
-	LockedReason string     `json:"locked_reason,omitempty"`
-	Role         string     `json:"role"`
+    ID           string    `json:"id"`
+    Username     string    `json:"username"`
+    FirstName    string    `json:"first_name"`
+    LastName     string    `json:"last_name"`
+    Email        string    `json:"email"`
+    CreatedAt    time.Time `json:"created_at"`
+    UpdatedAt    time.Time `json:"updated_at"`
+    IsPremium    bool      `json:"is_premium"`
+    IsLocked     bool      `json:"is_locked"`
+    LockedAt     *time.Time `json:"locked_at,omitempty"`
+    LockedReason string    `json:"locked_reason,omitempty"`
+    Role         string    `json:"role"`
 }
 
 // PaginatedUsersResponse represents paginated user results
