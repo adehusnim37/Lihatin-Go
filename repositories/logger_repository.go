@@ -2,9 +2,8 @@ package repositories
 
 import (
 	"database/sql"
-	"time"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/google/uuid"
 )
 
@@ -21,25 +20,12 @@ func NewLoggerRepository(db *sql.DB) *LoggerRepository {
 }
 
 // CreateLog inserts a new activity log into the database
-func (r *LoggerRepository) CreateLog(log *models.LoggerUser) error {
+func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
 	// Generate a unique ID for the log entry if not provided
 	if log.ID == "" {
 		log.ID = uuid.New().String()
 	}
-	currentTime := time.Now()
-	formatTime := currentTime.Format(time.RFC3339)
-	if log.Timestamp == "" {
-		log.Timestamp = formatTime
-	}
-
-	if log.CreatedAt == nil {
-		log.CreatedAt = &currentTime
-	}
-
-	if log.UpdatedAt == nil {
-		log.UpdatedAt = &currentTime
-	}
-
+	
 	// SQL query to insert log
 	query := `
 	INSERT INTO ActivityLog (
@@ -63,7 +49,7 @@ func (r *LoggerRepository) CreateLog(log *models.LoggerUser) error {
 }
 
 // GetLogsByUsername retrieves all logs for a specific username
-func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUser, error) {
+func (r *LoggerRepository) GetLogsByUsername(username string) ([]logging.ActivityLog, error) {
 	query := `
 	SELECT id, level, message, username, timestamp, ipaddress, 
 	       useragent, browserinfo, action, route, method, statuscode,
@@ -80,9 +66,9 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUs
 	}
 	defer rows.Close()
 
-	var logs []models.LoggerUser
+	var logs []logging.ActivityLog
 	for rows.Next() {
-		var log models.LoggerUser
+		var log logging.ActivityLog
 		var deletedAt sql.NullTime
 		var createdAt, updatedAt sql.NullTime
 		var requestBody, queryParams, routeParams, contextLocals sql.NullString
@@ -115,14 +101,6 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUs
 		if responseTime.Valid {
 			log.ResponseTime = responseTime.Int64
 		}
-		if createdAt.Valid {
-			createdTime := createdAt.Time
-			log.CreatedAt = &createdTime
-		}
-		if updatedAt.Valid {
-			updatedTime := updatedAt.Time
-			log.UpdatedAt = &updatedTime
-		}
 		if deletedAt.Valid {
 			deletedTime := deletedAt.Time
 			log.DeletedAt = &deletedTime
@@ -135,7 +113,7 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]models.LoggerUs
 }
 
 // GetAllLogs retrieves all logs from the database
-func (r *LoggerRepository) GetAllLogs() ([]models.LoggerUser, error) {
+func (r *LoggerRepository) GetAllLogs() ([]logging.ActivityLog, error) {
 	query := `
 	SELECT id, level, message, username, timestamp, ipaddress, 
 	       useragent, browserinfo, action, route, method, statuscode,
@@ -152,9 +130,9 @@ func (r *LoggerRepository) GetAllLogs() ([]models.LoggerUser, error) {
 	}
 	defer rows.Close()
 
-	var logs []models.LoggerUser
+	var logs []logging.ActivityLog
 	for rows.Next() {
-		var log models.LoggerUser
+		var log logging.ActivityLog
 		var deletedAt sql.NullTime
 		var createdAt, updatedAt sql.NullTime
 		var requestBody, queryParams, routeParams, contextLocals sql.NullString
@@ -186,14 +164,6 @@ func (r *LoggerRepository) GetAllLogs() ([]models.LoggerUser, error) {
 		}
 		if responseTime.Valid {
 			log.ResponseTime = responseTime.Int64
-		}
-		if createdAt.Valid {
-			createdTime := createdAt.Time
-			log.CreatedAt = &createdTime
-		}
-		if updatedAt.Valid {
-			updatedTime := updatedAt.Time
-			log.UpdatedAt = &updatedTime
 		}
 		if deletedAt.Valid {
 			deletedTime := deletedAt.Time

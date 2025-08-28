@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -21,7 +21,7 @@ func NewLoginAttemptRepository(db *gorm.DB) *LoginAttemptRepository {
 
 // RecordLoginAttempt records a login attempt
 func (r *LoginAttemptRepository) RecordLoginAttempt(userID, ipAddress, userAgent string, success bool, failReason string) error {
-	attempt := &models.LoginAttempt{
+	attempt := &user.LoginAttempt{
 		ID:          uuid.New().String(),
 		UserID:      userID,
 		IPAddress:   ipAddress,
@@ -38,8 +38,8 @@ func (r *LoginAttemptRepository) RecordLoginAttempt(userID, ipAddress, userAgent
 }
 
 // GetLoginAttemptsByUserID retrieves login attempts for a user
-func (r *LoginAttemptRepository) GetLoginAttemptsByUserID(userID string, limit int) ([]models.LoginAttempt, error) {
-	var attempts []models.LoginAttempt
+func (r *LoginAttemptRepository) GetLoginAttemptsByUserID(userID string, limit int) ([]user.LoginAttempt, error) {
+	var attempts []user.LoginAttempt
 	query := r.db.Where("user_id = ?", userID).Order("attempted_at DESC")
 
 	if limit > 0 {
@@ -53,8 +53,8 @@ func (r *LoginAttemptRepository) GetLoginAttemptsByUserID(userID string, limit i
 }
 
 // GetLoginAttemptsByIP retrieves login attempts by IP address
-func (r *LoginAttemptRepository) GetLoginAttemptsByIP(ipAddress string, since time.Time) ([]models.LoginAttempt, error) {
-	var attempts []models.LoginAttempt
+func (r *LoginAttemptRepository) GetLoginAttemptsByIP(ipAddress string, since time.Time) ([]user.LoginAttempt, error) {
+	var attempts []user.LoginAttempt
 	if err := r.db.Where("ip_address = ? AND attempted_at > ?", ipAddress, since).
 		Order("attempted_at DESC").Find(&attempts).Error; err != nil {
 		return nil, fmt.Errorf("failed to get login attempts by IP: %w", err)
@@ -65,7 +65,7 @@ func (r *LoginAttemptRepository) GetLoginAttemptsByIP(ipAddress string, since ti
 // GetRecentFailedAttempts gets recent failed login attempts for a user
 func (r *LoginAttemptRepository) GetRecentFailedAttempts(userID string, since time.Time) (int64, error) {
 	var count int64
-	if err := r.db.Model(&models.LoginAttempt{}).
+	if err := r.db.Model(&user.LoginAttempt{}).
 		Where("user_id = ? AND success = ? AND attempted_at > ?", userID, false, since).
 		Count(&count).Error; err != nil {
 		return 0, fmt.Errorf("failed to count failed attempts: %w", err)
@@ -80,7 +80,7 @@ func (r *LoginAttemptRepository) GetLoginStats(userID string, days int) (map[str
 
 	// Total attempts
 	var total int64
-	if err := r.db.Model(&models.LoginAttempt{}).
+	if err := r.db.Model(&user.LoginAttempt{}).
 		Where("user_id = ? AND attempted_at > ?", userID, since).
 		Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("failed to count total attempts: %w", err)
@@ -89,7 +89,7 @@ func (r *LoginAttemptRepository) GetLoginStats(userID string, days int) (map[str
 
 	// Successful attempts
 	var successful int64
-	if err := r.db.Model(&models.LoginAttempt{}).
+	if err := r.db.Model(&user.LoginAttempt{}).
 		Where("user_id = ? AND success = ? AND attempted_at > ?", userID, true, since).
 		Count(&successful).Error; err != nil {
 		return nil, fmt.Errorf("failed to count successful attempts: %w", err)
@@ -98,7 +98,7 @@ func (r *LoginAttemptRepository) GetLoginStats(userID string, days int) (map[str
 
 	// Failed attempts
 	var failed int64
-	if err := r.db.Model(&models.LoginAttempt{}).
+	if err := r.db.Model(&user.LoginAttempt{}).
 		Where("user_id = ? AND success = ? AND attempted_at > ?", userID, false, since).
 		Count(&failed).Error; err != nil {
 		return nil, fmt.Errorf("failed to count failed attempts: %w", err)
@@ -113,7 +113,7 @@ func (r *LoginAttemptRepository) GetLoginStats(userID string, days int) (map[str
 	}
 
 	// Last successful login
-	var lastSuccess models.LoginAttempt
+	var lastSuccess user.LoginAttempt
 	if err := r.db.Where("user_id = ? AND success = ?", userID, true).
 		Order("attempted_at DESC").First(&lastSuccess).Error; err == nil {
 		stats["last_successful_login"] = lastSuccess.AttemptedAt
@@ -123,12 +123,12 @@ func (r *LoginAttemptRepository) GetLoginStats(userID string, days int) (map[str
 }
 
 // GetAllLoginAttempts retrieves all login attempts with pagination (admin only)
-func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int) ([]models.LoginAttempt, int64, error) {
-	var attempts []models.LoginAttempt
+func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int) ([]user.LoginAttempt, int64, error) {
+	var attempts []user.LoginAttempt
 	var total int64
 
 	// Get total count
-	if err := r.db.Model(&models.LoginAttempt{}).Count(&total).Error; err != nil {
+	if err := r.db.Model(&user.LoginAttempt{}).Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to count login attempts: %w", err)
 	}
 
@@ -144,7 +144,7 @@ func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int) ([]model
 // CleanupOldAttempts removes login attempts older than specified days
 func (r *LoginAttemptRepository) CleanupOldAttempts(olderThanDays int) error {
 	cutoff := time.Now().AddDate(0, 0, -olderThanDays)
-	if err := r.db.Where("attempted_at < ?", cutoff).Delete(&models.LoginAttempt{}).Error; err != nil {
+	if err := r.db.Where("attempted_at < ?", cutoff).Delete(&user.LoginAttempt{}).Error; err != nil {
 		return fmt.Errorf("failed to cleanup old login attempts: %w", err)
 	}
 	return nil

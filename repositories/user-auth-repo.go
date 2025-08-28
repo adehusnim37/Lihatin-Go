@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/gorm"
 )
 
@@ -20,7 +20,7 @@ func NewUserAuthRepository(db *gorm.DB) *UserAuthRepository {
 }
 
 // CreateUserAuth creates a new UserAuth record
-func (r *UserAuthRepository) CreateUserAuth(userAuth *models.UserAuth) error {
+func (r *UserAuthRepository) CreateUserAuth(userAuth *user.UserAuth) error {
 	if err := r.db.Create(userAuth).Error; err != nil {
 		return fmt.Errorf("failed to create user auth: %w", err)
 	}
@@ -28,8 +28,8 @@ func (r *UserAuthRepository) CreateUserAuth(userAuth *models.UserAuth) error {
 }
 
 // GetUserAuthByUserID retrieves UserAuth by user ID
-func (r *UserAuthRepository) GetUserAuthByUserID(userID string) (*models.UserAuth, error) {
-	var userAuth models.UserAuth
+func (r *UserAuthRepository) GetUserAuthByUserID(userID string) (*user.UserAuth, error) {
+	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
@@ -40,8 +40,8 @@ func (r *UserAuthRepository) GetUserAuthByUserID(userID string) (*models.UserAut
 }
 
 // GetUserAuthByID retrieves UserAuth by ID
-func (r *UserAuthRepository) GetUserAuthByID(id string) (*models.UserAuth, error) {
-	var userAuth models.UserAuth
+func (r *UserAuthRepository) GetUserAuthByID(id string) (*user.UserAuth, error) {
+	var userAuth user.UserAuth
 	if err := r.db.First(&userAuth, "id = ?", id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
@@ -52,7 +52,7 @@ func (r *UserAuthRepository) GetUserAuthByID(id string) (*models.UserAuth, error
 }
 
 // UpdateUserAuth updates UserAuth record
-func (r *UserAuthRepository) UpdateUserAuth(userAuth *models.UserAuth) error {
+func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 	if err := r.db.Save(userAuth).Error; err != nil {
 		return fmt.Errorf("failed to update user auth: %w", err)
 	}
@@ -61,7 +61,7 @@ func (r *UserAuthRepository) UpdateUserAuth(userAuth *models.UserAuth) error {
 
 // SetEmailVerificationToken sets email verification token and expiry
 func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, expiresAt time.Time) error {
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"email_verification_token":            token,
@@ -76,7 +76,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, exp
 
 // VerifyEmail marks email as verified and clears verification token
 func (r *UserAuthRepository) VerifyEmail(token string) error {
-	result := r.db.Model(&models.UserAuth{}).
+	result := r.db.Model(&user.UserAuth{}).
 		Where("email_verification_token = ? AND email_verification_token_expires_at > ?", token, time.Now()).
 		Updates(map[string]interface{}{
 			"is_email_verified":                   true,
@@ -97,7 +97,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) error {
 
 // SetPasswordResetToken sets password reset token and expiry
 func (r *UserAuthRepository) SetPasswordResetToken(userID, token string, expiresAt time.Time) error {
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"password_reset_token":            token,
@@ -111,8 +111,8 @@ func (r *UserAuthRepository) SetPasswordResetToken(userID, token string, expires
 }
 
 // ValidatePasswordResetToken validates password reset token
-func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*models.UserAuth, error) {
-	var userAuth models.UserAuth
+func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.UserAuth, error) {
+	var userAuth user.UserAuth
 	err := r.db.Where("password_reset_token = ? AND password_reset_token_expires_at > ?", token, time.Now()).
 		First(&userAuth).Error
 
@@ -128,7 +128,7 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*models.U
 
 // ResetPassword updates password and clears reset token
 func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
-	result := r.db.Model(&models.UserAuth{}).
+	result := r.db.Model(&user.UserAuth{}).
 		Where("password_reset_token = ? AND password_reset_token_expires_at > ?", token, time.Now()).
 		Updates(map[string]interface{}{
 			"password_hash":                   hashedPassword,
@@ -152,7 +152,7 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 // UpdateLastLogin updates last login timestamp
 func (r *UserAuthRepository) UpdateLastLogin(userID string) error {
 	now := time.Now()
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"last_login_at":         &now,
@@ -169,7 +169,7 @@ func (r *UserAuthRepository) UpdateLastLogin(userID string) error {
 // IncrementFailedLogin increments failed login attempts
 func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 	// Get current failed attempts
-	var userAuth models.UserAuth
+	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		return fmt.Errorf("failed to get user auth for failed login: %w", err)
 	}
@@ -186,7 +186,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 		updates["lockout_until"] = &lockoutUntil
 	}
 
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(updates).Error
 
@@ -198,7 +198,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 
 // IsAccountLocked checks if account is currently locked
 func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
-	var userAuth models.UserAuth
+	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		return false, fmt.Errorf("failed to check account lock status: %w", err)
 	}
@@ -212,7 +212,7 @@ func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
 
 // UnlockAccount removes account lockout
 func (r *UserAuthRepository) UnlockAccount(userID string) error {
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"failed_login_attempts": 0,
@@ -227,7 +227,7 @@ func (r *UserAuthRepository) UnlockAccount(userID string) error {
 
 // ActivateAccount activates a user account
 func (r *UserAuthRepository) ActivateAccount(userID string) error {
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Update("is_active", true).Error
 
@@ -239,7 +239,7 @@ func (r *UserAuthRepository) ActivateAccount(userID string) error {
 
 // DeactivateAccount deactivates a user account
 func (r *UserAuthRepository) DeactivateAccount(userID string) error {
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Update("is_active", false).Error
 
@@ -251,7 +251,7 @@ func (r *UserAuthRepository) DeactivateAccount(userID string) error {
 
 // UpdatePassword updates user password
 func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error {
-	err := r.db.Model(&models.UserAuth{}).
+	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"password_hash":         hashedPassword,
@@ -266,12 +266,12 @@ func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error
 }
 
 // GetUserForLogin gets user with auth data for login
-func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*models.User, *models.UserAuth, error) {
-	var user models.User
-	var userAuth models.UserAuth
+func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User, *user.UserAuth, error) {
+	var userx user.User
+	var userAuth user.UserAuth
 
 	// First get the user
-	err := r.db.Where("email = ? OR username = ?", emailOrUsername, emailOrUsername).First(&user).Error
+	err := r.db.Where("email = ? OR username = ?", emailOrUsername, emailOrUsername).First(&userx).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil, sql.ErrNoRows
@@ -280,7 +280,7 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*models.Us
 	}
 
 	// Then get the auth data
-	err = r.db.Where("user_id = ?", user.ID).First(&userAuth).Error
+	err = r.db.Where("user_id = ?", userx.ID).First(&userAuth).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil, fmt.Errorf("user auth data not found")
@@ -288,12 +288,12 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*models.Us
 		return nil, nil, fmt.Errorf("failed to get user auth: %w", err)
 	}
 
-	return &user, &userAuth, nil
+	return &userx, &userAuth, nil
 }
 
 // DeleteUserAuth soft deletes UserAuth record
 func (r *UserAuthRepository) DeleteUserAuth(userID string) error {
-	err := r.db.Where("user_id = ?", userID).Delete(&models.UserAuth{}).Error
+	err := r.db.Where("user_id = ?", userID).Delete(&user.UserAuth{}).Error
 	if err != nil {
 		return fmt.Errorf("failed to delete user auth: %w", err)
 	}
@@ -303,7 +303,7 @@ func (r *UserAuthRepository) DeleteUserAuth(userID string) error {
 // GetActiveUserAuthCount gets count of active user auth records
 func (r *UserAuthRepository) GetActiveUserAuthCount() (int64, error) {
 	var count int64
-	err := r.db.Model(&models.UserAuth{}).Where("is_active = ?", true).Count(&count).Error
+	err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to get active user auth count: %w", err)
 	}
@@ -316,28 +316,28 @@ func (r *UserAuthRepository) GetUserAuthStats() (map[string]interface{}, error) 
 
 	// Total users
 	var totalUsers int64
-	if err := r.db.Model(&models.UserAuth{}).Count(&totalUsers).Error; err != nil {
+	if err := r.db.Model(&user.UserAuth{}).Count(&totalUsers).Error; err != nil {
 		return nil, fmt.Errorf("failed to count total users: %w", err)
 	}
 	stats["total_users"] = totalUsers
 
 	// Active users
 	var activeUsers int64
-	if err := r.db.Model(&models.UserAuth{}).Where("is_active = ?", true).Count(&activeUsers).Error; err != nil {
+	if err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&activeUsers).Error; err != nil {
 		return nil, fmt.Errorf("failed to count active users: %w", err)
 	}
 	stats["active_users"] = activeUsers
 
 	// Verified users
 	var verifiedUsers int64
-	if err := r.db.Model(&models.UserAuth{}).Where("is_email_verified = ?", true).Count(&verifiedUsers).Error; err != nil {
+	if err := r.db.Model(&user.UserAuth{}).Where("is_email_verified = ?", true).Count(&verifiedUsers).Error; err != nil {
 		return nil, fmt.Errorf("failed to count verified users: %w", err)
 	}
 	stats["verified_users"] = verifiedUsers
 
 	// Locked users
 	var lockedUsers int64
-	if err := r.db.Model(&models.UserAuth{}).Where("lockout_until > ?", time.Now()).Count(&lockedUsers).Error; err != nil {
+	if err := r.db.Model(&user.UserAuth{}).Where("lockout_until > ?", time.Now()).Count(&lockedUsers).Error; err != nil {
 		return nil, fmt.Errorf("failed to count locked users: %w", err)
 	}
 	stats["locked_users"] = lockedUsers

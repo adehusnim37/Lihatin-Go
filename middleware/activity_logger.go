@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models"
+	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
@@ -68,11 +68,11 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		message := fmt.Sprintf("%s %s - %d (%dms)", method, path, statusCode, responseTime)
 
 		// Create log entry
-		log := &models.LoggerUser{
+		log := &logging.ActivityLog{
 			Level:         level,
 			Message:       message,
 			Username:      fmt.Sprintf("%v", username),
-			Timestamp:     startTime.Format(time.RFC3339),
+			Timestamp:     startTime,
 			IPAddress:     c.ClientIP(),
 			UserAgent:     userAgent,
 			BrowserInfo:   browserInfo,
@@ -88,7 +88,7 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		}
 
 		// Save log asynchronously to not block the response
-		go func(logEntry *models.LoggerUser) {
+		go func(logEntry *logging.ActivityLog) {
 			err := loggerRepo.CreateLog(logEntry)
 			if err != nil {
 				// Just print error since we're in a goroutine

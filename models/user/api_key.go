@@ -1,4 +1,4 @@
-package models
+package user
 
 import (
 	"time"
@@ -6,11 +6,11 @@ import (
 
 // APIKey represents an API key for user authentication
 type APIKey struct {
-	ID          string     `json:"id" gorm:"primaryKey" validate:"required"`
-	UserID      string     `json:"user_id" gorm:"index" validate:"required"`
-	Name        string     `json:"name" validate:"required,min=3,max=100"`
-	Key         string     `json:"key" gorm:"uniqueIndex" validate:"required"`
-	KeyHash     string     `json:"-" gorm:"column:key_hash" validate:"required"` // Store hashed version
+	ID          string     `json:"id" gorm:"primaryKey"`
+	UserID      string     `json:"user_id" gorm:"not null;index"`
+	Name        string     `json:"name" gorm:"size:100;not null" validate:"required,min=3,max=100"`
+	Key         string     `json:"key" gorm:"uniqueIndex;size:255;not null"`
+	KeyHash     string     `json:"-" gorm:"column:key_hash;size:255;not null"` // Store hashed version
 	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	IsActive    bool       `json:"is_active" gorm:"default:true"`
@@ -55,29 +55,17 @@ type APIKeyResponse struct {
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
-// UpdateAPIKeyRequest represents the request to update an API key
-type UpdateAPIKeyRequest struct {
-	Name        *string    `json:"name,omitempty" validate:"omitempty,min=3,max=100"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty"`
-	IsActive    *bool      `json:"is_active,omitempty"`
+// CreateAPIKeyResponse represents the response when creating a new API key
+type CreateAPIKeyResponse struct {
+	APIKey *APIKeyResponse `json:"api_key"`
+	Key    string          `json:"key"` // Only shown once during creation
 }
 
-// LoginAttempt represents a login attempt record
-type LoginAttempt struct {
-	ID          string    `json:"id" gorm:"primaryKey"`
-	UserID      string    `json:"user_id" gorm:"index"`
-	IPAddress   string    `json:"ip_address"`
-	UserAgent   string    `json:"user_agent"`
-	Success     bool      `json:"success"`
-	FailReason  string    `json:"fail_reason,omitempty"`
-	AttemptedAt time.Time `json:"attempted_at"`
-
-	// Associations
-	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
-}
-
-// TableName specifies the table name for GORM
-func (LoginAttempt) TableName() string {
-	return "login_attempts"
+// PaginatedAPIKeysResponse represents paginated API keys
+type PaginatedAPIKeysResponse struct {
+	APIKeys    []APIKeyResponse `json:"api_keys"`
+	TotalCount int64            `json:"total_count"`
+	Page       int              `json:"page"`
+	Limit      int              `json:"limit"`
+	TotalPages int              `json:"total_pages"`
 }

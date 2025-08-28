@@ -19,7 +19,7 @@ type UserRepository interface {
 	GetUserForLogin(emailOrUsername string) (*models.User, error)
 	CheckPremiumByUsernameOrEmail(inputs string) (*models.User, error)
 	CreateUser(user *models.User) error
-	UpdateUser(id string, user *models.UpdateUser) error
+	UpdateUser(id string, user *models.User) error
 	DeleteUserPermanent(id string) error
 	// Admin methods
 	GetAllUsersWithPagination(limit, offset int) ([]models.User, int64, error)
@@ -134,7 +134,7 @@ func (ur *userRepository) CreateUser(user *models.User) error {
 	return err
 }
 
-func (ur *userRepository) UpdateUser(id string, user *models.UpdateUser) error {
+func (ur *userRepository) UpdateUser(id string, user *models.User) error {
 	// First, get the current user data to compare
 	currentUser, err := ur.GetUserByID(id)
 	if err != nil {
