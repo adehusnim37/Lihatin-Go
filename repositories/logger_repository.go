@@ -21,18 +21,16 @@ func NewLoggerRepository(db *sql.DB) *LoggerRepository {
 
 // CreateLog inserts a new activity log into the database
 func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
-	// Generate a unique ID for the log entry if not provided
 	if log.ID == "" {
 		log.ID = uuid.New().String()
 	}
-	
-	// SQL query to insert log
+
 	query := `
-	INSERT INTO ActivityLog (
-		id, level, message, username, timestamp, ipaddress,
-		useragent, browserinfo, action, route, method, 
-		statuscode, requestbody, queryparams, routeparams, 
-		contextlocals, responsetime, createdat, updatedat
+	INSERT INTO activity_logs (
+		id, level, message, username, timestamp, ip_address,
+		user_agent, browser_info, action, route, method,
+		status_code, request_body, query_params, route_params,
+		context_locals, response_time, created_at, updated_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -41,8 +39,8 @@ func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
 		log.ID, log.Level, log.Message, log.Username, log.Timestamp,
 		log.IPAddress, log.UserAgent, log.BrowserInfo, log.Action,
 		log.Route, log.Method, log.StatusCode, log.RequestBody,
-		log.QueryParams, log.RouteParams, log.ContextLocals, log.ResponseTime,
-		log.CreatedAt, log.UpdatedAt,
+		log.QueryParams, log.RouteParams, log.ContextLocals,
+		log.ResponseTime, log.CreatedAt, log.UpdatedAt,
 	)
 
 	return err
@@ -51,7 +49,7 @@ func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
 // GetLogsByUsername retrieves all logs for a specific username
 func (r *LoggerRepository) GetLogsByUsername(username string) ([]logging.ActivityLog, error) {
 	query := `
-	SELECT id, level, message, username, timestamp, ipaddress, 
+	SELECT id, level, message, username, timestamp, ip_address, 
 	       useragent, browserinfo, action, route, method, statuscode,
 	       requestbody, queryparams, routeparams, contextlocals, responsetime,
 	       createdat, updatedat, deletedat
@@ -115,7 +113,7 @@ func (r *LoggerRepository) GetLogsByUsername(username string) ([]logging.Activit
 // GetAllLogs retrieves all logs from the database
 func (r *LoggerRepository) GetAllLogs() ([]logging.ActivityLog, error) {
 	query := `
-	SELECT id, level, message, username, timestamp, ipaddress, 
+	SELECT id, level, message, username, timestamp, ip_address, 
 	       useragent, browserinfo, action, route, method, statuscode,
 	       requestbody, queryparams, routeparams, contextlocals, responsetime,
 	       createdat, updatedat, deletedat
