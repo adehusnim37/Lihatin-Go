@@ -1,145 +1,136 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/adehusnim37/lihatin-go/models/logging"
+	"github.com/adehusnim37/lihatin-go/models/migrations"
+	"github.com/adehusnim37/lihatin-go/models/shortlink"
+	"github.com/adehusnim37/lihatin-go/models/user"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func main() {
-	// Database connection - using same credentials as main app
-	db, err := sql.Open("mysql", "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?parseTime=true")
+	// Database connection
+	dsn := "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
-	defer db.Close()
-
-	// Test connection
-	if err := db.Ping(); err != nil {
-		log.Fatal("Failed to ping database:", err)
+		log.Fatalf("Failed to connect database: %v", err)
 	}
 
-	fmt.Println("Connected to database successfully!")
-
-	// Get migrations directory
-	migrationsDir := "./migrations"
-	if len(os.Args) > 1 {
-		migrationsDir = os.Args[1]
+	// Check command line arguments
+	args := os.Args[1:]
+	if len(args) == 0 {
+		log.Fatalf("Usage: go run cmd/migrate/main.go [migrate|rollback|fresh|status]")
 	}
 
-	// Run migrations
-	err = runMigrations(db, migrationsDir)
-	if err != nil {
-		log.Fatal("Migration failed:", err)
-	}
+	command := args[0]
 
-	fmt.Println("All migrations completed successfully!")
+	switch command {
+	case "migrate":
+		runMigrations(db)
+	case "fresh":
+		dropAllTables(db)
+		runMigrations(db)
+	case "rollback":
+		rollbackMigrations(db)
+	case "status":
+		showMigrationStatus(db)
+	default:
+		log.Fatalf("Unknown command: %s. Available: migrate, fresh, rollback, status", command)
+	}
 }
 
-func runMigrations(db *sql.DB, migrationsDir string) error {
-	// Create migrations table if it doesn't exist
-	createMigrationsTable := `
-	CREATE TABLE IF NOT EXISTS migrations (
-		id INT AUTO_INCREMENT PRIMARY KEY,
-		migration_name VARCHAR(255) NOT NULL UNIQUE,
-		applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);`
+// runMigrations creates/updates all tables
+func runMigrations(db *gorm.DB) {
+	fmt.Println("🚀 Running database migrations...")
 
-	_, err := db.Exec(createMigrationsTable)
-	if err != nil {
-		return fmt.Errorf("failed to create migrations table: %v", err)
+	models := []interface{}{
+		// User models
+		&user.User{},
+		&user.UserAuth{},
+		&user.AuthMethod{},
+		&user.APIKey{},
+
+		// ShortLink models
+		&shortlink.ShortLink{},
+		&shortlink.ShortLinkDetail{},
+		&shortlink.ViewLinkDetail{},
+
+		// Logging models
+		&logging.ActivityLog{},
+
+		// Migration tracking
+		&migrations.Migration{},
 	}
 
-	// Read migration files
-	files, err := os.ReadDir(migrationsDir)
-	if err != nil {
-		return fmt.Errorf("failed to read migrations directory: %v", err)
+	for _, model := range models {
+		if err := db.AutoMigrate(model); err != nil {
+			log.Fatalf("❌ Failed to migrate %T: %v", model, err)
+		}
+		fmt.Printf("✅ Migrated: %T\n", model)
 	}
 
-	for _, file := range files {
-		if filepath.Ext(file.Name()) != ".sql" {
-			continue
-		}
-
-		migrationName := file.Name()
-
-		// Check if migration already applied
-		var count int
-		err := db.QueryRow("SELECT COUNT(*) FROM migrations WHERE migration_name = ?", migrationName).Scan(&count)
-		if err != nil {
-			return fmt.Errorf("failed to check migration status: %v", err)
-		}
-
-		if count > 0 {
-			fmt.Printf("Migration %s already applied, skipping...\n", migrationName)
-			continue
-		}
-
-		// Read and execute migration file
-		migrationPath := filepath.Join(migrationsDir, migrationName)
-		content, err := os.ReadFile(migrationPath)
-		if err != nil {
-			return fmt.Errorf("failed to read migration file %s: %v", migrationName, err)
-		}
-
-		fmt.Printf("Applying migration: %s\n", migrationName)
-
-		// Execute migration (split by semicolons for multiple statements)
-		statements := splitSQL(string(content))
-		for _, stmt := range statements {
-			if stmt == "" {
-				continue
-			}
-			_, err = db.Exec(stmt)
-			if err != nil {
-				return fmt.Errorf("failed to execute migration %s: %v\nStatement: %s", migrationName, err, stmt)
-			}
-		}
-
-		// Record migration as applied
-		_, err = db.Exec("INSERT INTO migrations (migration_name) VALUES (?)", migrationName)
-		if err != nil {
-			return fmt.Errorf("failed to record migration %s: %v", migrationName, err)
-		}
-
-		fmt.Printf("Migration %s applied successfully!\n", migrationName)
-	}
-
-	return nil
+	fmt.Println("🎉 All migrations completed successfully!")
 }
 
-// Simple SQL statement splitter (handles basic cases)
-func splitSQL(content string) []string {
-	var statements []string
-	var current string
+// dropAllTables drops all tables (fresh migration)
+func dropAllTables(db *gorm.DB) {
+	fmt.Println("🗑️  Dropping all tables...")
 
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
+	tables := []interface{}{
+		&logging.ActivityLog{},
+		&shortlink.ViewLinkDetail{},
+		&shortlink.ShortLinkDetail{},
+		&shortlink.ShortLink{},
+		&user.APIKey{},
+		&user.AuthMethod{},
+		&user.UserAuth{},
+		&user.User{},
+	}
 
-		// Skip comments and empty lines
-		if strings.HasPrefix(line, "--") || line == "" {
-			continue
-		}
-
-		current += line + " "
-
-		// Check if statement ends with semicolon
-		if strings.HasSuffix(strings.TrimSpace(line), ";") {
-			statements = append(statements, strings.TrimSpace(current))
-			current = ""
+	for _, table := range tables {
+		if err := db.Migrator().DropTable(table); err != nil {
+			log.Printf("⚠️  Warning: Failed to drop %T: %v", table, err)
+		} else {
+			fmt.Printf("🗑️  Dropped: %T\n", table)
 		}
 	}
 
-	// Add final statement if it doesn't end with semicolon
-	if strings.TrimSpace(current) != "" {
-		statements = append(statements, strings.TrimSpace(current))
+	fmt.Println("✅ All tables dropped!")
+}
+
+// rollbackMigrations drops all tables (simple rollback)
+func rollbackMigrations(db *gorm.DB) {
+	fmt.Println("⏪ Rolling back migrations...")
+	dropAllTables(db)
+	fmt.Println("🎉 Rollback completed!")
+}
+
+// showMigrationStatus shows current database status
+func showMigrationStatus(db *gorm.DB) {
+	fmt.Println("📊 Migration Status:")
+
+	models := []interface{}{
+		&user.User{},
+		&user.UserAuth{},
+		&user.AuthMethod{},
+		&user.APIKey{},
+		&shortlink.ShortLink{},
+		&shortlink.ShortLinkDetail{},
+		&shortlink.ViewLinkDetail{},
+		&logging.ActivityLog{},
 	}
 
-	return statements
+	for _, model := range models {
+		exists := db.Migrator().HasTable(model)
+		status := "❌ Missing"
+		if exists {
+			status = "✅ Exists"
+		}
+		fmt.Printf("%s %T\n", status, model)
+	}
 }

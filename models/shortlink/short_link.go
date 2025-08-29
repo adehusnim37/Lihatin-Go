@@ -8,8 +8,8 @@ import (
 
 // ShortLink represents the main short link entity
 type ShortLink struct {
-	ID          uint           `json:"id" gorm:"primaryKey"`
-	UserID      string         `json:"user_id" gorm:"not null;index"` // Foreign key to users table (string to match User.ID)
+	ID          string         `json:"id" gorm:"primaryKey"`                   // Changed to string for consistency
+	UserID      string         `json:"user_id" gorm:"size:191;not null;index"` // Foreign key to users table (string to match User.ID)
 	ShortCode   string         `json:"short_code" gorm:"uniqueIndex;size:10;not null"`
 	OriginalURL string         `json:"original_url" gorm:"type:text;not null"`
 	Title       string         `json:"title" gorm:"size:255"`

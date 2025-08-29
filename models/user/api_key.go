@@ -7,7 +7,7 @@ import (
 // APIKey represents an API key for user authentication
 type APIKey struct {
 	ID          string     `json:"id" gorm:"primaryKey"`
-	UserID      string     `json:"user_id" gorm:"not null;index"`
+	UserID      string     `json:"user_id" gorm:"size:191;not null;index"`
 	Name        string     `json:"name" gorm:"size:100;not null" validate:"required,min=3,max=100"`
 	Key         string     `json:"key" gorm:"uniqueIndex;size:255;not null"`
 	KeyHash     string     `json:"-" gorm:"column:key_hash;size:255;not null"` // Store hashed version
