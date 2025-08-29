@@ -11,7 +11,6 @@ import (
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // Controller provides all handlers for authentication operations
@@ -88,7 +87,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	// Create user
-	user := &user.User{
+	newUser := &user.User{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Email:     req.Email,
@@ -97,7 +96,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 		IsPremium: false,
 	}
 
-	if err := c.repo.GetUserRepository().CreateUser(user); err != nil {
+	if err := c.repo.GetUserRepository().CreateUser(newUser); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -109,7 +108,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 
 	// Create user auth record for email verification
 	userAuth := &user.UserAuth{
-		UserID:                 user.ID,
+		UserID:                 newUser.ID,
 		PasswordHash:           hashedPassword, // Use the same hashed password
 		IsEmailVerified:        false,
 		EmailVerificationToken: "verification-token", // TODO: Generate proper token
@@ -122,13 +121,13 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	// Send verification email (optional, continue even if fails)
-	_ = c.emailService.SendVerificationEmail(user.Email, user.FirstName, "verification-token")
+	_ = c.emailService.SendVerificationEmail(newUser.Email, newUser.FirstName, "verification-token")
 
 	ctx.JSON(http.StatusCreated, common.APIResponse{
 		Success: true,
 		Data: gin.H{
-			"user_id": user.ID,
-			"email":   user.Email,
+			"user_id": newUser.ID,
+			"email":   newUser.Email,
 		},
 		Message: "Registration successful. Please check your email for verification.",
 		Error:   nil,
@@ -336,20 +335,20 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 
 	// Convert to admin response format (remove passwords)
 	adminUsers := make([]user.AdminUserResponse, len(users))
-	for i, user := range users {
+	for i, u := range users {
 		adminUsers[i] = user.AdminUserResponse{
-			ID:           user.ID,
-			Username:     user.Username,
-			FirstName:    user.FirstName,
-			LastName:     user.LastName,
-			Email:        user.Email,
-			CreatedAt:    user.CreatedAt,
-			UpdatedAt:    user.UpdatedAt,
-			IsPremium:    user.IsPremium,
-			IsLocked:     user.IsLocked,
-			LockedAt:     user.LockedAt,
-			LockedReason: user.LockedReason,
-			Role:         user.Role,
+			ID:           u.ID,
+			Username:     u.Username,
+			FirstName:    u.FirstName,
+			LastName:     u.LastName,
+			Email:        u.Email,
+			CreatedAt:    u.CreatedAt,
+			UpdatedAt:    u.UpdatedAt,
+			IsPremium:    u.IsPremium,
+			IsLocked:     u.IsLocked,
+			LockedAt:     u.LockedAt,
+			LockedReason: u.LockedReason,
+			Role:         u.Role,
 		}
 	}
 
