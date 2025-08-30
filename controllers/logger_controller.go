@@ -16,7 +16,7 @@ type LoggerController struct {
 
 // NewLoggerController creates a new logger controller
 func NewLoggerController(base *BaseController) *LoggerController {
-	loggerRepo := repositories.NewLoggerRepository(base.DB)
+	loggerRepo := repositories.NewLoggerRepository(base.GormDB)
 	return &LoggerController{
 		BaseController: base,
 		repo:           loggerRepo,

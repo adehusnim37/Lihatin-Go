@@ -1,19 +1,18 @@
 package repositories
 
 import (
-	"database/sql"
-
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // LoggerRepository handles database operations for user activity logs
 type LoggerRepository struct {
-	DB *sql.DB
+	DB *gorm.DB
 }
 
 // NewLoggerRepository creates a new logger repository
-func NewLoggerRepository(db *sql.DB) *LoggerRepository {
+func NewLoggerRepository(db *gorm.DB) *LoggerRepository {
 	return &LoggerRepository{
 		DB: db,
 	}
@@ -25,151 +24,26 @@ func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
 		log.ID = uuid.New().String()
 	}
 
-	query := `
-	INSERT INTO activity_logs (
-		id, level, message, username, timestamp, ip_address,
-		user_agent, browser_info, action, route, method,
-		status_code, request_body, query_params, route_params,
-		context_locals, response_time, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
-
-	_, err := r.DB.Exec(
-		query,
-		log.ID, log.Level, log.Message, log.Username, log.Timestamp,
-		log.IPAddress, log.UserAgent, log.BrowserInfo, log.Action,
-		log.Route, log.Method, log.StatusCode, log.RequestBody,
-		log.QueryParams, log.RouteParams, log.ContextLocals,
-		log.ResponseTime, log.CreatedAt, log.UpdatedAt,
-	)
-
-	return err
+	return r.DB.Create(log).Error
 }
 
 // GetLogsByUsername retrieves all logs for a specific username
 func (r *LoggerRepository) GetLogsByUsername(username string) ([]logging.ActivityLog, error) {
-	query := `
-	SELECT id, level, message, username, timestamp, ip_address, 
-	       useragent, browserinfo, action, route, method, statuscode,
-	       requestbody, queryparams, routeparams, contextlocals, responsetime,
-	       createdat, updatedat, deletedat
-	FROM ActivityLog
-	WHERE username = ? AND deletedat IS NULL
-	ORDER BY createdat DESC
-	`
-
-	rows, err := r.DB.Query(query, username)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var logs []logging.ActivityLog
-	for rows.Next() {
-		var log logging.ActivityLog
-		var deletedAt sql.NullTime
-		var createdAt, updatedAt sql.NullTime
-		var requestBody, queryParams, routeParams, contextLocals sql.NullString
-		var responseTime sql.NullInt64
-
-		err := rows.Scan(
-			&log.ID, &log.Level, &log.Message, &log.Username, &log.Timestamp,
-			&log.IPAddress, &log.UserAgent, &log.BrowserInfo, &log.Action,
-			&log.Route, &log.Method, &log.StatusCode,
-			&requestBody, &queryParams, &routeParams, &contextLocals, &responseTime,
-			&createdAt, &updatedAt, &deletedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Handle nullable fields
-		if requestBody.Valid {
-			log.RequestBody = requestBody.String
-		}
-		if queryParams.Valid {
-			log.QueryParams = queryParams.String
-		}
-		if routeParams.Valid {
-			log.RouteParams = routeParams.String
-		}
-		if contextLocals.Valid {
-			log.ContextLocals = contextLocals.String
-		}
-		if responseTime.Valid {
-			log.ResponseTime = responseTime.Int64
-		}
-		if deletedAt.Valid {
-			deletedTime := deletedAt.Time
-			log.DeletedAt = &deletedTime
-		}
-
-		logs = append(logs, log)
-	}
-
-	return logs, nil
+	
+	err := r.DB.Where("username = ?", username).
+		Order("createdat DESC").
+		Find(&logs).Error
+		
+	return logs, err
 }
 
 // GetAllLogs retrieves all logs from the database
 func (r *LoggerRepository) GetAllLogs() ([]logging.ActivityLog, error) {
-	query := `
-	SELECT id, level, message, username, timestamp, ip_address, 
-	       useragent, browserinfo, action, route, method, statuscode,
-	       requestbody, queryparams, routeparams, contextlocals, responsetime,
-	       createdat, updatedat, deletedat
-	FROM ActivityLog
-	WHERE deletedat IS NULL
-	ORDER BY createdat DESC
-	`
-
-	rows, err := r.DB.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var logs []logging.ActivityLog
-	for rows.Next() {
-		var log logging.ActivityLog
-		var deletedAt sql.NullTime
-		var createdAt, updatedAt sql.NullTime
-		var requestBody, queryParams, routeParams, contextLocals sql.NullString
-		var responseTime sql.NullInt64
-
-		err := rows.Scan(
-			&log.ID, &log.Level, &log.Message, &log.Username, &log.Timestamp,
-			&log.IPAddress, &log.UserAgent, &log.BrowserInfo, &log.Action,
-			&log.Route, &log.Method, &log.StatusCode,
-			&requestBody, &queryParams, &routeParams, &contextLocals, &responseTime,
-			&createdAt, &updatedAt, &deletedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Handle nullable fields
-		if requestBody.Valid {
-			log.RequestBody = requestBody.String
-		}
-		if queryParams.Valid {
-			log.QueryParams = queryParams.String
-		}
-		if routeParams.Valid {
-			log.RouteParams = routeParams.String
-		}
-		if contextLocals.Valid {
-			log.ContextLocals = contextLocals.String
-		}
-		if responseTime.Valid {
-			log.ResponseTime = responseTime.Int64
-		}
-		if deletedAt.Valid {
-			deletedTime := deletedAt.Time
-			log.DeletedAt = &deletedTime
-		}
-
-		logs = append(logs, log)
-	}
-
-	return logs, nil
+	
+	err := r.DB.Order("createdat DESC").
+		Find(&logs).Error
+		
+	return logs, err
 }

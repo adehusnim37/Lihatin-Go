@@ -13,11 +13,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type bodyLogWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w bodyLogWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)               // copy to buffer
+	return w.ResponseWriter.Write(b) // write out normally
+}
+
+func (w bodyLogWriter) WriteString(s string) (int, error) {
+	w.body.WriteString(s)
+	return w.ResponseWriter.WriteString(s)
+}
+
 // ActivityLogger middleware for logging user activities
 func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Start timer
 		startTime := time.Now()
+
+		blw := &bodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		c.Writer = blw
 
 		// Capture request body for POST, PUT, PATCH requests
 		var requestBody string
@@ -28,11 +46,17 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 			}
 		}
 
-		// Capture query parameters
+		// Capture query parameters - ensure valid JSON for database constraint
 		queryParams := captureQueryParams(c)
+		if queryParams == "" {
+			queryParams = "{}" // Empty JSON object to satisfy database constraint
+		}
 
-		// Capture route parameters
+		// Capture route parameters - ensure valid JSON for database constraint
 		routeParams := captureRouteParams(c)
+		if routeParams == "" {
+			routeParams = "{}" // Empty JSON object to satisfy database constraint
+		}
 
 		// Process request
 		c.Next()
@@ -53,8 +77,11 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 			username = "anonymous"
 		}
 
-		// Capture context locals (all context values)
+		// Capture context locals (all context values) - ensure valid JSON for database constraint
 		contextLocals := captureContextLocals(c)
+		if contextLocals == "" {
+			contextLocals = "{}" // Empty JSON object to satisfy database constraint
+		}
 
 		// Get path and method
 		path := c.Request.URL.Path
@@ -66,6 +93,18 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 
 		// Create log message
 		message := fmt.Sprintf("%s %s - %d (%dms)", method, path, statusCode, responseTime)
+
+		// Create response body - ensure valid JSON for database constraint
+		responseBody := blw.body.String()
+		if responseBody == "" {
+			responseBody = "{}" // Empty JSON object to satisfy database constraint
+		}
+
+		// Ensure requestBody is valid JSON for database constraint
+		if requestBody == "" {
+			requestBody = "{}" // Empty JSON object to satisfy database constraint
+		}
+		
 
 		// Create log entry
 		log := &logging.ActivityLog{
@@ -85,6 +124,7 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 			RouteParams:   routeParams,
 			ContextLocals: contextLocals,
 			ResponseTime:  responseTime,
+			ResponseBody:  responseBody,
 		}
 
 		// Save log asynchronously to not block the response
@@ -150,7 +190,7 @@ func sanitizeRequestBody(body string) string {
 // captureQueryParams captures all query parameters as JSON string
 func captureQueryParams(c *gin.Context) string {
 	if len(c.Request.URL.RawQuery) == 0 {
-		return ""
+		return "{}" // Return empty JSON object instead of empty string
 	}
 
 	queryMap := make(map[string]interface{})
@@ -166,14 +206,14 @@ func captureQueryParams(c *gin.Context) string {
 		return string(jsonBytes)
 	}
 
-	return c.Request.URL.RawQuery
+	return "{}" // Return empty JSON object on error
 }
 
 // captureRouteParams captures all route parameters as JSON string
 func captureRouteParams(c *gin.Context) string {
 	params := c.Params
 	if len(params) == 0 {
-		return ""
+		return "{}" // Return empty JSON object instead of empty string
 	}
 
 	paramsMap := make(map[string]string)
@@ -185,7 +225,7 @@ func captureRouteParams(c *gin.Context) string {
 		return string(jsonBytes)
 	}
 
-	return ""
+	return "{}" // Return empty JSON object on error
 }
 
 // captureContextLocals captures important context values (excluding sensitive data)
@@ -210,14 +250,14 @@ func captureContextLocals(c *gin.Context) string {
 	}
 
 	if len(locals) == 0 {
-		return ""
+		return "{}" // Return empty JSON object instead of empty string
 	}
 
 	if jsonBytes, err := json.Marshal(locals); err == nil {
 		return string(jsonBytes)
 	}
 
-	return ""
+	return "{}" // Return empty JSON object on error
 }
 
 // parseUserAgent extracts browser and OS information from user agent string

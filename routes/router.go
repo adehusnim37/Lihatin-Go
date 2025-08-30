@@ -37,7 +37,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	loggerController := controllers.NewLoggerController(baseController)
 
 	// Setup logger repository for middleware
-	loggerRepo := repositories.NewLoggerRepository(db)
+	loggerRepo := repositories.NewLoggerRepository(gormDB)
 
 	// Setup user repository for auth middleware
 	userRepo := repositories.NewUserRepository(db)
