@@ -7,9 +7,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-
-
-var jwtSecret = []byte(getEnvOrDefault("JWT_SECRET", "default-secret-key"))
+var jwtSecret = []byte(GetRequiredEnv(EnvJWTSecret))
 
 // JWTClaims represents the JWT claims structure
 type JWTClaims struct {
@@ -32,7 +30,7 @@ func GenerateJWT(userID, username, email, role string, isPremium, isVerified boo
 		IsPremium:  isPremium,
 		IsVerified: isVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 24 hours
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(GetEnvAsInt(EnvJWTExpired, 24)) * time.Hour)), // 48 hours
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "lihatin-go",

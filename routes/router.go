@@ -2,17 +2,15 @@ package routes
 
 import (
 	"database/sql"
-	"log"
-	"os"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
 	"github.com/adehusnim37/lihatin-go/controllers/user"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -21,15 +19,8 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	// Inisialisasi router Gin default (sudah include logger & recovery middleware)
 	r := gin.Default()
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
 	// Initialize GORM for new auth repositories
-	dsn := os.Getenv("DATABASE_URL") // Ambil dari environment variable
-	if dsn == "" {
-		log.Fatal("DATABASE_URL config is required")
-	}
+	dsn := utils.GetRequiredEnv(utils.EnvDatabaseURL)
 	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("Failed to connect to database with GORM: " + err.Error())

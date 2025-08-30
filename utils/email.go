@@ -2,12 +2,9 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"net/smtp"
-	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/jordan-wright/email"
 )
 
@@ -40,12 +37,12 @@ type EmailService struct {
 func NewEmailService() *EmailService {
 	return &EmailService{
 		config: EmailConfig{
-			SMTPHost:     getEnvOrDefault("SMTP_HOST", "smtp.gmail.com"),
-			SMTPPort:     getEnvOrDefault("SMTP_PORT", "587"),
-			SMTPUsername: getEnvOrDefault("SMTP_USER", ""),
-			SMTPPassword: getEnvOrDefault("SMTP_PASS", ""),
-			FromEmail:    getEnvOrDefault("FROM_EMAIL", "noreply@lihatin.com"),
-			FromName:     getEnvOrDefault("FROM_NAME", "Lihatin"),
+			SMTPHost:     GetEnvOrDefault(EnvSMTPHost, "smtp.gmail.com"),
+			SMTPPort:     GetEnvOrDefault(EnvSMTPPort, "587"),
+			SMTPUsername: GetEnvOrDefault(EnvSMTPUser, ""),
+			SMTPPassword: GetEnvOrDefault(EnvSMTPPass, ""),
+			FromEmail:    GetEnvOrDefault(EnvFromEmail, "noreply@lihatin.com"),
+			FromName:     GetEnvOrDefault(EnvFromName, "Lihatin"),
 		},
 	}
 }
@@ -314,18 +311,6 @@ func (es *EmailService) sendEmail(to, subject, textBody, htmlBody string) error 
 	addr := fmt.Sprintf("%s:%s", es.config.SMTPHost, es.config.SMTPPort)
 
 	return e.Send(addr, auth)
-}
-
-// getEnvOrDefault returns environment variable value or default
-func getEnvOrDefault(key, defaultValue string) string {
-    err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
 
 // IsTokenExpired checks if a token timestamp has expired

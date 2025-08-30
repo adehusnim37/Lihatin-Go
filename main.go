@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
@@ -13,7 +12,6 @@ import (
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -61,15 +59,8 @@ func runMigrations(db *gorm.DB) error {
 
 func main() {
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
 	// Initialize GORM for new auth repositories
-	dsn := os.Getenv("DATABASE_URL") // Ambil dari environment variable
-	if dsn == "" {
-		log.Fatal("DATABASE_URL config is required")
-	}
+	dsn := utils.GetRequiredEnv(utils.EnvDatabaseURL)
 	// Setup database connection for sql.DB (existing code)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -100,6 +91,6 @@ func main() {
 	utils.SetupCustomValidators(validate)
 
 	r := routes.SetupRouter(db, validate)
-	fmt.Println("Server running on localhost:8880 Please check your browser")
-	r.Run(":8880")
+	fmt.Println("Server running on port:", utils.GetRequiredEnv(utils.EnvAppPort))
+	r.Run(utils.GetRequiredEnv(utils.EnvAppPort))
 }
