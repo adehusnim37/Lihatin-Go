@@ -53,6 +53,7 @@ func runMigrations(db *gorm.DB) {
 		&user.User{},
 		&user.UserAuth{},
 		&user.AuthMethod{},
+		&user.LoginAttempt{},
 		&user.APIKey{},
 
 		// ShortLink models
@@ -87,6 +88,7 @@ func dropAllTables(db *gorm.DB) {
 		&shortlink.ShortLinkDetail{},
 		&shortlink.ShortLink{},
 		&user.APIKey{},
+		&user.LoginAttempt{},
 		&user.AuthMethod{},
 		&user.UserAuth{},
 		&user.User{},

@@ -19,7 +19,7 @@ type bodyLogWriter struct {
 }
 
 func (w bodyLogWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)               // copy to buffer
+	w.body.Write(b)                  // copy to buffer
 	return w.ResponseWriter.Write(b) // write out normally
 }
 
@@ -27,7 +27,7 @@ func (w bodyLogWriter) WriteString(s string) (int, error) {
 	w.body.WriteString(s)
 	return w.ResponseWriter.WriteString(s)
 }
-
+	
 // ActivityLogger middleware for logging user activities
 func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -104,7 +104,6 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		if requestBody == "" {
 			requestBody = "{}" // Empty JSON object to satisfy database constraint
 		}
-		
 
 		// Create log entry
 		log := &logging.ActivityLog{

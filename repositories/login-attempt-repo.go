@@ -22,8 +22,14 @@ func NewLoginAttemptRepository(db *gorm.DB) *LoginAttemptRepository {
 // RecordLoginAttempt records a login attempt
 func (r *LoginAttemptRepository) RecordLoginAttempt(userID, ipAddress, userAgent string, success bool, failReason string) error {
 	attempt := &user.LoginAttempt{
-		ID:          uuid.New().String(),
-		UserID:      userID,
+		ID: uuid.New().String(),
+		UserID: func() *string {
+			if userID == "" || userID == "null" {
+				return nil
+			} else {
+				return &userID
+			}
+		}(),
 		IPAddress:   ipAddress,
 		UserAgent:   userAgent,
 		Success:     success,

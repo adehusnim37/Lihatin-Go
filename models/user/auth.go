@@ -95,13 +95,15 @@ func (AuthMethod) TableName() string {
 
 // LoginAttempt represents a login attempt record
 type LoginAttempt struct {
-	ID          string    `json:"id" gorm:"primaryKey"`
-	UserID      string    `json:"user_id" gorm:"index"`
-	IPAddress   string    `json:"ip_address"`
-	UserAgent   string    `json:"user_agent"`
-	Success     bool      `json:"success"`
-	FailReason  string    `json:"fail_reason,omitempty"`
-	AttemptedAt time.Time `json:"attempted_at"`
+	ID          string     `json:"id" gorm:"primaryKey"`
+	UserID      *string    `json:"user_id,omitempty" gorm:"index"` // Nullable foreign key
+	IPAddress   string     `json:"ip_address" gorm:"size:45"`     // IPv4/IPv6
+	UserAgent   string     `json:"user_agent" gorm:"size:255"`
+	Success     bool       `json:"success" gorm:"default:false"`
+	FailReason  string     `json:"fail_reason,omitempty" gorm:"size:255"`
+	AttemptedAt time.Time  `json:"attempted_at" gorm:"autoCreateTime"`
+	CreatedAt   time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 
 	// Associations
 	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`

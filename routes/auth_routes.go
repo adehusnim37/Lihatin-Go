@@ -8,12 +8,12 @@ import (
 )
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository) {
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
 		// Basic authentication
-		authGroup.POST("/login", authController.Login)
+		authGroup.POST("/login", authController.Login, middleware.RecordLoginAttempt(&loginAttemptRepo))
 		authGroup.POST("/register", authController.Register)
 
 		// Password reset flow

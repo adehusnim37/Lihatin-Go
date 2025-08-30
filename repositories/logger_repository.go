@@ -30,20 +30,20 @@ func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
 // GetLogsByUsername retrieves all logs for a specific username
 func (r *LoggerRepository) GetLogsByUsername(username string) ([]logging.ActivityLog, error) {
 	var logs []logging.ActivityLog
-	
+
 	err := r.DB.Where("username = ?", username).
 		Order("createdat DESC").
 		Find(&logs).Error
-		
+
 	return logs, err
 }
 
 // GetAllLogs retrieves all logs from the database
 func (r *LoggerRepository) GetAllLogs() ([]logging.ActivityLog, error) {
 	var logs []logging.ActivityLog
-	
+
 	err := r.DB.Order("createdat DESC").
 		Find(&logs).Error
-		
+
 	return logs, err
 }
