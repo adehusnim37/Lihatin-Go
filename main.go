@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
@@ -12,6 +13,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -58,8 +60,18 @@ func runMigrations(db *gorm.DB) error {
 }
 
 func main() {
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	// Initialize GORM for new auth repositories
+	dsn := os.Getenv("DATABASE_URL") // Ambil dari environment variable
+	if dsn == "" {
+		log.Fatal("DATABASE_URL config is required")
+	}
 	// Setup database connection for sql.DB (existing code)
-	db, err := sql.Open("mysql", "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?parseTime=true")
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Printf("Please check your database connection during hitting the server")
 		log.Printf("Error connecting to database: %v", err)
@@ -68,7 +80,6 @@ func main() {
 	defer db.Close()
 
 	// Setup GORM connection for migrations
-	dsn := "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?charset=utf8mb4&parseTime=True&loc=Local"
 	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Printf("Failed to connect database with GORM: %v", err)

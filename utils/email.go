@@ -2,10 +2,12 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"net/smtp"
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/jordan-wright/email"
 )
 
@@ -40,8 +42,8 @@ func NewEmailService() *EmailService {
 		config: EmailConfig{
 			SMTPHost:     getEnvOrDefault("SMTP_HOST", "smtp.gmail.com"),
 			SMTPPort:     getEnvOrDefault("SMTP_PORT", "587"),
-			SMTPUsername: getEnvOrDefault("SMTP_USERNAME", ""),
-			SMTPPassword: getEnvOrDefault("SMTP_PASSWORD", ""),
+			SMTPUsername: getEnvOrDefault("SMTP_USER", ""),
+			SMTPPassword: getEnvOrDefault("SMTP_PASS", ""),
 			FromEmail:    getEnvOrDefault("FROM_EMAIL", "noreply@lihatin.com"),
 			FromName:     getEnvOrDefault("FROM_NAME", "Lihatin"),
 		},
@@ -316,6 +318,10 @@ func (es *EmailService) sendEmail(to, subject, textBody, htmlBody string) error 
 
 // getEnvOrDefault returns environment variable value or default
 func getEnvOrDefault(key, defaultValue string) string {
+    err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	if value := os.Getenv(key); value != "" {
 		return value
 	}

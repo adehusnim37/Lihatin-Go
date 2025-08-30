@@ -7,7 +7,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("your-super-secret-jwt-key-change-this-in-production")
+
+
+var jwtSecret = []byte(getEnvOrDefault("JWT_SECRET", "default-secret-key"))
 
 // JWTClaims represents the JWT claims structure
 type JWTClaims struct {

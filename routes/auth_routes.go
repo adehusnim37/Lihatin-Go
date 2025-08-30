@@ -22,7 +22,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 		// Email verification
 		authGroup.GET("/verify-email", authController.VerifyEmail)
-		authGroup.POST("/resend-verification", authController.ResendVerification)
 
 		// Token refresh
 		authGroup.POST("/refresh-token", authController.RefreshToken)

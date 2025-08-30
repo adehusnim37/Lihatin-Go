@@ -10,6 +10,7 @@ import (
 func SetupCustomValidators(v *validator.Validate) {
 	// Register custom validation for password complexity
 	v.RegisterValidation("pwdcomplex", validatePasswordComplexity)
+	v.RegisterValidation("username", ValidateUserRegistration)
 }
 
 // validatePasswordComplexity checks if a password has alphanumeric characters and symbols
@@ -27,4 +28,12 @@ func validatePasswordComplexity(fl validator.FieldLevel) bool {
 
 	// Return true only if all conditions are met
 	return hasLetter && hasDigit && hasSymbol
+}
+
+func ValidateUserRegistration(fl validator.FieldLevel) bool {
+	username := fl.Field().String()
+
+	minLength := 5
+	maxLength := 20
+	return username != "" && username != "null" && len(username) >= minLength && len(username) <= maxLength
 }
