@@ -8,16 +8,16 @@ import (
 
 // ShortLink represents the main short link entity
 type ShortLink struct {
-	ID          string         `json:"id" gorm:"primaryKey"`                   // Changed to string for consistency
-	UserID      string         `json:"user_id" gorm:"size:191;not null;index"` // Foreign key to users table (string to match User.ID)
+	ID          string         `json:"id" gorm:"primaryKey"`                    // Changed to string for consistency
+	UserID      string         `json:"user_id,omitempty" gorm:"size:191;index"` // Foreign key to users table (string to match User.ID)
 	ShortCode   string         `json:"short_code" gorm:"uniqueIndex;size:10;not null"`
-	OriginalURL string         `json:"original_url" gorm:"type:text;not null"`
-	Title       string         `json:"title" gorm:"size:255"`
-	Description string         `json:"description" gorm:"type:text"`
+	OriginalURL string         `json:"original_url,omitempty" gorm:"type:text;not null"`
+	Title       string         `json:"title,omitempty" gorm:"size:255"`
+	Description string         `json:"description,omitempty" gorm:"type:text"`
 	IsActive    bool           `json:"is_active" gorm:"default:true"`
-	ExpiresAt   *time.Time     `json:"expires_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ExpiresAt   *time.Time     `json:"expires_at" gorm:"index"`
+	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt   gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 
 	// Relationships - Note: User tidak di-include untuk menghindari circular import
@@ -33,7 +33,7 @@ func (ShortLink) TableName() string {
 
 // ShortLinkResponse represents short link data for API responses
 type ShortLinkResponse struct {
-	ID          uint       `json:"id"`
+	ID          string     `json:"id"`
 	UserID      string     `json:"user_id"`
 	ShortCode   string     `json:"short_code"`
 	OriginalURL string     `json:"original_url"`
@@ -48,6 +48,7 @@ type ShortLinkResponse struct {
 
 // CreateShortLinkRequest represents request to create short link
 type CreateShortLinkRequest struct {
+	UserID      string     `json:"user_id,omitempty"`
 	OriginalURL string     `json:"original_url" validate:"required,url"`
 	Title       string     `json:"title,omitempty" validate:"max=255"`
 	Description string     `json:"description,omitempty"`

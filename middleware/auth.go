@@ -147,6 +147,7 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 					c.Set("role", claims.Role)
 					c.Set("is_premium", claims.IsPremium)
 					c.Set("is_verified", claims.IsVerified)
+					c.Set("is_authenticated", true)
 
 					// Optionally get full user object
 					if user, err := userRepo.GetUserByID(claims.UserID); err == nil {
