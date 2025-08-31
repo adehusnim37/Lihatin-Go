@@ -95,7 +95,7 @@ func GetLocationString(ip string) string {
 	}
 
 	if len(parts) > 0 {
-		return fmt.Sprintf("%s", joinWithComma(parts))
+		return joinWithComma(parts)
 	}
 
 	return "Unknown Location"
