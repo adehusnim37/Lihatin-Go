@@ -229,6 +229,7 @@ The Lihatin Team
 func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAgent string) error {
 	subject := "New Login to Your Account"
 	loginTime := time.Now().Format("January 2, 2006 at 3:04 PM MST")
+    location := GetLocationString(ipAddress)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -255,6 +256,7 @@ func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAg
             <div class="info-box">
                 <strong>Login Details:</strong><br>
                 Time: %s<br>
+                Location: %s<br>
                 IP Address: %s<br>
                 Device/Browser: %s
             </div>
@@ -269,7 +271,7 @@ func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAg
     </div>
 </body>
 </html>
-`, userName, loginTime, ipAddress, userAgent)
+`, userName, loginTime, location, ipAddress, userAgent)
 
 	textBody := fmt.Sprintf(`
 Hello %s,

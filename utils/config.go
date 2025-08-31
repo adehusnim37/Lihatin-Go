@@ -96,4 +96,5 @@ const (
 	EnvJWTSecret   = "JWT_SECRET"
 	EnvAppPort     = "APP_PORT"
 	EnvJWTExpired  = "JWT_EXPIRED"
+	EnvIPGeoAPIKey = "IP_GEOLOCATION_API_KEY"
 )
