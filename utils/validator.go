@@ -86,6 +86,8 @@ func GetIndonesianValidationMessage(err validator.FieldError) string {
 		return "maksimal " + err.Param() + " karakter"
 	case "min":
 		return "minimal " + err.Param() + " karakter"
+	case "len":
+		return "harus tepat " + err.Param() + " karakter"
 	case "alphanum":
 		return "hanya boleh huruf dan angka"
 	case "alpha":

@@ -56,6 +56,7 @@ func (c *Controller) Create(ctx *gin.Context) {
 		Title:       req.Title,
 		Description: req.Description,
 		CustomCode:  req.CustomCode,
+		Passcode:    req.Passcode, // 🎯 ADD THIS MISSING LINE!
 		ExpiresAt:   req.ExpiresAt,
 	}
 

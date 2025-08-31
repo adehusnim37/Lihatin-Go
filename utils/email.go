@@ -50,7 +50,7 @@ func NewEmailService() *EmailService {
 // SendVerificationEmail sends email verification email
 func (es *EmailService) SendVerificationEmail(toEmail, userName, token string) error {
 	subject := "Verify Your Email Address"
-	verificationURL := fmt.Sprintf("http://localhost:8880/v1/auth/verify-email?token=%s", token)
+	verificationURL := fmt.Sprintf(GetRequiredEnv(EnvBackendURL)+`/v1/auth/verify-email?token=%s`, token)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>

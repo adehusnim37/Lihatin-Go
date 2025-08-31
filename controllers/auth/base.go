@@ -106,22 +106,51 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 
+	token, err := utils.GenerateVerificationToken()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Registration failed",
+			Error:   map[string]string{"server": "Failed to generate verification token"},
+		})
+		return
+	}
+
+	jwtExpiredHours, err := strconv.Atoi(utils.GetRequiredEnv("JWT_EXPIRED"))
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Invalid JWT_EXPIRED environment variable",
+			Error:   map[string]string{"server": "Failed to parse JWT_EXPIRED"},
+		})
+		return
+	}
+	expirationTime := time.Now().Add(time.Duration(jwtExpiredHours) * time.Hour)
+
 	// Create user auth record for email verification
 	userAuth := &user.UserAuth{
 		UserID:                 newUser.ID,
 		PasswordHash:           hashedPassword, // Use the same hashed password
 		IsEmailVerified:        false,
-		EmailVerificationToken: "verification-token", // TODO: Generate proper token
+		EmailVerificationToken: token,
+		EmailVerificationTokenExpiresAt: &expirationTime,
 		IsActive:               true,
 	}
 
 	if err := c.repo.GetUserAuthRepository().CreateUserAuth(userAuth); err != nil {
-		// Log error but don't fail registration
-		// User can verify email later
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Registration failed",
+			Error:   map[string]string{"server": "Failed to create user authentication record"},
+		})
+		return
 	}
 
 	// Send verification email (optional, continue even if fails)
-	_ = c.emailService.SendVerificationEmail(newUser.Email, newUser.FirstName, "verification-token")
+	_ = c.emailService.SendVerificationEmail(newUser.Email, newUser.FirstName, token)
 
 	ctx.JSON(http.StatusCreated, common.APIResponse{
 		Success: true,

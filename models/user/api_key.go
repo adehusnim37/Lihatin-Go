@@ -1,6 +1,10 @@
 package user
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
 	"time"
 )
 
@@ -34,6 +38,68 @@ func (a *APIKey) KeyPreview() string {
 		return a.Key + "..."
 	}
 	return a.Key[:8] + "..."
+}
+
+const (
+	// DefaultKeyPrefix is a generic prefix for API keys.
+	DefaultKeyPrefix = "sk_lh" // "sk" for Secret Key
+	// KeyByteLength determines the length of the random part of the key.
+	KeyByteLength = 32
+	// SecretByteLength determines the length of the random part of the secret.
+	SecretByteLength = 64
+)
+
+// GenerateAPIKeyPair creates a new API Key ID (Client ID part) and a Secret Key.
+// The Key ID is returned directly.
+// The Secret Key is returned directly ONCE for the user to copy.
+// The HASH of the Secret Key is what you should store.
+//
+// Returns:
+//
+//	keyID (string): The full API Key ID (e.g., "sk_live_xxxxxxxxxxxx"). To be stored and used by the client.
+//	secretKey (string): The plaintext secret key. SHOW THIS TO THE USER ONCE. DO NOT STORE.
+//	secretKeyHash (string): The SHA256 hash of the secret key. STORE THIS in APIClientKey.SecretKeyHash.
+//	keyPreview (string): Last few characters of keyID for display.
+//	error: Any error during generation.
+func GenerateAPIKeyPair(prefix string) (keyID, secretKey, secretKeyHash, keyPreview string, err error) {
+	if prefix == "" {
+		prefix = DefaultKeyPrefix
+	}
+
+	// Generate Key ID part
+	keyIDBytes := make([]byte, KeyByteLength)
+	if _, err = rand.Read(keyIDBytes); err != nil {
+		return "", "", "", "", fmt.Errorf("failed to generate key ID bytes: %w", err)
+	}
+	keyID = prefix + base64.URLEncoding.EncodeToString(keyIDBytes)
+	// Make it a bit shorter and more URL-friendly if needed, or ensure length constraints
+	// For simplicity, using the full base64 encoded string here.
+
+	if len(keyID) > 4 { // Ensure there are enough characters for a preview
+		keyPreview = keyID[len(keyID)-4:]
+	} else {
+		keyPreview = keyID
+	}
+
+	// Generate Secret Key part
+	secretBytes := make([]byte, SecretByteLength)
+	if _, err = rand.Read(secretBytes); err != nil {
+		return "", "", "", "", fmt.Errorf("failed to generate secret key bytes: %w", err)
+	}
+	secretKey = base64.URLEncoding.EncodeToString(secretBytes) // This is the raw secret
+
+	// Hash the Secret Key
+	hash := sha256.Sum256([]byte(secretKey))
+	secretKeyHash = fmt.Sprintf("%x", hash[:]) // Hex encode the hash
+
+	return keyID, secretKey, secretKeyHash, keyPreview, nil
+}
+
+// ValidateAPISecretKey compares a provided plaintext secret key against a stored hash.
+func ValidateAPISecretKey(providedSecretKey, storedSecretKeyHash string) bool {
+	hash := sha256.Sum256([]byte(providedSecretKey))
+	providedSecretKeyHash := fmt.Sprintf("%x", hash[:])
+	return providedSecretKeyHash == storedSecretKeyHash
 }
 
 // APIKeyRequest represents the request to create a new API key

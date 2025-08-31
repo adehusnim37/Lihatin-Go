@@ -63,7 +63,7 @@ func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, expiresAt time.Time) error {
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"email_verification_token":            token,
 			"email_verification_token_expires_at": expiresAt,
 		}).Error
@@ -89,7 +89,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("invalid or expired verification token")
+		return fmt.Errorf("invalid or expired verification token: %s", token)
 	}
 
 	return nil

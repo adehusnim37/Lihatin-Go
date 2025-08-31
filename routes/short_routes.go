@@ -11,6 +11,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	shortGroup := rg.Group("/short")
 	{
 		shortGroup.POST("", shortController.Create, middleware.OptionalAuth(userRepo))
+		shortGroup.GET("/:code", shortController.Redirect) // Fixed: removed invalid ?:passcode
 	}
 }
 

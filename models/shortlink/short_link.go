@@ -49,6 +49,7 @@ type ShortLinkResponse struct {
 // CreateShortLinkRequest represents request to create short link
 type CreateShortLinkRequest struct {
 	UserID      string     `json:"user_id,omitempty"`
+	Passcode    string     `json:"passcode,omitempty" validate:"len=6,numeric"`
 	OriginalURL string     `json:"original_url" validate:"required,url"`
 	Title       string     `json:"title,omitempty" validate:"max=255"`
 	Description string     `json:"description,omitempty"`
