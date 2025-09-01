@@ -2,39 +2,29 @@ package shortlink
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
+type DTO struct {
+	Code string `json:"code" binding:"required,min=1,max=100,alphanum" uri:"code"`
+}
+
 func (c *Controller) GetShortLink(ctx *gin.Context) {
-	id := ctx.Param("id")
-	passcodeStr := ctx.Query("passcode")
-	
-	passcode, err := strconv.Atoi(passcodeStr)
-	if err != nil {
+	var dto DTO
+
+	if err := ctx.ShouldBindUri(&dto); err != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Invalid passcode format",
-			Error:   map[string]string{"passcode": "Passcode must be a valid integer"},
+			Message: "Invalid request",
+			Error:   map[string]string{"code": "Invalid short code format"},
 		})
 		return
 	}
-	shortLink, err := c.repo.GetShortLinkByShortCode(id, ctx.ClientIP(), ctx.Request.UserAgent(), ctx.Request.Referer(), passcode)
 
-
-	if err != nil && err != gorm.ErrRecordNotFound {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve short link. Looks like the link is not active or has expired.",
-			Error:   map[string]string{"id": "Failed to retrieve short link. Looks like the link is not active or has expired."},
-		})
-		return
-	}
+	shortLink, err := c.repo.GetShortLinkByShortCode(dto.Code)
 
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, common.APIResponse{

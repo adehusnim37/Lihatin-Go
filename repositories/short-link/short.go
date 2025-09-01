@@ -7,6 +7,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/google/uuid"
 
 	"gorm.io/gorm"
@@ -26,7 +27,7 @@ func NewShortLinkRepository(db *gorm.DB) *ShortLinkRepository {
 	return &ShortLinkRepository{db: db}
 }
 
-func (r *ShortLinkRepository) CreateShortLink(link *shortlink.CreateShortLinkRequest) error {
+func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) error {
 	if err := r.db.Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
 		return gorm.ErrDuplicatedKey
 	}
@@ -82,8 +83,8 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 	return url[:endIndex]
 }
 
-// GetShortLinksByUserIDWithPagination gets short links with pagination
-func (r *ShortLinkRepository) GetShortLinksByUserIDWithPagination(userID string, page, limit int) (*shortlink.PaginatedShortLinksResponse, error) {
+// RedirectsByUserIDWithPagination gets short links with pagination
+func (r *ShortLinkRepository) GetShortByUserIDWithPagination(userID string, page, limit int) (*shortlink.PaginatedShortLinksResponse, error) {
 	var links []shortlink.ShortLink
 	var totalCount int64
 
@@ -136,7 +137,7 @@ func (r *ShortLinkRepository) GetShortLinksByUserIDWithPagination(userID string,
 	return response, nil
 }
 
-func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, ipAddress, userAgent, referer string, passcode int) (*shortlink.ShortLink, error) {
+func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAgent, referer string, passcode int) (*shortlink.ShortLink, error) {
 	var link shortlink.ShortLink
 	// Find the short link by code with proper validation
 	err := r.db.Where("short_code = ?", code).First(&link).Error
@@ -236,6 +237,14 @@ func (r *ShortLinkRepository) GetAllShortLinks() ([]shortlink.ShortLink, error) 
 		return nil, err
 	}
 	return links, nil
+}
+
+func (r *ShortLinkRepository) GetShortLinkByShortCode(code string) (*shortlink.ShortLink, error) {
+	var link shortlink.ShortLink
+	if err := r.db.Where("short_code = ?", code).First(&link).Error; err != nil {
+		return nil, err
+	}
+	return &link, nil
 }
 
 func (r *ShortLinkRepository) UpdateShortLinkByShortCode(code string, updates shortlink.UpdateShortLinkRequest) error {

@@ -42,7 +42,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	}
 
 	// Get short link and track the view
-	link, err := c.repo.GetShortLinkByShortCode(shortCode, ipAddress, userAgent, referer, passcode)
+	link, err := c.repo.RedirectByShortCode(shortCode, ipAddress, userAgent, referer, passcode)
 	if err != nil {
 
 		if err == gorm.ErrRecordNotFound {

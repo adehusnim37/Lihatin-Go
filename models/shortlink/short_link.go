@@ -47,15 +47,7 @@ type ShortLinkResponse struct {
 }
 
 // CreateShortLinkRequest represents request to create short link
-type CreateShortLinkRequest struct {
-	UserID      string     `json:"user_id,omitempty"`
-	Passcode    string     `json:"passcode,omitempty" validate:"len=6,numeric"`
-	OriginalURL string     `json:"original_url" validate:"required,url"`
-	Title       string     `json:"title,omitempty" validate:"max=255"`
-	Description string     `json:"description,omitempty"`
-	CustomCode  string     `json:"custom_code,omitempty" validate:"max=10,alphanum"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-}
+
 
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {

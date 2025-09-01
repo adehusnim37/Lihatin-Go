@@ -4,14 +4,14 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 func (c *Controller) Create(ctx *gin.Context) {
-	var req shortlink.CreateShortLinkRequest
+	var req dto.CreateShortLinkRequest
 	var userID string
 	if userIDVal, exists := ctx.Get("user_id"); exists {
 		userID = userIDVal.(string)
@@ -36,22 +36,9 @@ func (c *Controller) Create(ctx *gin.Context) {
 		return
 	}
 
-	// Validate the request using the validator
-	if err := c.Validate.Struct(&req); err != nil {
-		// Use global function to handle validation errors
-		validationErrors := utils.HandleValidationError(err, &req)
 
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   validationErrors,
-		})
-		return
-	}
-
-	link := &shortlink.CreateShortLinkRequest{
-		UserID:      req.UserID,
+	link := dto.CreateShortLinkRequest{
+		UserID:      userID,
 		OriginalURL: req.OriginalURL,
 		Title:       req.Title,
 		Description: req.Description,
@@ -60,7 +47,7 @@ func (c *Controller) Create(ctx *gin.Context) {
 		ExpiresAt:   req.ExpiresAt,
 	}
 
-	if err := c.repo.CreateShortLink(link); err != nil {
+	if err := c.repo.CreateShortLink(&link); err != nil {
 		if err == gorm.ErrDuplicatedKey {
 			ctx.JSON(http.StatusConflict, common.APIResponse{
 				Success: false,
