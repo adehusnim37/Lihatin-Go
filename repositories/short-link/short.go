@@ -2,21 +2,21 @@ package shortlink
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/shortlink"
-	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/adehusnim37/lihatin-go/dto"
+	shortlink "github.com/adehusnim37/lihatin-go/models/shortlink"
+	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
-
 	"gorm.io/gorm"
 )
 
-var rng *rand.Rand
+var localRng *rand.Rand
 
 func init() {
-	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	localRng = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
 type ShortLinkRepository struct {
@@ -28,17 +28,34 @@ func NewShortLinkRepository(db *gorm.DB) *ShortLinkRepository {
 }
 
 func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) error {
-	if err := r.db.Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
-		return gorm.ErrDuplicatedKey
+	// Check for duplicate short code first
+	if link.CustomCode != "" {
+		if err := r.db.Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
+			return gorm.ErrDuplicatedKey
+		}
 	}
 
 	if link.CustomCode == "" {
 		link.CustomCode = r.generateCustomCode(link.OriginalURL)
 	}
 
+	// Handle nullable UserID - convert string to *string for database
+	var userIDPtr *string
+	if link.UserID != "" {
+		userIDPtr = &link.UserID
+		utils.Logger.Info("Creating short link for authenticated user",
+			"user_id", link.UserID,
+			"short_code", link.CustomCode,
+		)
+	} else {
+		utils.Logger.Info("Creating short link for anonymous user",
+			"short_code", link.CustomCode,
+		)
+	}
+
 	shortLink := shortlink.ShortLink{
 		ID:          uuid.New().String(),
-		UserID:      link.UserID,
+		UserID:      userIDPtr, // ✅ Use pointer for nullable field
 		ShortCode:   link.CustomCode,
 		OriginalURL: link.OriginalURL,
 		Title:       link.Title,
@@ -47,18 +64,26 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	}
 
 	if err := r.db.Create(&shortLink).Error; err != nil {
+		utils.Logger.Error("Failed to create short link", "error", err.Error())
 		return err
 	}
 
 	shortLinkDetail := shortlink.ShortLinkDetail{
-		ID:          uuid.New().String(), // Add missing ID generation
+		ID:          uuid.New().String(),
 		ShortLinkID: shortLink.ID,
 		Passcode:    utils.StringToInt(link.Passcode),
 	}
 
 	if err := r.db.Create(&shortLinkDetail).Error; err != nil {
+		utils.Logger.Error("Failed to create short link detail", "error", err.Error())
 		return err
 	}
+
+	utils.Logger.Info("Short link created successfully",
+		"id", shortLink.ID,
+		"short_code", shortLink.ShortCode,
+		"user_id", link.UserID,
+	)
 
 	return nil
 }
@@ -69,7 +94,7 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 		const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		code := make([]byte, 6)
 		for i := range code {
-			code[i] = charset[rng.Intn(len(charset))]
+			code[i] = charset[localRng.Intn(len(charset))]
 		}
 		return string(code)
 	}
@@ -83,8 +108,8 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 	return url[:endIndex]
 }
 
-// RedirectsByUserIDWithPagination gets short links with pagination
-func (r *ShortLinkRepository) GetShortByUserIDWithPagination(userID string, page, limit int) (*shortlink.PaginatedShortLinksResponse, error) {
+// GetShortsByUserIDWithPagination gets short links with pagination and sorting
+func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, page, limit int, sort, orderBy string) (*dto.PaginatedShortLinksResponse, error) {
 	var links []shortlink.ShortLink
 	var totalCount int64
 
@@ -96,19 +121,37 @@ func (r *ShortLinkRepository) GetShortByUserIDWithPagination(userID string, page
 	// Calculate offset
 	offset := (page - 1) * limit
 
-	// Get paginated results
-	if err := r.db.Where("user_id = ?", userID).Offset(offset).Limit(limit).Find(&links).Error; err != nil {
+	// Build order clause
+	orderClause := fmt.Sprintf("%s %s", sort, orderBy)
+
+	// Get paginated results with sorting
+	if err := r.db.Where("user_id = ?", userID).
+		Order(orderClause).
+		Offset(offset).
+		Limit(limit).
+		Find(&links).Error; err != nil {
 		return nil, err
 	}
 
-	// Convert ShortLink to ShortLinkResponse with pre-allocated capacity
-	shortLinkResponses := make([]shortlink.ShortLinkResponse, 0, len(links))
+	for _, link := range links {
+		if link.UserID == nil || *link.UserID != userID {
+			utils.Logger.Warn("Unauthorized access attempt to short link",
+				"short_code", link.ShortCode,
+				"requesting_user", userID,
+				"owner_user", link.UserID,
+			)
+			return nil, utils.ErrShortLinkUnauthorized
+		}
+	}
+
+	// Convert ShortLink to ShortsLinkResponse with pre-allocated capacity
+	shortLinkResponses := make([]dto.ShortsLinkResponse, 0, len(links))
 	for _, link := range links {
 		// Calculate click count from views using a separate query (more efficient for large datasets)
 		var clickCount int64
 		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Count(&clickCount)
 
-		shortLinkResponses = append(shortLinkResponses, shortlink.ShortLinkResponse{
+		shortLinkResponses = append(shortLinkResponses, dto.ShortsLinkResponse{
 			ID:          link.ID, // Now both are strings - consistent!
 			UserID:      link.UserID,
 			ShortCode:   link.ShortCode,
@@ -126,12 +169,14 @@ func (r *ShortLinkRepository) GetShortByUserIDWithPagination(userID string, page
 	// Calculate total pages
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	response := &shortlink.PaginatedShortLinksResponse{
+	response := &dto.PaginatedShortLinksResponse{
 		ShortLinks: shortLinkResponses,
 		TotalCount: totalCount,
 		Page:       page,
 		Limit:      limit,
 		TotalPages: totalPages,
+		Sort:       sort,
+		OrderBy:    orderBy,
 	}
 
 	return response, nil
@@ -142,115 +187,195 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 	// Find the short link by code with proper validation
 	err := r.db.Where("short_code = ?", code).First(&link).Error
 	if err != nil {
-		return nil, err // Link not found
-	}
-
-	// Check if link is expired
-	if link.ExpiresAt != nil && link.ExpiresAt.Before(time.Now()) {
-		return nil, gorm.ErrRecordNotFound // Link expired
-	}
-
-	// Check if link is active
-	if !link.IsActive {
-		return nil, gorm.ErrRecordNotFound // Link inactive
-	}
-
-	// Load existing detail or create if doesn't exist
-	var detail shortlink.ShortLinkDetail
-	err = r.db.Where("short_link_id = ?", link.ID).First(&detail).Error
-	if err == gorm.ErrRecordNotFound {
-		// Create detail if doesn't exist
-		detail = shortlink.ShortLinkDetail{
-			ID:            uuid.New().String(),
-			ShortLinkID:   link.ID,
-			CurrentClicks: 0,
-			EnableStats:   true,
-			Passcode:      0, // No passcode by default
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.Logger.Warn("Short link not found",
+				"short_code", code,
+				"ip_address", ipAddress,
+			)
+			return nil, utils.ErrShortLinkNotFound
 		}
-		if err := r.db.Create(&detail).Error; err != nil {
-			// Log error but continue
-		}
-	} else if err != nil {
+
+		utils.Logger.Error("Database error while fetching short link",
+			"short_code", code,
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 
-	// Check if passcode is required and validate (only if passcode is set in database)
-	if detail.Passcode != 0 {
+	// Check if short link is active
+	if !link.IsActive {
+		utils.Logger.Warn("Inactive short link accessed",
+			"short_code", code,
+			"ip_address", ipAddress,
+		)
+		return nil, utils.ErrShortLinkInactive
+	}
+
+	// Check if short link is expired
+	if link.ExpiresAt != nil && link.ExpiresAt.Before(time.Now()) {
+		utils.Logger.Warn("Expired short link accessed",
+			"short_code", code,
+			"expires_at", *link.ExpiresAt,
+			"ip_address", ipAddress,
+		)
+		return nil, utils.ErrShortLinkExpired
+	}
+
+	// Check passcode if provided
+	if passcode > 0 {
+		var detail shortlink.ShortLinkDetail
+		if err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error; err != nil {
+			utils.Logger.Error("Failed to fetch short link detail",
+				"short_code", code,
+				"error", err.Error(),
+			)
+			return nil, err
+		}
 
 		if detail.Passcode != passcode {
-			// Passcode is incorrect or not provided - return error immediately
-			// fmt.Printf("Passcode mismatch! Returning error.\n")
-			return nil, errors.New("incorrect or missing passcode")
+			utils.Logger.Warn("Invalid passcode attempt",
+				"short_code", code,
+				"ip_address", ipAddress,
+			)
+			return nil, utils.ErrPasscodeIncorrect
 		}
-		// fmt.Printf("Passcode matches! Continuing...\n")
-		// Passcode is correct, continue with the function
-	}
-	// If passcode is 0 in database, no passcode validation needed
 
-	// Check click limit if enabled
-	if detail.ClickLimit > 0 && detail.CurrentClicks >= detail.ClickLimit {
-		return nil, gorm.ErrRecordNotFound // Click limit reached
-	}
+		if detail.ClickLimit > 0 && detail.CurrentClicks >= detail.ClickLimit {
+			utils.Logger.Warn("Click limit reached",
+				"short_code", code,
+				"ip_address", ipAddress,
+			)
+			return nil, utils.ErrClickLimitReached
+		}
 
-	// Get location information from IP
-	var country, city string
-	if ipAddress != "" && ipAddress != "127.0.0.1" && ipAddress != "::1" {
-		if locationResponse, err := utils.IPGeolocation(ipAddress); err == nil {
-			country = locationResponse.Location.CountryName
-			city = locationResponse.Location.City
+		detail.CurrentClicks++
+		detail.UpdatedAt = time.Now()
+		if err := r.db.Save(&detail).Error; err != nil {
+			utils.Logger.Error("Failed to update short link detail",
+				"short_code", code,
+				"ip_address", ipAddress,
+				"error", err.Error(),
+			)
+			return nil, err
 		}
 	}
 
-	// Parse user agent for device, browser, OS info
-	deviceInfo := utils.ParseUserAgent(userAgent)
+	// Track the click with basic info
+	go func() {
+		viewDetail := shortlink.ViewLinkDetail{
+			ID:          uuid.New().String(),
+			ShortLinkID: link.ID,
+			IPAddress:   ipAddress,
+			UserAgent:   userAgent,
+			Referer:     referer,
+			Country:     "Unknown", // TODO: Implement IP geolocation
+			City:        "Unknown", // TODO: Implement IP geolocation
+			ClickedAt:   time.Now(),
+		}
 
-	// Create view record to track this click
-	viewRecord := shortlink.ViewLinkDetail{
-		ID:          uuid.New().String(),
-		ShortLinkID: link.ID,
-		IPAddress:   ipAddress,
-		UserAgent:   userAgent,
-		Referer:     referer,
-		Country:     country,
-		City:        city,
-		Device:      deviceInfo.Device,
-		Browser:     deviceInfo.Browser,
-		OS:          deviceInfo.OS,
-		ClickedAt:   time.Now(),
-	}
-
-	// Save view record
-	if err := r.db.Create(&viewRecord).Error; err != nil {
-		// Log error but don't fail the redirect
-		// The user should still be able to access the link
-	}
-
-	// Update click count in detail
-	r.db.Model(&detail).UpdateColumn("current_clicks", gorm.Expr("current_clicks + ?", 1))
+		if err := r.db.Create(&viewDetail).Error; err != nil {
+			utils.Logger.Error("Failed to track click",
+				"short_code", code,
+				"ip_address", ipAddress,
+				"error", err.Error(),
+			)
+		}
+	}()
 
 	return &link, nil
 }
 
-func (r *ShortLinkRepository) GetAllShortLinks() ([]shortlink.ShortLink, error) {
-	var links []shortlink.ShortLink
-	if err := r.db.Find(&links).Error; err != nil {
-		return nil, err
-	}
-	return links, nil
-}
-
-func (r *ShortLinkRepository) GetShortLinkByShortCode(code string) (*shortlink.ShortLink, error) {
+func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, userID string) (*dto.ShortLinkResponse, error) {
 	var link shortlink.ShortLink
-	if err := r.db.Where("short_code = ?", code).First(&link).Error; err != nil {
+	var detail shortlink.ShortLinkDetail
+
+	// Get the short link first
+	err := r.db.Where("short_code = ?", code).First(&link).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrShortLinkNotFound
+		}
+
+		utils.Logger.Error("Database error while fetching short link",
+			"short_code", code,
+			"user_id", userID,
+			"error", err.Error(),
+		)
 		return nil, err
 	}
-	return &link, nil
-}
 
-func (r *ShortLinkRepository) UpdateShortLinkByShortCode(code string, updates shortlink.UpdateShortLinkRequest) error {
-	return r.db.Model(&shortlink.ShortLink{}).Where("short_code = ?", code).Updates(updates).Error
-}
+	// Check if the link belongs to the user (handle nullable UserID)
+	if link.UserID == nil || *link.UserID != userID {
+		utils.Logger.Warn("Unauthorized access attempt to short link",
+			"short_code", code,
+			"requesting_user", userID,
+			"owner_user", link.UserID,
+		)
+		return nil, utils.ErrShortLinkUnauthorized
+	}
 
-func (r *ShortLinkRepository) DeleteShortLinkByShortCode(code string) error {
-	return r.db.Where("short_code = ?", code).Delete(&shortlink.ShortLink{}).Error
+	// Get the short link detail
+	if err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.Logger.Error("Failed to fetch short link detail", "error", err.Error())
+		}
+		// Continue even if detail not found - use empty detail
+	}
+
+	// Get recent views (last 10)
+	var recentViews []shortlink.ViewLinkDetail
+	r.db.Where("short_link_id = ?", link.ID).
+		Order("clicked_at DESC").
+		Limit(10).
+		Find(&recentViews)
+
+
+	// Convert recent views to response format
+	recentViewsResponse := make([]dto.ViewLinkDetailResponse, 0, len(recentViews))
+	for _, view := range recentViews {
+		recentViewsResponse = append(recentViewsResponse, dto.ViewLinkDetailResponse{
+			ID:          view.ID,
+			IPAddress:   view.IPAddress,
+			UserAgent:   view.UserAgent,
+			Referer:     view.Referer,
+			Country:     view.Country,
+			City:        view.City,
+			Device:      view.Device,
+			Browser:     view.Browser,
+			OS:          view.OS,
+			ClickedAt:   view.ClickedAt,
+		})
+	}
+
+	utils.Logger.Info("Short link retrieved successfully",
+		"short_code", code,
+		"user_id", userID,
+	)
+
+	return &dto.ShortLinkResponse{
+		ID:           link.ID,
+		UserID:       link.UserID,
+		ShortCode:    link.ShortCode,
+		OriginalURL:  link.OriginalURL,
+		Title:        link.Title,
+		Description:  link.Description,
+		IsActive:     link.IsActive,
+		ExpiresAt:    link.ExpiresAt,
+		CreatedAt:    link.CreatedAt,
+		UpdatedAt:    link.UpdatedAt,
+		ShortLinkDetail: &dto.ShortLinkDetailsResponse{
+			ID:            detail.ID,
+			Passcode:      detail.Passcode,
+			ClickLimit:    detail.ClickLimit,
+			CurrentClicks: detail.CurrentClicks, // Real-time current clicks
+			EnableStats:   detail.EnableStats,
+			CustomDomain:  detail.CustomDomain,
+			UTMSource:     detail.UTMSource,
+			UTMMedium:     detail.UTMMedium,
+			UTMCampaign:   detail.UTMCampaign,
+			UTMTerm:       detail.UTMTerm,
+			UTMContent:    detail.UTMContent,
+		},
+		RecentViews: recentViewsResponse,
+	}, nil
 }

@@ -8,8 +8,8 @@ import (
 
 // ShortLink represents the main short link entity
 type ShortLink struct {
-	ID          string         `json:"id" gorm:"primaryKey"`                    // Changed to string for consistency
-	UserID      string         `json:"user_id,omitempty" gorm:"size:191;index"` // Foreign key to users table (string to match User.ID)
+	ID          string         `json:"id" gorm:"primaryKey"`                     // Changed to string for consistency
+	UserID      *string        `json:"user_id,omitempty" gorm:"size:191;index"`  // Foreign key to users table (nullable for optional auth)
 	ShortCode   string         `json:"short_code" gorm:"uniqueIndex;size:10;not null"`
 	OriginalURL string         `json:"original_url,omitempty" gorm:"type:text;not null"`
 	Title       string         `json:"title,omitempty" gorm:"size:255"`
@@ -29,39 +29,4 @@ type ShortLink struct {
 // TableName specifies the table name for GORM
 func (ShortLink) TableName() string {
 	return "short_links"
-}
-
-// ShortLinkResponse represents short link data for API responses
-type ShortLinkResponse struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"user_id"`
-	ShortCode   string     `json:"short_code"`
-	OriginalURL string     `json:"original_url"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	IsActive    bool       `json:"is_active"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	ClickCount  int        `json:"click_count,omitempty"`
-}
-
-// CreateShortLinkRequest represents request to create short link
-
-
-// UpdateShortLinkRequest represents request to update short link
-type UpdateShortLinkRequest struct {
-	Title       *string    `json:"title,omitempty" validate:"omitempty,max=255"`
-	Description *string    `json:"description,omitempty"`
-	IsActive    *bool      `json:"is_active,omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-}
-
-// PaginatedShortLinksResponse represents paginated short links
-type PaginatedShortLinksResponse struct {
-	ShortLinks []ShortLinkResponse `json:"short_links"`
-	TotalCount int64               `json:"total_count"`
-	Page       int                 `json:"page"`
-	Limit      int                 `json:"limit"`
-	TotalPages int                 `json:"total_pages"`
 }

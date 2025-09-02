@@ -76,7 +76,7 @@ func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
 		return nil, err
 	}
 
-	log.Printf("User found: ID=%s, Username=%s", user.ID, user.Username)
+	log.Printf(" ID=%s, Username=%s", user.ID, user.Username)
 	return &user, nil
 }
 

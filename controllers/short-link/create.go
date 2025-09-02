@@ -3,26 +3,16 @@ package shortlink
 import (
 	"net/http"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
-	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 func (c *Controller) Create(ctx *gin.Context) {
 	var req dto.CreateShortLinkRequest
-	var userID string
-	if userIDVal, exists := ctx.Get("user_id"); exists {
-		userID = userIDVal.(string)
-	}
-
-	if userID == "" {
-		userID = req.UserID
-	}
-
-	req.UserID = userID
-
+	
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// Use global function to handle JSON binding errors
 		bindingErrors := utils.HandleJSONBindingError(err, &req)
@@ -35,6 +25,21 @@ func (c *Controller) Create(ctx *gin.Context) {
 		})
 		return
 	}
+
+	var userID string
+    if userIDVal, exists := ctx.Get("user_id"); exists {
+        userID = userIDVal.(string)
+        utils.Logger.Info("User authenticated", "user_id", userID)
+    }
+
+    // 3. THIRD: Use authenticated user ID or fall back to request UserID (for anonymous)
+    if userID == "" {
+        userID = req.UserID // This could be empty for anonymous users
+        utils.Logger.Info("No authenticated user, using request UserID", "user_id", userID)
+    }
+
+    // 4. Override request UserID with the final userID (authenticated takes priority)
+    req.UserID = userID
 
 
 	link := dto.CreateShortLinkRequest{
