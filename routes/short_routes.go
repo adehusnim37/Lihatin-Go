@@ -19,5 +19,6 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedShort.Use(middleware.AuthMiddleware(userRepo))
 		protectedShort.GET("/:code", shortController.GetShortLink)
 		protectedShort.GET("", shortController.ListUserShortLinks)
+		protectedShort.DELETE("stats/:code", shortController.GetShortLinkStats)
 	}
 }

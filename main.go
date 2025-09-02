@@ -12,6 +12,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -60,6 +61,7 @@ func runMigrations(db *gorm.DB) error {
 func main() {
 
 	// Initialize GORM for new auth repositories
+	_ = godotenv.Load() // ignore error kalau .env ga ada
 	dsn := utils.GetRequiredEnv(utils.EnvDatabaseURL)
 	// Setup database connection for sql.DB (existing code)
 	db, err := sql.Open("mysql", dsn)

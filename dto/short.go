@@ -37,10 +37,36 @@ type ShortLinkResponse struct {
 	Description     string                    `json:"description,omitempty"`
 	IsActive        bool                      `json:"is_active"`
 	ExpiresAt       *time.Time                `json:"expires_at"`
-	CreatedAt       time.Time                 `json:"created_at,omitempty"`
+	CreatedAt       time.Time                 `json:"created_at"`
 	UpdatedAt       time.Time                 `json:"updated_at,omitempty"`
 	ShortLinkDetail *ShortLinkDetailsResponse `json:"detail,omitempty"`
 	RecentViews     []ViewLinkDetailResponse  `json:"recent_views,omitempty"`
+}
+type ShortLinkDetailsResponse struct {
+	ID            string `json:"id"`
+	Passcode      int    `json:"passcode,omitempty"`
+	ClickLimit    int    `json:"click_limit,omitempty"`
+	CurrentClicks int    `json:"current_clicks,omitempty"`
+	EnableStats   bool   `json:"enable_stats,omitempty"`
+	CustomDomain  string `json:"custom_domain,omitempty"`
+	UTMSource     string `json:"utm_source,omitempty"`
+	UTMMedium     string `json:"utm_medium,omitempty"`
+	UTMCampaign   string `json:"utm_campaign,omitempty"`
+	UTMTerm       string `json:"utm_term,omitempty"`
+	UTMContent    string `json:"utm_content,omitempty"`
+}
+
+type ViewLinkDetailResponse struct {
+	ID        string    `json:"id"`
+	IPAddress string    `json:"ip_address,omitempty"`
+	UserAgent string    `json:"user_agent,omitempty"`
+	Referer   string    `json:"referer,omitempty"`
+	Country   string    `json:"country,omitempty"`
+	City      string    `json:"city,omitempty"`
+	Device    string    `json:"device,omitempty"`
+	Browser   string    `json:"browser,omitempty"`
+	OS        string    `json:"os,omitempty"`
+	ClickedAt time.Time `json:"clicked_at,omitempty"`
 }
 
 // UpdateShortLinkRequest represents request to update short link
@@ -62,34 +88,6 @@ type PaginatedShortLinksResponse struct {
 	OrderBy    string               `json:"order_by" binding:"omitempty,oneof=asc desc"`
 }
 
-type ShortLinkStatsResponse struct {
-	TotalClicks  int64 `json:"total_clicks"`
-	UniqueClicks int64 `json:"unique_clicks"`
-}
-
-type ShortLinkDetailsResponse struct {
-	ID            string `json:"id"`
-	Passcode      int    `json:"passcode,omitempty"`
-	ClickLimit    int    `json:"click_limit,omitempty"`
-	CurrentClicks int    `json:"current_clicks,omitempty"`
-	EnableStats   bool   `json:"enable_stats,omitempty"`
-	CustomDomain  string `json:"custom_domain,omitempty"`
-	UTMSource     string `json:"utm_source,omitempty"`
-	UTMMedium     string `json:"utm_medium,omitempty"`
-	UTMCampaign   string `json:"utm_campaign,omitempty"`
-	UTMTerm       string `json:"utm_term,omitempty"`
-	UTMContent    string `json:"utm_content,omitempty"`
-}
-
-type ViewLinkDetailResponse struct {
-	ID          string    `json:"id"`
-	IPAddress   string    `json:"ip_address,omitempty"`
-	UserAgent   string    `json:"user_agent,omitempty"`
-	Referer     string    `json:"referer,omitempty"`
-	Country     string    `json:"country,omitempty"`
-	City        string    `json:"city,omitempty"`
-	Device      string    `json:"device,omitempty"`
-	Browser     string    `json:"browser,omitempty"`
-	OS          string    `json:"os,omitempty"`
-	ClickedAt   time.Time `json:"clicked_at,omitempty"`
+type CodeRequest struct {
+	Code string `json:"code" binding:"required,min=1,max=100,alphanum"`
 }

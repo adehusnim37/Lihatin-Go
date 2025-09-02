@@ -314,6 +314,15 @@ func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, userID string
 		return nil, utils.ErrShortLinkUnauthorized
 	}
 
+	if link.UserID == nil || *link.UserID != userID {
+		utils.Logger.Warn("Unauthorized access attempt to short link",
+			"short_code", code,
+			"requesting_user", userID,
+			"owner_user", link.UserID,
+		)
+		return nil, utils.ErrShortLinkUnauthorized
+	}
+
 	// Get the short link detail
 	if err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -377,5 +386,50 @@ func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, userID string
 			UTMContent:    detail.UTMContent,
 		},
 		RecentViews: recentViewsResponse,
+	}, nil
+}
+
+func (r *ShortLinkRepository) ShortLinkStats(code string) (*dto.ViewLinkDetailResponse, error) {
+	var link shortlink.ShortLink
+	var viewDetail shortlink.ViewLinkDetail
+
+	// Get the short link first
+	err := r.db.Where("short_code = ?", code).First(&link).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrShortLinkNotFound
+		}
+
+		utils.Logger.Error("Database error while fetching short link",
+			"short_code", code,			
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	err = r.db.Where("short_link_id = ? AND id = ?", link.ID, viewDetail.ID).First(&viewDetail).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrShortLinkNotFound
+		}
+
+		utils.Logger.Error("Database error while fetching short link stats",
+			"short_code", code,
+			"error", err.Error(),
+		)
+		return nil, err
+	}
+
+	return &dto.ViewLinkDetailResponse{
+		ID:          viewDetail.ID,
+		IPAddress:   viewDetail.IPAddress,
+		UserAgent:   viewDetail.UserAgent,
+		Referer:     viewDetail.Referer,
+		Country:     viewDetail.Country,
+		City:        viewDetail.City,
+		Device:      viewDetail.Device,
+		Browser:     viewDetail.Browser,
+		OS:          viewDetail.OS,
+		ClickedAt:   viewDetail.ClickedAt,
 	}, nil
 }
