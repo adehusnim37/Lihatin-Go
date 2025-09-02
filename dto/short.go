@@ -69,12 +69,16 @@ type ViewLinkDetailResponse struct {
 	ClickedAt time.Time `json:"clicked_at,omitempty"`
 }
 
+type PaginatedViewLinkDetailResponse struct {
+	Views []ViewLinkDetailResponse `json:"recent_views"`
+}
+
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {
 	Title       *string    `json:"title" binding:"omitempty,max=255,min=3"`
 	Description *string    `json:"description" binding:"omitempty,max=500,min=3"`
 	IsActive    *bool      `json:"is_active" binding:"omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at" binding:"omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at" binding:"omitempty,gt=now"`
 }
 
 // PaginatedShortLinksResponse represents paginated short links
@@ -89,5 +93,5 @@ type PaginatedShortLinksResponse struct {
 }
 
 type CodeRequest struct {
-	Code string `json:"code" binding:"required,min=1,max=100,alphanum"`
+	Code string `json:"code" binding:"required,min=1,max=100,alphanum" uri:"code"`
 }

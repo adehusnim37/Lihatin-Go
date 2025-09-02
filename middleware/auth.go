@@ -162,7 +162,7 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 }
 
 // RateLimitMiddleware provides basic rate limiting
-func RateLimitMiddleware() gin.HandlerFunc {
+func RateLimitMiddleware(count int) gin.HandlerFunc {
 	// Simple in-memory rate limiting
 	// In production, use Redis or similar
 	requestCounts := make(map[string]int)
@@ -171,7 +171,7 @@ func RateLimitMiddleware() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 
 		// Reset counter every minute (simplified)
-		if requestCounts[clientIP] > 100 { // 100 requests per minute
+		if requestCounts[clientIP] > count { // 100 requests per minute
 			c.JSON(http.StatusTooManyRequests, common.APIResponse{
 				Success: false,
 				Data:    nil,

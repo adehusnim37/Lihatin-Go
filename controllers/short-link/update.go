@@ -9,12 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) GetShortLinkStats(ctx *gin.Context) {
-	// Implement the logic to retrieve and return short link statistics
-	var req dto.CodeRequest
+func (c *Controller) UpdateShortLink(ctx *gin.Context) {
+	var updateData dto.UpdateShortLinkRequest
+	if err := ctx.ShouldBindJSON(&updateData); err != nil {
+		bindingErrors := utils.HandleJSONBindingError(err, &updateData)
+		utils.Logger.Warn("Invalid request payload",
+			"error", err.Error(),
+		)
 
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		bindingErrors := utils.HandleJSONBindingError(err, &req)
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -24,8 +26,12 @@ func (c *Controller) GetShortLinkStats(ctx *gin.Context) {
 		return
 	}
 
-	stats, err := c.repo.ShortLinkStats(req.Code, ctx.GetString("user_id"))
-	if err != nil {
+	shortCode := ctx.Param("code")
+	if err := c.repo.UpdateShortLink(shortCode, ctx.GetString("user_id"), &updateData); err != nil {
+		utils.Logger.Error("Failed to update short link",
+			"short_code", shortCode,
+			"error", err.Error(),
+		)
 		switch {
 		case err == utils.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
@@ -54,8 +60,8 @@ func (c *Controller) GetShortLinkStats(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
-		Data:    stats,
-		Message: "Short link stats retrieved successfully",
+		Data:    updateData,
+		Message: "Short link updated successfully",
 		Error:   nil,
 	})
 }

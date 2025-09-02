@@ -11,7 +11,6 @@ import (
 )
 
 
-
 func (c *Controller) GetShortLink(ctx *gin.Context) {
 	var dto dto.CodeRequest
 

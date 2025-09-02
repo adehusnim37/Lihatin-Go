@@ -338,21 +338,20 @@ func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, userID string
 		Limit(10).
 		Find(&recentViews)
 
-
 	// Convert recent views to response format
 	recentViewsResponse := make([]dto.ViewLinkDetailResponse, 0, len(recentViews))
 	for _, view := range recentViews {
 		recentViewsResponse = append(recentViewsResponse, dto.ViewLinkDetailResponse{
-			ID:          view.ID,
-			IPAddress:   view.IPAddress,
-			UserAgent:   view.UserAgent,
-			Referer:     view.Referer,
-			Country:     view.Country,
-			City:        view.City,
-			Device:      view.Device,
-			Browser:     view.Browser,
-			OS:          view.OS,
-			ClickedAt:   view.ClickedAt,
+			ID:        view.ID,
+			IPAddress: view.IPAddress,
+			UserAgent: view.UserAgent,
+			Referer:   view.Referer,
+			Country:   view.Country,
+			City:      view.City,
+			Device:    view.Device,
+			Browser:   view.Browser,
+			OS:        view.OS,
+			ClickedAt: view.ClickedAt,
 		})
 	}
 
@@ -362,16 +361,16 @@ func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, userID string
 	)
 
 	return &dto.ShortLinkResponse{
-		ID:           link.ID,
-		UserID:       link.UserID,
-		ShortCode:    link.ShortCode,
-		OriginalURL:  link.OriginalURL,
-		Title:        link.Title,
-		Description:  link.Description,
-		IsActive:     link.IsActive,
-		ExpiresAt:    link.ExpiresAt,
-		CreatedAt:    link.CreatedAt,
-		UpdatedAt:    link.UpdatedAt,
+		ID:          link.ID,
+		UserID:      link.UserID,
+		ShortCode:   link.ShortCode,
+		OriginalURL: link.OriginalURL,
+		Title:       link.Title,
+		Description: link.Description,
+		IsActive:    link.IsActive,
+		ExpiresAt:   link.ExpiresAt,
+		CreatedAt:   link.CreatedAt,
+		UpdatedAt:   link.UpdatedAt,
 		ShortLinkDetail: &dto.ShortLinkDetailsResponse{
 			ID:            detail.ID,
 			Passcode:      detail.Passcode,
@@ -389,25 +388,25 @@ func (r *ShortLinkRepository) GetShortLinkByShortCode(code string, userID string
 	}, nil
 }
 
-func (r *ShortLinkRepository) ShortLinkStats(code string) (*dto.ViewLinkDetailResponse, error) {
+func (r *ShortLinkRepository) ShortLinkStats(code string, userID string) (*dto.PaginatedViewLinkDetailResponse, error) {
 	var link shortlink.ShortLink
-	var viewDetail shortlink.ViewLinkDetail
+	var viewDetail []shortlink.ViewLinkDetail
 
 	// Get the short link first
-	err := r.db.Where("short_code = ?", code).First(&link).Error
+	err := r.db.Where("short_code = ? AND user_id = ?", code, userID).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.ErrShortLinkNotFound
 		}
 
 		utils.Logger.Error("Database error while fetching short link",
-			"short_code", code,			
+			"short_code", code,
 			"error", err.Error(),
 		)
 		return nil, err
 	}
 
-	err = r.db.Where("short_link_id = ? AND id = ?", link.ID, viewDetail.ID).First(&viewDetail).Error
+	err = r.db.Where("short_link_id = ?", link.ID).Order("clicked_at DESC").Find(&viewDetail).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.ErrShortLinkNotFound
@@ -420,16 +419,66 @@ func (r *ShortLinkRepository) ShortLinkStats(code string) (*dto.ViewLinkDetailRe
 		return nil, err
 	}
 
-	return &dto.ViewLinkDetailResponse{
-		ID:          viewDetail.ID,
-		IPAddress:   viewDetail.IPAddress,
-		UserAgent:   viewDetail.UserAgent,
-		Referer:     viewDetail.Referer,
-		Country:     viewDetail.Country,
-		City:        viewDetail.City,
-		Device:      viewDetail.Device,
-		Browser:     viewDetail.Browser,
-		OS:          viewDetail.OS,
-		ClickedAt:   viewDetail.ClickedAt,
+	// Convert recent views to response format
+	recentViewsResponse := make([]dto.ViewLinkDetailResponse, 0, len(viewDetail))
+	for _, view := range viewDetail {
+		recentViewsResponse = append(recentViewsResponse, dto.ViewLinkDetailResponse{
+			ID:        view.ID,
+			IPAddress: view.IPAddress,
+			UserAgent: view.UserAgent,
+			Referer:   view.Referer,
+			Country:   view.Country,
+			City:      view.City,
+			Device:    view.Device,
+			Browser:   view.Browser,
+			OS:        view.OS,
+			ClickedAt: view.ClickedAt,
+		})
+	}
+
+	return &dto.PaginatedViewLinkDetailResponse{
+		Views: recentViewsResponse,
 	}, nil
+}
+
+func (r *ShortLinkRepository) UpdateShortLink(code string, userID string, updateData *dto.UpdateShortLinkRequest) error {
+	var link shortlink.ShortLink
+
+	err := r.db.Where("short_code = ? AND user_id = ?", code, userID).First(&link).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ErrShortLinkNotFound
+		}
+
+		utils.Logger.Error("Database error while fetching short link",
+			"short_code", code,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	// Update the link fields
+	if updateData.Title != nil {
+		link.Title = *updateData.Title
+	}
+	if updateData.Description != nil {
+		link.Description = *updateData.Description
+	}
+	if updateData.IsActive != nil {
+		link.IsActive = *updateData.IsActive
+	}
+	if updateData.ExpiresAt != nil {
+		link.ExpiresAt = updateData.ExpiresAt
+	}
+
+	// Save the updated link
+	if err := r.db.Save(&link).Error; err != nil {
+		utils.Logger.Error("Failed to update short link",
+			"short_code", code,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	return nil
 }

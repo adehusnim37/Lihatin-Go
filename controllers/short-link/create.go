@@ -7,7 +7,6 @@ import (
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 func (c *Controller) Create(ctx *gin.Context) {
@@ -53,21 +52,32 @@ func (c *Controller) Create(ctx *gin.Context) {
 	}
 
 	if err := c.repo.CreateShortLink(&link); err != nil {
-		if err == gorm.ErrDuplicatedKey {
-			ctx.JSON(http.StatusConflict, common.APIResponse{
+		utils.Logger.Error("Failed to create short link",
+			"error", err.Error(),
+		)
+		switch {
+		case err == utils.ErrShortLinkNotFound:
+			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Short link already exists",
-				Error:   map[string]string{"details": err.Error()},
+				Message: "Failed to retrieve short link stats",
+				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
 			})
-			return
+		case err == utils.ErrShortLinkUnauthorized:
+			ctx.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Failed to retrieve short link stats",
+				Error:   map[string]string{"code": "Anda tidak memiliki akses ke link ini"},
+			})
+		default:
+			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Failed to retrieve short link stats",
+				Error:   map[string]string{"code": "Terjadi kesalahan pada server"},
+			})
 		}
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to create short link",
-			Error:   map[string]string{"details": err.Error()},
-		})
 		return
 	}
 
