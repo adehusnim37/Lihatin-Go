@@ -9,7 +9,9 @@ var (
     ErrShortLinkInactive     = errors.New("short link is inactive")
     ErrShortLinkUnauthorized = errors.New("unauthorized to access this link")
     ErrDuplicateShortCode    = errors.New("short code already exists")
-    
+    ErrInvalidOriginalURL    = errors.New("invalid original URL")
+    ErrShortLinkAlreadyDeleted = errors.New("short link has already been deleted")
+
     // Passcode errors
     ErrPasscodeRequired      = errors.New("passcode required")
     ErrPasscodeIncorrect     = errors.New("incorrect passcode")

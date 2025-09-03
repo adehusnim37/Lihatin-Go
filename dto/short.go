@@ -75,6 +75,7 @@ type PaginatedViewLinkDetailResponse struct {
 
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {
+	CodeRequest
 	Title       *string    `json:"title" binding:"omitempty,max=255,min=3"`
 	Description *string    `json:"description" binding:"omitempty,max=500,min=3"`
 	IsActive    *bool      `json:"is_active" binding:"omitempty"`
@@ -90,6 +91,11 @@ type PaginatedShortLinksResponse struct {
 	TotalPages int                  `json:"total_pages"`
 	Sort       string               `json:"sort" binding:"omitempty,oneof=created_at updated_at"`
 	OrderBy    string               `json:"order_by" binding:"omitempty,oneof=asc desc"`
+}
+
+type DeleteRequest struct {
+	CodeRequest
+	Passcode string `json:"passcode" binding:"omitempty,min=6,max=6,numeric"`
 }
 
 type CodeRequest struct {

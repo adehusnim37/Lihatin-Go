@@ -202,6 +202,14 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		return nil, err
 	}
 
+	if link.DeletedAt.Valid {
+		utils.Logger.Warn("Deleted short link accessed",
+			"short_code", code,
+			"ip_address", ipAddress,
+		)
+		return nil, utils.ErrShortLinkAlreadyDeleted
+	}
+
 	// Check if short link is active
 	if !link.IsActive {
 		utils.Logger.Warn("Inactive short link accessed",
@@ -474,6 +482,48 @@ func (r *ShortLinkRepository) UpdateShortLink(code string, userID string, update
 	// Save the updated link
 	if err := r.db.Save(&link).Error; err != nil {
 		utils.Logger.Error("Failed to update short link",
+			"short_code", code,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	return nil
+}
+
+func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passcode int) error {
+	var link shortlink.ShortLink
+	
+	err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
+		Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
+		Select("short_links.*, short_link_details.passcode").
+		First(&link).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ErrShortLinkNotFound
+		}
+
+		utils.Logger.Error("Database error while fetching short link",
+			"short_code", code,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	if link.Detail.Passcode != passcode {
+		return utils.ErrShortLinkUnauthorized
+	}
+
+	if link.DeletedAt.Valid {
+		return utils.ErrShortLinkAlreadyDeleted
+	}
+
+	link.DeletedAt.Time = time.Now()
+	link.DeletedAt.Valid = true
+
+	if err := r.db.Save(&link).Error; err != nil {
+		utils.Logger.Error("Failed to delete short link",
 			"short_code", code,
 			"error", err.Error(),
 		)

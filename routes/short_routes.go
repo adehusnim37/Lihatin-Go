@@ -23,6 +23,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedShort.PUT("/:code", shortController.UpdateShortLink)
 		protectedShort.GET("", shortController.ListUserShortLinks)
 		protectedShort.GET("stats/:code", shortController.GetShortLinkStats)
+		protectedShort.DELETE("/:code", shortController.DeleteShortLink)
 	}
 
 	protectedAdminShort := rg.Group("admin/shorts")

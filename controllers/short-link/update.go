@@ -32,26 +32,26 @@ func (c *Controller) UpdateShortLink(ctx *gin.Context) {
 			"short_code", shortCode,
 			"error", err.Error(),
 		)
-		switch {
-		case err == utils.ErrShortLinkNotFound:
+		switch  err{
+		case utils.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Failed to retrieve short link stats",
+				Message: "Failed to update short link",
 				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
 			})
-		case err == utils.ErrShortLinkUnauthorized:
+		case utils.ErrShortLinkUnauthorized:
 			ctx.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Failed to retrieve short link stats",
+				Message: "Failed to update short link",
 				Error:   map[string]string{"code": "Anda tidak memiliki akses ke link ini"},
 			})
 		default:
 			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Failed to retrieve short link stats",
+				Message: "Failed to update short link",
 				Error:   map[string]string{"code": "Terjadi kesalahan pada server"},
 			})
 		}
