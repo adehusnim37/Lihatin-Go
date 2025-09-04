@@ -13,6 +13,16 @@ import (
 func (c *Controller) DeleteShortLink(ctx *gin.Context) {
 	var deleteData dto.DeleteRequest
 
+	if err := ctx.ShouldBindUri(&deleteData); err != nil {
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Invalid URI parameter",
+			Error:   map[string]string{"code": "Invalid short code"},
+		})
+		return
+	}
+
 	if err := ctx.ShouldBindJSON(&deleteData); err != nil {
 		bindingErrors := utils.HandleJSONBindingError(err, &deleteData)
 		utils.Logger.Error("Failed to bind JSON",
@@ -20,9 +30,9 @@ func (c *Controller) DeleteShortLink(ctx *gin.Context) {
 		)
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
-			Data:   nil,
+			Data:    nil,
 			Message: "Invalid request",
-			Error:  bindingErrors,
+			Error:   bindingErrors,
 		})
 		return
 	}

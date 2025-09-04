@@ -19,8 +19,8 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Authorization header required",
-				Error:   map[string]string{"auth": "Missing authorization header"},
+				Message: "Authorization header required.",
+				Error:   map[string]string{"auth": "Missing authorization header. Login required."},
 			})
 			c.Abort()
 			return
@@ -31,7 +31,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Invalid authorization header format",
+				Message: "Invalid authorization header format. Please provide a valid token.",
 				Error:   map[string]string{"auth": "Authorization header must be 'Bearer <token>'"},
 			})
 			c.Abort()
