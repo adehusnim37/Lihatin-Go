@@ -116,6 +116,7 @@ func RequirePremium() gin.HandlerFunc {
 func RequireRole(requiredRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
+		utils.Logger.Info("Checking user role", "role", role, "required", requiredRole)
 		if !exists || role.(string) != requiredRole {
 			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,

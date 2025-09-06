@@ -93,6 +93,16 @@ type PaginatedShortLinksResponse struct {
 	OrderBy    string               `json:"order_by" binding:"omitempty,oneof=asc desc"`
 }
 
+type PaginatedShortLinksAdminResponse struct {
+	ShortLinks []ShortLinkResponse `json:"short_links"`
+	TotalCount int64               `json:"total_count"`
+	Page       int                 `json:"page"`
+	Limit      int                 `json:"limit"`
+	TotalPages int                 `json:"total_pages"`
+	Sort       string              `json:"sort"`
+	OrderBy    string              `json:"order_by"`
+}
+
 type DeleteRequest struct {
 	CodeRequest
 	Passcode string `json:"passcode" binding:"omitempty,min=6,max=6,numeric"`

@@ -532,3 +532,236 @@ func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passco
 
 	return nil
 }
+
+// Admin
+
+func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy string) (*dto.PaginatedShortLinksAdminResponse, error) {
+	var shortLinks []shortlink.ShortLink
+	var totalCount int64
+
+	utils.Logger.Info("Fetching all short links for admin",
+		"page", page,
+		"limit", limit,
+		"sort", sort,
+		"order_by", orderBy,
+	)
+
+	// Get total count (without joins for better performance)
+	if err := r.db.Model(&shortlink.ShortLink{}).Count(&totalCount).Error; err != nil {
+		utils.Logger.Error("Failed to count short links", "error", err.Error())
+		return nil, err
+	}
+
+	// Calculate offset and build order clause
+	offset := (page - 1) * limit
+	orderClause := sort + " " + orderBy
+
+	// Query with LEFT JOINs to get all data including details and view counts
+	if err := r.db.
+		Preload("Detail"). // Load detail relationship
+		Order(orderClause).
+		Limit(limit).
+		Offset(offset).
+		Find(&shortLinks).Error; err != nil {
+		utils.Logger.Error("Failed to fetch short links", "error", err.Error())
+		return nil, err
+	}
+
+	// Convert to response format with detailed information
+	shortLinkResponses := make([]dto.ShortLinkResponse, 0, len(shortLinks))
+	for _, link := range shortLinks {
+		// Count total clicks for this short link
+		var clickCount int64
+		r.db.Model(&shortlink.ViewLinkDetail{}).
+			Where("short_link_id = ?", link.ID).
+			Count(&clickCount)
+
+		// Build detail response
+		var detailResponse *dto.ShortLinkDetailsResponse
+		if link.Detail != nil {
+			detailResponse = &dto.ShortLinkDetailsResponse{
+				ID:            link.Detail.ID,
+				Passcode:      link.Detail.Passcode,
+				ClickLimit:    link.Detail.ClickLimit,
+				CurrentClicks: link.Detail.CurrentClicks,
+				EnableStats:   link.Detail.EnableStats,
+				CustomDomain:  link.Detail.CustomDomain,
+				UTMSource:     link.Detail.UTMSource,
+				UTMMedium:     link.Detail.UTMMedium,
+				UTMCampaign:   link.Detail.UTMCampaign,
+				UTMTerm:       link.Detail.UTMTerm,
+				UTMContent:    link.Detail.UTMContent,
+			}
+		}
+
+		// Build main response
+		shortLinkResponse := dto.ShortLinkResponse{
+			ID:              link.ID,
+			UserID:          link.UserID,
+			ShortCode:       link.ShortCode,
+			OriginalURL:     link.OriginalURL,
+			Title:           link.Title,
+			Description:     link.Description,
+			IsActive:        link.IsActive,
+			ExpiresAt:       link.ExpiresAt,
+			CreatedAt:       link.CreatedAt,
+			UpdatedAt:       link.UpdatedAt,
+			ShortLinkDetail: detailResponse,
+		}
+
+		
+		shortLinkResponses = append(shortLinkResponses, shortLinkResponse)
+	}
+
+	// Calculate total pages
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	utils.Logger.Info("Successfully fetched short links for admin",
+		"total_count", totalCount,
+		"returned_count", len(shortLinkResponses),
+		"total_pages", totalPages,
+	)
+
+	return &dto.PaginatedShortLinksAdminResponse{
+		ShortLinks: shortLinkResponses,
+		TotalCount: totalCount,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		Sort:       sort,
+		OrderBy:    orderBy,
+	}, nil
+}
+
+// GetShortLinkStatsAdmin gets detailed statistics for a specific short link (admin only)
+func (r *ShortLinkRepository) GetShortLinkStatsAdmin(shortCode string) (*dto.ShortLinkResponse, error) {
+	var link shortlink.ShortLink
+
+	utils.Logger.Info("Fetching short link stats for admin", "short_code", shortCode)
+
+	// Get short link with detail
+	if err := r.db.Preload("Detail").
+		Where("short_code = ?", shortCode).
+		First(&link).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, utils.ErrShortLinkNotFound
+		}
+		utils.Logger.Error("Failed to fetch short link", "error", err.Error())
+		return nil, err
+	}
+
+	// Get total clicks
+	var totalClicks int64
+	r.db.Model(&shortlink.ViewLinkDetail{}).
+		Where("short_link_id = ?", link.ID).
+		Count(&totalClicks)
+
+	// Get unique visitors
+	var uniqueVisitors int64
+	r.db.Model(&shortlink.ViewLinkDetail{}).
+		Select("DISTINCT ip_address").
+		Where("short_link_id = ?", link.ID).
+		Count(&uniqueVisitors)
+
+	// Get recent views (last 10)
+	var recentViews []shortlink.ViewLinkDetail
+	r.db.Where("short_link_id = ?", link.ID).
+		Order("clicked_at DESC").
+		Limit(10).
+		Find(&recentViews)
+
+	// Convert recent views to response format
+	recentViewsResponse := make([]dto.ViewLinkDetailResponse, 0, len(recentViews))
+	for _, view := range recentViews {
+		recentViewsResponse = append(recentViewsResponse, dto.ViewLinkDetailResponse{
+			ID:        view.ID,
+			IPAddress: view.IPAddress,
+			UserAgent: view.UserAgent,
+			Referer:   view.Referer,
+			Country:   view.Country,
+			City:      view.City,
+			Device:    view.Device,
+			Browser:   view.Browser,
+			OS:        view.OS,
+			ClickedAt: view.ClickedAt,
+		})
+	}
+
+	// Build detail response
+	var detailResponse *dto.ShortLinkDetailsResponse
+	if link.Detail != nil {
+		detailResponse = &dto.ShortLinkDetailsResponse{
+			ID:            link.Detail.ID,
+			Passcode:      link.Detail.Passcode,
+			ClickLimit:    link.Detail.ClickLimit,
+			CurrentClicks: link.Detail.CurrentClicks,
+			EnableStats:   link.Detail.EnableStats,
+			CustomDomain:  link.Detail.CustomDomain,
+			UTMSource:     link.Detail.UTMSource,
+			UTMMedium:     link.Detail.UTMMedium,
+			UTMCampaign:   link.Detail.UTMCampaign,
+			UTMTerm:       link.Detail.UTMTerm,
+			UTMContent:    link.Detail.UTMContent,
+		}
+	}
+
+	// Build main response
+	response := &dto.ShortLinkResponse{
+		ID:              link.ID,
+		UserID:          link.UserID,
+		ShortCode:       link.ShortCode,
+		OriginalURL:     link.OriginalURL,
+		Title:           link.Title,
+		Description:     link.Description,
+		IsActive:        link.IsActive,
+		ExpiresAt:       link.ExpiresAt,
+		CreatedAt:       link.CreatedAt,
+		UpdatedAt:       link.UpdatedAt,
+		ShortLinkDetail: detailResponse,
+		RecentViews:     recentViewsResponse,
+	}
+
+	// Add latest view if exists
+	if len(recentViews) > 0 {
+		latestView := recentViews[0]
+		response.RecentViews = append(response.RecentViews, dto.ViewLinkDetailResponse{
+			ID:        latestView.ID,
+			IPAddress: latestView.IPAddress,
+			UserAgent: latestView.UserAgent,
+			Referer:   latestView.Referer,
+			Country:   latestView.Country,
+			City:      latestView.City,
+			Device:    latestView.Device,
+			Browser:   latestView.Browser,
+			OS:        latestView.OS,
+			ClickedAt: latestView.ClickedAt,
+		})
+	}
+
+	utils.Logger.Info("Successfully fetched short link stats for admin",
+		"short_code", shortCode,
+		"total_clicks", totalClicks,
+		"unique_visitors", uniqueVisitors,
+	)
+
+	return response, nil
+}
+
+// DeleteShortLinkAdmin allows admin to delete any short link
+func (r *ShortLinkRepository) DeleteShortLinkAdmin(shortCode string) error {
+	utils.Logger.Info("Admin deleting short link", "short_code", shortCode)
+
+	// Soft delete the short link
+	result := r.db.Where("short_code = ?", shortCode).Delete(&shortlink.ShortLink{})
+	if result.Error != nil {
+		utils.Logger.Error("Failed to delete short link", "error", result.Error)
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrShortLinkNotFound
+	}
+
+	utils.Logger.Info("Successfully deleted short link", "short_code", shortCode)
+	return nil
+}

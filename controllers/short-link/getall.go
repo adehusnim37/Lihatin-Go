@@ -9,13 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
-	// Get user ID from context (set by auth middleware)
-	var userID string
-	if userIDVal, exists := ctx.Get("user_id"); exists {
-		userID = userIDVal.(string)
-		utils.Logger.Info("User authenticated", "user_id", userID)
-	} else {
+// ListShortLinks handles both user and admin requests with role-based filtering
+func (c *Controller) ListShortLinks(ctx *gin.Context) {
+	// Get user info from context (set by auth middleware)
+	userID, exists := ctx.Get("user_id")
+	if !exists {
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -24,6 +22,17 @@ func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
 		})
 		return
 	}
+
+	// Get user role from context (set by auth middleware)
+	userRole, roleExists := ctx.Get("role")
+	if !roleExists {
+		// Default to "user" role if not specified
+		userRole = "user"
+	}
+
+	// Convert to strings
+	userIDStr := userID.(string)
+	userRoleStr := userRole.(string)
 
 	// Get pagination parameters from query string
 	pageStr := ctx.DefaultQuery("page", "1")
@@ -34,6 +43,7 @@ func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
 	// Convert to integers with validation
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
+		utils.Logger.Warn("Invalid page parameter", "page", pageStr, "user_id", userIDStr)
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -45,6 +55,7 @@ func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit < 1 || limit > 100 {
+		utils.Logger.Warn("Invalid limit parameter", "limit", limitStr, "user_id", userIDStr)
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -54,19 +65,32 @@ func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
 		return
 	}
 
-	// Validate sort parameter
+	// Validate sort parameter (admin gets more options)
 	validSorts := map[string]bool{
 		"created_at": true,
 		"updated_at": true,
 		"short_code": true,
 		"title":      true,
 	}
+
+	// Admin gets additional sort options
+	if userRoleStr == "admin" {
+		validSorts["original_url"] = true
+		validSorts["is_active"] = true
+		validSorts["user_id"] = true // Admin can sort by owner
+	}
+
 	if !validSorts[sort] {
+		sortOptions := "created_at, updated_at, short_code, title"
+		if userRoleStr == "admin" {
+			sortOptions += ", original_url, is_active, user_id"
+		}
+
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid sort parameter",
-			Error:   map[string]string{"sort": "Sort must be one of: created_at, updated_at, short_code, title"},
+			Error:   map[string]string{"sort": "Sort must be one of: " + sortOptions},
 		})
 		return
 	}
@@ -82,16 +106,38 @@ func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
 		return
 	}
 
-	// Get paginated short links from repository
-	paginatedResponse, err := c.repo.GetShortsByUserIDWithPagination(userID, page, limit, sort, orderBy)
-	if err != nil {
-		utils.Logger.Error("Failed to retrieve paginated short links",
-			"user_id", userID,
+	utils.Logger.Info("Fetching short links",
+		"user_id", userIDStr,
+		"user_role", userRoleStr,
+		"page", page,
+		"limit", limit,
+		"sort", sort,
+		"order_by", orderBy,
+	)
+
+	// ✅ SMART FILTERING: Choose repository method based on role
+	var paginatedResponse interface{}
+	var repositoryErr error
+
+	if userRoleStr == "admin" {
+		// ✅ Admin: Get all short links (no user filter)
+		utils.Logger.Info("Admin accessing all short links", "admin_user", userIDStr)
+		paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(page, limit, sort, orderBy)
+	} else {
+		// ✅ User: Get only user's short links (filtered by user_id)
+		utils.Logger.Info("User accessing own short links", "user_id", userIDStr)
+		paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(userIDStr, page, limit, sort, orderBy)
+	}
+
+	if repositoryErr != nil {
+		utils.Logger.Error("Failed to retrieve short links",
+			"user_id", userIDStr,
+			"user_role", userRoleStr,
 			"page", page,
 			"limit", limit,
 			"sort", sort,
 			"order_by", orderBy,
-			"error", err.Error(),
+			"error", repositoryErr.Error(),
 		)
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -102,20 +148,31 @@ func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Short links retrieved successfully",
-		"user_id", userID,
-		"page", page,
-		"limit", limit,
-		"sort", sort,
-		"order_by", orderBy,
-		"total_count", paginatedResponse.TotalCount,
-		"total_pages", paginatedResponse.TotalPages,
-	)
+	// ✅ SUCCESS: Log different messages based on role
+	if userRoleStr == "admin" {
+		utils.Logger.Info("Admin retrieved all short links successfully",
+			"admin_user", userIDStr,
+			"page", page,
+		)
+	} else {
+		utils.Logger.Info("User retrieved own short links successfully",
+			"user_id", userIDStr,
+			"page", page,
+		)
+	}
 
+	// ✅ Return unified response
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    paginatedResponse,
 		Message: "Short links retrieved successfully",
 		Error:   nil,
 	})
+}
+
+// ✅ DEPRECATED: Keep for backward compatibility (optional)
+func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
+	// Force user role for backward compatibility
+	ctx.Set("role", "user")
+	c.ListShortLinks(ctx)
 }

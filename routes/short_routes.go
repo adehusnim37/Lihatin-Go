@@ -11,7 +11,8 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	shortGroup := rg.Group("/short")
 	{
 		shortGroup.Use(middleware.RateLimitMiddleware(20))
-		shortGroup.POST("", middleware.OptionalAuth(userRepo), shortController.Create)
+		shortGroup.Use(middleware.OptionalAuth(userRepo))
+		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)
 	}
 
@@ -21,14 +22,25 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedShort.Use(middleware.AuthMiddleware(userRepo))
 		protectedShort.GET("/:code", shortController.GetShortLink)
 		protectedShort.PUT("/:code", shortController.UpdateShortLink)
-		protectedShort.GET("", shortController.ListUserShortLinks)
+		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
 		protectedShort.GET("stats/:code", shortController.GetShortLinkStats)
 		protectedShort.DELETE("/:code", shortController.DeleteShortLink)
 	}
 
+	// ✅ ADMIN ROUTES: Only accessible by admin users
 	protectedAdminShort := rg.Group("admin/shorts")
 	{
 		protectedAdminShort.Use(middleware.AuthMiddleware(userRepo))
+		protectedAdminShort.Use(middleware.RequireRole("admin")) // Ensures only admin access
 
+		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
+		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
+		// protectedAdminShort.DELETE("/:code", shortController.AdminDeleteShortLink)
+		// protectedAdminShort.POST("/bulk-delete", shortController.AdminBulkDeleteShortLinks)
+		// protectedAdminShort.PUT("/:code/suspend", shortController.AdminSuspendShortLink)
+		// protectedAdminShort.PUT("/:code/unsuspend", shortController.AdminUnsuspendShortLink)
+		// protectedAdminShort.GET("stats/:code", shortController.AdminGetShortLinkStats)
+		// protectedAdminShort.GET("/stats", shortController.AdminGetAllShortLinksStats)
+		// protectedAdminShort.GET("/export", shortController.AdminExportShortLinks)
 	}
 }
