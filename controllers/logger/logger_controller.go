@@ -1,8 +1,9 @@
-package controllers
+package logger
 
 import (
 	"net/http"
 
+	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
@@ -10,12 +11,12 @@ import (
 
 // LoggerController handles logging operations
 type LoggerController struct {
-	*BaseController
+	*controllers.BaseController
 	repo *repositories.LoggerRepository
 }
 
 // NewLoggerController creates a new logger controller
-func NewLoggerController(base *BaseController) *LoggerController {
+func NewLoggerController(base *controllers.BaseController) *LoggerController {
 	loggerRepo := repositories.NewLoggerRepository(base.GormDB)
 	return &LoggerController{
 		BaseController: base,

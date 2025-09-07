@@ -6,7 +6,8 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
-	shortlink "github.com/adehusnim37/lihatin-go/controllers/short-link"
+	"github.com/adehusnim37/lihatin-go/controllers/logger"
+	"github.com/adehusnim37/lihatin-go/controllers/shortlink"
 	"github.com/adehusnim37/lihatin-go/controllers/user"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
@@ -38,7 +39,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	// Inisialisasi controller spesifik
 	userController := user.NewController(baseController)
 	authController := auth.NewAuthController(baseAuthController)
-	loggerController := controllers.NewLoggerController(baseController)
+	loggerController := logger.NewLoggerController(baseController)
 	shortController := shortlink.NewController(baseAuthController) // Use baseAuthController for GORM access
 
 	// Setup repositories for middleware

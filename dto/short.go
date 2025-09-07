@@ -70,7 +70,45 @@ type ViewLinkDetailResponse struct {
 }
 
 type PaginatedViewLinkDetailResponse struct {
-	Views []ViewLinkDetailResponse `json:"recent_views"`
+	Views      []ViewLinkDetailResponse `json:"recent_views"`
+	TotalCount int64                    `json:"total_count"`
+	Page       int                      `json:"page"`
+	Limit      int                      `json:"limit"`
+	TotalPages int                      `json:"total_pages"`
+	Sort       string                   `json:"sort"`
+	OrderBy    string                   `json:"order_by"`
+}
+
+type TopReferrer struct {
+	Host  string `json:"host"`
+	Count int    `json:"count"`
+}
+
+type TopDevice struct {
+	Device string `json:"device"`
+	Count  int    `json:"count"`
+}
+
+type Country struct {
+	Country string `json:"country"`
+	Count   int    `json:"count"`
+}
+
+type ShortLinkWithStatsResponse struct {
+	TotalClicks    int           `json:"total_clicks"`
+	UniqueVisitors int           `json:"unique_visitors"`
+	Last24h        int           `json:"last_24h"`
+	Last7d         int           `json:"last_7d"`
+	Last30d        int           `json:"last_30d"`
+	TopReferrers   []TopReferrer `json:"top_referrers"`
+	TopDevices     []TopDevice   `json:"top_devices"`
+	TopCountries   []Country     `json:"top_countries"`
+}
+
+type PaginatedShortLinkDetailWithStatsResponse struct {
+	ShortLinks      []ShortLinkResponse             `json:"short_links"`
+	ShortLinkDetail ShortLinkDetailsResponse        `json:"short_link_detail"`
+	Views           PaginatedViewLinkDetailResponse `json:"views"`
 }
 
 // UpdateShortLinkRequest represents request to update short link

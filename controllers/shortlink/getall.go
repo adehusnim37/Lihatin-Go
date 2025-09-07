@@ -2,7 +2,6 @@ package shortlink
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
@@ -40,68 +39,14 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	sort := ctx.DefaultQuery("sort", "created_at")
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 
-	// Convert to integers with validation
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		utils.Logger.Warn("Invalid page parameter", "page", pageStr, "user_id", userIDStr)
+	// Validate and convert pagination parameters
+	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sort, orderBy, utils.Role(userRoleStr))
+	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Invalid page parameter",
-			Error:   map[string]string{"page": "Page must be a positive integer"},
-		})
-		return
-	}
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit < 1 || limit > 100 {
-		utils.Logger.Warn("Invalid limit parameter", "limit", limitStr, "user_id", userIDStr)
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid limit parameter",
-			Error:   map[string]string{"limit": "Limit must be between 1 and 100"},
-		})
-		return
-	}
-
-	// Validate sort parameter (admin gets more options)
-	validSorts := map[string]bool{
-		"created_at": true,
-		"updated_at": true,
-		"short_code": true,
-		"title":      true,
-	}
-
-	// Admin gets additional sort options
-	if userRoleStr == "admin" {
-		validSorts["original_url"] = true
-		validSorts["is_active"] = true
-		validSorts["user_id"] = true // Admin can sort by owner
-	}
-
-	if !validSorts[sort] {
-		sortOptions := "created_at, updated_at, short_code, title"
-		if userRoleStr == "admin" {
-			sortOptions += ", original_url, is_active, user_id"
-		}
-
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid sort parameter",
-			Error:   map[string]string{"sort": "Sort must be one of: " + sortOptions},
-		})
-		return
-	}
-
-	// Validate order_by parameter
-	if orderBy != "asc" && orderBy != "desc" {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid order_by parameter",
-			Error:   map[string]string{"order_by": "Order must be 'asc' or 'desc'"},
+			Message: "Invalid pagination parameters",
+			Error:   vErrs,
 		})
 		return
 	}

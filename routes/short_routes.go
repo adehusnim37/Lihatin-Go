@@ -1,7 +1,7 @@
 package routes
 
 import (
-	shortlink "github.com/adehusnim37/lihatin-go/controllers/short-link"
+	shortlink "github.com/adehusnim37/lihatin-go/controllers/shortlink"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
@@ -18,12 +18,13 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 
 	protectedShort := rg.Group("users/me/shorts")
 	{
-		protectedShort.Use(middleware.RateLimitMiddleware(100))
 		protectedShort.Use(middleware.AuthMiddleware(userRepo))
+		protectedShort.Use(middleware.RateLimitMiddleware(100))
 		protectedShort.GET("/:code", shortController.GetShortLink)
 		protectedShort.PUT("/:code", shortController.UpdateShortLink)
 		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
 		protectedShort.GET("stats/:code", shortController.GetShortLinkStats)
+		protectedShort.GET("views/:code", shortController.GetShortLinkViewsPaginated) // New route for paginated views
 		protectedShort.DELETE("/:code", shortController.DeleteShortLink)
 	}
 
@@ -35,6 +36,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 
 		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
 		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
+		protectedAdminShort.GET("/:code", shortController.GetShortLinkViewsPaginated)
 		// protectedAdminShort.DELETE("/:code", shortController.AdminDeleteShortLink)
 		// protectedAdminShort.POST("/bulk-delete", shortController.AdminBulkDeleteShortLinks)
 		// protectedAdminShort.PUT("/:code/suspend", shortController.AdminSuspendShortLink)
