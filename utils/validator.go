@@ -6,134 +6,291 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
-// SetupCustomValidators adds custom validation rules to the validator
-func SetupCustomValidators(v *validator.Validate) {
-	// Register custom validation for password complexity
-	v.RegisterValidation("pwdcomplex", validatePasswordComplexity)
-	v.RegisterValidation("username", ValidateUserRegistration)
+// ValidationResponse contains the parsed validation error
+type ValidationResponse struct {
+	Status   int               `json:"status"`
+	Details  []DetailError     `json:"details"`
+	ErrorMap map[string]string `json:"error_map"`
+	Message  string            `json:"message"`
+	Success  bool              `json:"success"`
 }
 
-// validatePasswordComplexity checks if a password has alphanumeric characters and symbols
-func validatePasswordComplexity(fl validator.FieldLevel) bool {
-	password := fl.Field().String()
-
-	// Check for at least one letter
-	hasLetter := regexp.MustCompile(`[a-zA-Z]`).MatchString(password)
-
-	// Check for at least one digit
-	hasDigit := regexp.MustCompile(`\d`).MatchString(password)
-
-	// Check for at least one symbol
-	hasSymbol := regexp.MustCompile(`[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]`).MatchString(password)
-
-	// Return true only if all conditions are met
-	return hasLetter && hasDigit && hasSymbol
+// DetailError represents a single field validation error
+type DetailError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
 }
 
-func ValidateUserRegistration(fl validator.FieldLevel) bool {
-	username := fl.Field().String()
-
-	minLength := 5
-	maxLength := 20
-	return username != "" && username != "null" && len(username) >= minLength && len(username) <= maxLength
+// Indonesian error messages mapping
+var indonesianMessages = map[string]string{
+	"required":   "%s wajib diisi",
+	"min":        "%s minimal %s karakter/item",
+	"max":        "%s maksimal %s karakter/item",
+	"len":        "%s harus %s karakter/item",
+	"email":      "%s harus berupa email yang valid",
+	"url":        "%s harus berupa URL yang valid",
+	"alphanum":   "%s hanya boleh berisi huruf dan angka",
+	"alpha":      "%s hanya boleh berisi huruf",
+	"lowercase":  "%s harus berupa huruf kecil",
+	"uppercase":  "%s harus berupa huruf besar",
+	"numeric":    "%s harus berupa angka",
+	"oneof":      "%s harus salah satu dari: %s",
+	"matches":    "%s format tidak valid",
+	"unique":     "%s tidak boleh ada yang duplikat",
+	"no_space":   "%s tidak boleh mengandung spasi",
+	"pwdcomplex": "%s harus mengandung minimal 8 karakter, huruf besar, huruf kecil, angka, dan simbol",
+	"username":   "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
+	"gte":        "%s minimal %s",
+	"lte":        "%s maksimal %s",
+	"gt":         "%s harus lebih dari %s",
+	"lt":         "%s harus kurang dari %s",
+	"dive":       "item dalam %s",
 }
 
-// GetJSONFieldName returns the JSON tag name for a struct field
-func GetJSONFieldName(fieldName string, structPtr interface{}) string {
-	structType := reflect.TypeOf(structPtr).Elem()
-	field, found := structType.FieldByName(fieldName)
-	if !found {
-		return strings.ToLower(fieldName)
+// Type mapping for Indonesian error messages
+var typeMapping = map[string]string{
+	"string":   "teks",
+	"int":      "angka",
+	"int64":    "angka",
+	"int32":    "angka",
+	"float64":  "angka desimal",
+	"float32":  "angka desimal",
+	"bool":     "boolean",
+	"[]string": "array teks",
+	"[]int":    "array angka",
+	"array":    "array",
+	"slice":    "array",
+}
+
+// GetFieldLabel extracts the label from struct tag or defaults to field name
+func GetFieldLabel(fieldName string, structPtr interface{}) string {
+	if structPtr == nil {
+		return fieldName
 	}
 
-	jsonTag := field.Tag.Get("json")
-	if jsonTag == "" {
-		return strings.ToLower(fieldName)
+	val := reflect.ValueOf(structPtr)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
 	}
 
-	// Remove omitempty or other options from json tag
-	parts := strings.Split(jsonTag, ",")
-	return parts[0]
+	if val.Kind() != reflect.Struct {
+		return fieldName
+	}
+
+	typ := val.Type()
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.Name == fieldName {
+			if label := field.Tag.Get("label"); label != "" {
+				return label
+			}
+			if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+				parts := strings.Split(jsonTag, ",")
+				if parts[0] != "" && parts[0] != "-" {
+					return parts[0]
+				}
+			}
+			break
+		}
+	}
+
+	return fieldName
 }
 
 // GetIndonesianType converts Go type to Indonesian type name
 func GetIndonesianType(goType string) string {
-	switch goType {
-	case "string":
-		return "string"
-	case "int", "int64", "int32":
-		return "angka"
-	case "float64", "float32":
-		return "angka desimal"
-	case "bool":
-		return "boolean"
-	default:
-		return "format yang benar"
+	if msg, exists := typeMapping[goType]; exists {
+		return msg
 	}
+	return "format yang benar"
 }
 
-// GetIndonesianValidationMessage converts validation error to Indonesian message
-func GetIndonesianValidationMessage(err validator.FieldError) string {
-	switch err.Tag() {
-	case "required":
-		return "harus diisi"
-	case "url":
-		return "harus berupa URL yang valid"
-	case "max":
-		return "maksimal " + err.Param() + " karakter"
-	case "min":
-		return "minimal " + err.Param() + " karakter"
-	case "len":
-		return "harus tepat " + err.Param() + " karakter"
-	case "alphanum":
-		return "hanya boleh huruf dan angka"
-	case "alpha":
-		return "hanya boleh huruf"
-	case "numeric":
-		return "hanya boleh angka"
-	case "email":
-		return "harus berupa email yang valid"
-	case "pwdcomplex":
-		return "harus mengandung huruf, angka, dan simbol"
-	case "username":
-		return "username harus 5-20 karakter"
-	default:
-		return "tidak valid"
-	}
-}
+// HandleJSONBindingError handles JSON syntax and type mismatch errors
+func HandleJSONBindingError(err error, structPtr interface{}) ValidationResponse {
+	details := []DetailError{}
+	errorMap := make(map[string]string)
 
-// HandleJSONBindingError creates Indonesian error messages for JSON binding errors
-func HandleJSONBindingError(err error, structPtr interface{}) map[string]string {
-	bindingErrors := make(map[string]string)
+	if syntaxErr, ok := err.(*json.SyntaxError); ok {
+		details = append(details, DetailError{
+			Field:   "json",
+			Message: "Format JSON tidak valid pada posisi " + strings.Split(syntaxErr.Error(), " ")[len(strings.Split(syntaxErr.Error(), " "))-1],
+		})
+		errorMap["json"] = "Format JSON tidak valid"
+	} else if typeErr, ok := err.(*json.UnmarshalTypeError); ok {
+		fieldLabel := GetFieldLabel(typeErr.Field, structPtr)
+		message := fieldLabel + " harus bertipe " + GetIndonesianType(typeErr.Type.String())
 
-	// Check if it's a JSON syntax error
-	if _, ok := err.(*json.SyntaxError); ok {
-		bindingErrors["json"] = "format JSON tidak valid"
-	} else if jsonErr, ok := err.(*json.UnmarshalTypeError); ok {
-		// Get the JSON field name from the struct field
-		fieldName := GetJSONFieldName(jsonErr.Field, structPtr)
-		bindingErrors[fieldName] = "harus bertipe " + GetIndonesianType(jsonErr.Type.String())
+		details = append(details, DetailError{
+			Field:   typeErr.Field,
+			Message: message,
+		})
+		errorMap[typeErr.Field] = message
 	} else {
-		// Generic binding error
-		bindingErrors["request"] = "format data tidak valid"
+		// Handle other JSON errors
+		details = append(details, DetailError{
+			Field:   "request",
+			Message: "Format data request tidak valid",
+		})
+		errorMap["request"] = "Format data request tidak valid"
 	}
 
-	return bindingErrors
+	return ValidationResponse{
+		Status:   400,
+		Details:  details,
+		ErrorMap: errorMap,
+		Message:  "Validasi gagal",
+		Success:  false,
+	}
 }
 
-// HandleValidationError creates Indonesian error messages for validation errors
-func HandleValidationError(err error, structPtr interface{}) map[string]string {
-	validationErrors := make(map[string]string)
+// HandleValidationError handles validator.v10 validation errors
+func HandleValidationError(err error, structPtr interface{}) ValidationResponse {
+	details := []DetailError{}
+	errorMap := make(map[string]string)
 
-	if validationErrs, ok := err.(validator.ValidationErrors); ok {
-		for _, validationErr := range validationErrs {
-			fieldName := GetJSONFieldName(validationErr.Field(), structPtr)
-			validationErrors[fieldName] = GetIndonesianValidationMessage(validationErr)
+	if validationErrors, ok := err.(validator.ValidationErrors); ok {
+		for _, validationErr := range validationErrors {
+			fieldLabel := GetFieldLabel(validationErr.Field(), structPtr)
+			message := formatIndonesianMessage(validationErr, fieldLabel)
+
+			details = append(details, DetailError{
+				Field:   validationErr.Field(),
+				Message: message,
+			})
+			errorMap[validationErr.Field()] = message
 		}
 	}
 
-	return validationErrors
+	return ValidationResponse{
+		Status:   400,
+		Details:  details,
+		ErrorMap: errorMap,
+		Message:  "Validasi gagal",
+		Success:  false,
+	}
+}
+
+// formatIndonesianMessage formats validation error message in Indonesian
+func formatIndonesianMessage(err validator.FieldError, fieldLabel string) string {
+	tag := err.Tag()
+	param := err.Param()
+
+	if template, exists := indonesianMessages[tag]; exists {
+		if param != "" {
+			// Handle special cases
+			switch tag {
+			case "oneof":
+				return strings.Replace(template, "%s", strings.ReplaceAll(param, " ", ", "), 1)
+			default:
+				// For tags with parameters like min, max, len
+				if strings.Contains(template, "%s") {
+					template = strings.Replace(template, "%s", fieldLabel, 1)
+					if strings.Contains(template, "%s") {
+						template = strings.Replace(template, "%s", param, 1)
+					}
+				}
+				return template
+			}
+		} else {
+			// For tags without parameters
+			return strings.Replace(template, "%s", fieldLabel, 1)
+		}
+	}
+
+	// Fallback for unknown validation tags
+	return fieldLabel + " tidak valid"
+}
+
+// SendValidationError sends formatted validation error response
+func SendValidationError(c *gin.Context, err error, structPtr interface{}) {
+	var result ValidationResponse
+
+	// Check if it's a JSON binding error or validation error
+	if _, ok := err.(*json.SyntaxError); ok {
+		result = HandleJSONBindingError(err, structPtr)
+	} else if _, ok := err.(*json.UnmarshalTypeError); ok {
+		result = HandleJSONBindingError(err, structPtr)
+	} else if _, ok := err.(validator.ValidationErrors); ok {
+		result = HandleValidationError(err, structPtr)
+	} else {
+		// Handle other binding errors
+		result = ValidationResponse{
+			Status:  400,
+			Details: []DetailError{{Field: "request", Message: "Format request tidak valid"}},
+			ErrorMap: map[string]string{
+				"request": "Format request tidak valid",
+			},
+			Message: "Validasi gagal",
+			Success: false,
+		}
+	}
+
+	c.JSON(result.Status, gin.H{
+		"success": result.Success,
+		"message": result.Message,
+		"errors":  result.ErrorMap,
+		"details": result.Details,
+	})
+}
+
+// Custom validation functions
+
+// validatePasswordComplexity validates password complexity
+func validatePasswordComplexity(fl validator.FieldLevel) bool {
+	password := fl.Field().String()
+
+	if len(password) < 8 {
+		return false
+	}
+
+	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
+	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
+	hasNumber := regexp.MustCompile(`\d`).MatchString(password)
+	hasSymbol := regexp.MustCompile(`[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~` + "`" + `]`).MatchString(password)
+
+	return hasUpper && hasLower && hasNumber && hasSymbol
+}
+
+// validateUsername validates username format
+func validateUsername(fl validator.FieldLevel) bool {
+	username := fl.Field().String()
+	return regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(username)
+}
+
+// validateUnique validates that slice has no duplicate values
+func validateUnique(fl validator.FieldLevel) bool {
+	slice := fl.Field()
+
+	if slice.Kind() != reflect.Slice && slice.Kind() != reflect.Array {
+		return true
+	}
+
+	seen := make(map[string]bool)
+	for i := 0; i < slice.Len(); i++ {
+		value := slice.Index(i).String()
+		if seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+
+	return true
+}
+
+// validateNoSpace validates that field contains no spaces
+func validateNoSpace(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	return !strings.Contains(value, " ")
+}
+
+// SetupCustomValidators registers custom validation rules
+func SetupCustomValidators(v *validator.Validate) {
+	v.RegisterValidation("pwdcomplex", validatePasswordComplexity)
+	v.RegisterValidation("username", validateUsername)
+	v.RegisterValidation("unique", validateUnique)
+	v.RegisterValidation("no_space", validateNoSpace)
 }

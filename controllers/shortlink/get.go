@@ -13,13 +13,7 @@ func (c *Controller) GetShortLink(ctx *gin.Context) {
 	// Parse URI parameters
 	var req dto.CodeRequest
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		bindingErrors := utils.HandleJSONBindingError(err, &req)
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid request",
-			Error:   bindingErrors,
-		})
+		utils.SendValidationError(ctx, err, &req)
 		return
 	}
 

@@ -719,40 +719,86 @@ func (r *ShortLinkRepository) UpdateShortLink(code string, userID string, update
 	return nil
 }
 
-func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passcode int) error {
+func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passcode int, roleUser string) error {
 	var link shortlink.ShortLink
 
-	err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
-		Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
-		Select("short_links.*, short_link_details.passcode").
-		First(&link).Error
+	if roleUser != "admin" {
+		err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
+			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
+			Select("short_links.*, short_link_details.passcode").
+			First(&link).Error
 
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return utils.ErrShortLinkNotFound
+			}
+
+			utils.Logger.Error("Database error while fetching short link",
+				"short_code", code,
+				"error", err.Error(),
+			)
+			return err
 		}
 
-		utils.Logger.Error("Database error while fetching short link",
-			"short_code", code,
-			"error", err.Error(),
-		)
-		return err
-	}
+		// Validate passcode if set
+		if link.Detail.Passcode != 0 && link.Detail.Passcode != passcode {
+			return utils.ErrPasscodeIncorrect
+		}
+	} else {
+		err := r.db.Where("short_code = ?", code).
+			First(&link).Error
 
-	if link.Detail.Passcode != passcode {
-		return utils.ErrShortLinkUnauthorized
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return utils.ErrShortLinkNotFound
+			}
+
+			utils.Logger.Error("Database error while fetching short link",
+				"short_code", code,
+				"error", err.Error(),
+			)
+			return err
+		}
 	}
 
 	if link.DeletedAt.Valid {
 		return utils.ErrShortLinkAlreadyDeleted
 	}
 
-	link.DeletedAt.Time = time.Now()
-	link.DeletedAt.Valid = true
-
-	if err := r.db.Save(&link).Error; err != nil {
+	if err := r.db.Where("short_code = ?", link.ShortCode).Delete(&link).Error; err != nil {
 		utils.Logger.Error("Failed to delete short link",
-			"short_code", code,
+			"short_code", link.ShortCode,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	return nil
+}
+
+func (r *ShortLinkRepository) DeleteShortsLink(req *dto.BulkDeleteRequest) error {
+	var links []shortlink.ShortLink
+
+	if len(req.Codes) == 0 {
+		return utils.ErrEmptyCodesList
+	}
+
+	// perform a check to see if all codes exist
+	if err := r.db.Where("short_code IN ?", req.Codes).Find(&links).Error; err != nil {
+		utils.Logger.Error("Failed to fetch short links for bulk delete",
+			"short_codes", req.Codes,
+			"error", err.Error(),
+		)
+		return err
+	}
+
+	if len(req.Codes) != len(links) {
+		return utils.ErrSomeShortLinksNotFound
+	}
+	// Perform bulk delete
+	if err := r.db.Where("short_code IN ?", req.Codes).Delete(&shortlink.ShortLink{}).Error; err != nil {
+		utils.Logger.Error("Failed to delete short links",
+			"short_codes", req.Codes,
 			"error", err.Error(),
 		)
 		return err

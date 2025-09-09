@@ -8,7 +8,6 @@ import (
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 )
 
 // Login authenticates a user with email/username and password
@@ -17,38 +16,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Bind and validate the request body
 	if err := ctx.ShouldBindJSON(&loginReq); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid input",
-			Error:   map[string]string{"input": "Invalid input format or missing fields, please check your request body"},
-		})
-		return
-	}
-
-	// Validate the login request
-	if err := c.Validate.Struct(loginReq); err != nil {
-		errorMap := make(map[string]string)
-		for _, err := range err.(validator.ValidationErrors) {
-			field := err.Field()
-			switch err.Tag() {
-			case "required":
-				errorMap[field] = field + " is required"
-			case "min":
-				errorMap[field] = field + " must be at least " + err.Param() + " characters"
-			case "max":
-				errorMap[field] = field + " must not exceed " + err.Param() + " characters"
-			default:
-				errorMap[field] = "Invalid value for " + field
-			}
-		}
-
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   errorMap,
-		})
+		utils.SendValidationError(ctx, err, &loginReq)
 		return
 	}
 
@@ -173,7 +141,6 @@ func (c *Controller) Login(ctx *gin.Context) {
 		})
 		return
 	}
-
 
 	// Send login alert email (async)
 	go func() {

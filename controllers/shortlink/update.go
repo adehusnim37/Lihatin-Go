@@ -12,17 +12,7 @@ import (
 func (c *Controller) UpdateShortLink(ctx *gin.Context) {
 	var updateData dto.UpdateShortLinkRequest
 	if err := ctx.ShouldBindJSON(&updateData); err != nil {
-		bindingErrors := utils.HandleJSONBindingError(err, &updateData)
-		utils.Logger.Warn("Invalid request payload",
-			"error", err.Error(),
-		)
-
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid request",
-			Error:   bindingErrors,
-		})
+		utils.SendValidationError(ctx, err, &updateData)
 		return
 	}
 
@@ -32,7 +22,7 @@ func (c *Controller) UpdateShortLink(ctx *gin.Context) {
 			"short_code", shortCode,
 			"error", err.Error(),
 		)
-		switch  err{
+		switch err {
 		case utils.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,

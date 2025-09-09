@@ -10,6 +10,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/routes"
 	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
@@ -88,7 +89,15 @@ func main() {
 	}
 	log.Println("Database migrations completed successfully!")
 
-	// Initialize validator with custom rules
+	// Setup custom validators untuk Gin's binding validator (untuk controller baru)
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		utils.SetupCustomValidators(v)
+		log.Println("✅ Custom validators registered to Gin's engine!")
+	} else {
+		log.Println("⚠️  Failed to register custom validators to Gin's engine")
+	}
+
+	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()
 	utils.SetupCustomValidators(validate)
 

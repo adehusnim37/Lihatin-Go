@@ -14,46 +14,36 @@ func (c *Controller) DeleteShortLink(ctx *gin.Context) {
 	var deleteData dto.DeleteRequest
 
 	if err := ctx.ShouldBindUri(&deleteData); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid URI parameter",
-			Error:   map[string]string{"code": "Invalid short code"},
-		})
+		utils.SendValidationError(ctx, err, &deleteData)
 		return
 	}
 
-	if err := ctx.ShouldBindJSON(&deleteData); err != nil {
-		bindingErrors := utils.HandleJSONBindingError(err, &deleteData)
-		utils.Logger.Error("Failed to bind JSON",
-			"error", err.Error(),
-		)
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid request",
-			Error:   bindingErrors,
-		})
+	if err := ctx.ShouldBindJSON(&deleteData); err != nil && err.Error() != "EOF" {
+		utils.SendValidationError(ctx, err, &deleteData)
 		return
 	}
 
 	shortCode := ctx.Param("code")
-	passcode, err := strconv.Atoi(deleteData.Passcode)
-	if err != nil {
-		utils.Logger.Error("Invalid passcode format",
-			"passcode", deleteData.Passcode,
-			"error", err.Error(),
-		)
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid passcode format",
-			Error:   map[string]string{"passcode": "Passcode harus berupa angka"},
-		})
-		return
+	var passcode int
+	if deleteData.Passcode != "" {
+		var err error
+		passcode, err = strconv.Atoi(deleteData.Passcode)
+		if err != nil {
+			utils.Logger.Error("Invalid passcode format",
+				"passcode", deleteData.Passcode,
+				"error", err.Error(),
+			)
+			ctx.JSON(http.StatusBadRequest, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Invalid passcode format",
+				Error:   map[string]string{"passcode": "Passcode harus berupa angka"},
+			})
+			return
+		}
 	}
 
-	if err := c.repo.DeleteShortLink(shortCode, ctx.GetString("user_id"), passcode); err != nil {
+	if err := c.repo.DeleteShortLink(shortCode, ctx.GetString("user_id"), passcode, ctx.GetString("role")); err != nil {
 		utils.Logger.Error("Failed to delete short link",
 			"short_code", shortCode,
 			"error", err.Error(),

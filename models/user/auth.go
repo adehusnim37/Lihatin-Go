@@ -95,15 +95,15 @@ func (AuthMethod) TableName() string {
 
 // LoginAttempt represents a login attempt record
 type LoginAttempt struct {
-	ID          string     `json:"id" gorm:"primaryKey"`
-	UserID      *string    `json:"user_id,omitempty" gorm:"index"` // Nullable foreign key
-	IPAddress   string     `json:"ip_address" gorm:"size:45"`     // IPv4/IPv6
-	UserAgent   string     `json:"user_agent" gorm:"size:255"`
-	Success     bool       `json:"success" gorm:"default:false"`
-	FailReason  string     `json:"fail_reason,omitempty" gorm:"size:255"`
-	AttemptedAt time.Time  `json:"attempted_at" gorm:"autoCreateTime"`
-	CreatedAt   time.Time  `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+	ID          string    `json:"id" gorm:"primaryKey"`
+	UserID      *string   `json:"user_id,omitempty" gorm:"index"` // Nullable foreign key
+	IPAddress   string    `json:"ip_address" gorm:"size:45"`      // IPv4/IPv6
+	UserAgent   string    `json:"user_agent" gorm:"size:255"`
+	Success     bool      `json:"success" gorm:"default:false"`
+	FailReason  string    `json:"fail_reason,omitempty" gorm:"size:255"`
+	AttemptedAt time.Time `json:"attempted_at" gorm:"autoCreateTime"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 
 	// Associations
 	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
@@ -115,8 +115,8 @@ func (LoginAttempt) TableName() string {
 
 // LoginRequest represents the login request payload
 type LoginRequest struct {
-	EmailOrUsername string `json:"email_or_username" validate:"required,min=3,max=100"`
-	Password        string `json:"password" validate:"required,min=8,max=50"`
+	EmailOrUsername string `json:"email_or_username" label:"Email atau Username" binding:"required,min=3,max=100"`
+	Password        string `json:"password" label:"Kata Sandi" binding:"required,min=8,max=50"`
 }
 
 // LoginResponse represents the successful login response

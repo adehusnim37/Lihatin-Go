@@ -5,12 +5,12 @@ import "time"
 // CreateShortLinkRequest represents request to create short link
 type CreateShortLinkRequest struct {
 	UserID      string     `json:"user_id,omitempty"`
-	Passcode    string     `json:"passcode,omitempty"    binding:"omitempty,len=6,numeric"`
-	OriginalURL string     `json:"original_url"          binding:"required,url"`
-	Title       string     `json:"title,omitempty"       binding:"omitempty,max=255"`
-	Description string     `json:"description,omitempty"`
-	CustomCode  string     `json:"custom_code,omitempty" binding:"omitempty,max=10,alphanum"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	Passcode    string     `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
+	OriginalURL string     `json:"original_url" label:"URL Asli" binding:"required,url"`
+	Title       string     `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255"`
+	Description string     `json:"description,omitempty" label:"Deskripsi"`
+	CustomCode  string     `json:"custom_code,omitempty" label:"Kode Kustom" binding:"omitempty,max=10,alphanum,no_space"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa"`
 }
 
 // ShortLinkResponse represents short link data for API responses
@@ -114,10 +114,10 @@ type PaginatedShortLinkDetailWithStatsResponse struct {
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {
 	CodeRequest
-	Title       *string    `json:"title" binding:"omitempty,max=255,min=3"`
-	Description *string    `json:"description" binding:"omitempty,max=500,min=3"`
-	IsActive    *bool      `json:"is_active" binding:"omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at" binding:"omitempty,gt=now"`
+	Title       *string    `json:"title" label:"Judul" binding:"omitempty,max=255,min=3"`
+	Description *string    `json:"description" label:"Deskripsi" binding:"omitempty,max=500,min=3"`
+	IsActive    *bool      `json:"is_active" label:"Status Aktif" binding:"omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
 }
 
 // PaginatedShortLinksResponse represents paginated short links
@@ -141,11 +141,15 @@ type PaginatedShortLinksAdminResponse struct {
 	OrderBy    string              `json:"order_by"`
 }
 
+type BulkDeleteRequest struct {
+	Codes []string `json:"codes" label:"Kode Short Link" binding:"required,min=1,unique,dive,required,min=1,max=100,no_space"`
+}
+
 type DeleteRequest struct {
 	CodeRequest
-	Passcode string `json:"passcode" binding:"omitempty,min=6,max=6,numeric"`
+	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
 }
 
 type CodeRequest struct {
-	Code string `json:"code" binding:"required,min=1,max=100,alphanum" uri:"code"`
+	Code string `json:"code" label:"Kode Short Link" binding:"required,min=1,max=100" uri:"code"`
 }

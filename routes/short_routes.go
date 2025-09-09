@@ -23,8 +23,8 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedShort.GET("/:code", shortController.GetShortLink)
 		protectedShort.PUT("/:code", shortController.UpdateShortLink)
 		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
-		protectedShort.GET("stats/:code", shortController.GetShortLinkStats)
-		protectedShort.GET("views/:code", shortController.GetShortLinkViewsPaginated) // New route for paginated views
+		protectedShort.GET("/:code/stats", shortController.GetShortLinkStats)
+		protectedShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated) // New route for paginated views
 		protectedShort.DELETE("/:code", shortController.DeleteShortLink)
 	}
 
@@ -36,9 +36,9 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 
 		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
 		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
-		protectedAdminShort.GET("/:code", shortController.GetShortLinkViewsPaginated)
-		// protectedAdminShort.DELETE("/:code", shortController.AdminDeleteShortLink)
-		// protectedAdminShort.POST("/bulk-delete", shortController.AdminBulkDeleteShortLinks)
+		protectedAdminShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
+		protectedAdminShort.DELETE("/:code", shortController.DeleteShortLink)
+		protectedAdminShort.DELETE("/bulk-delete", shortController.AdminBulkDeleteShortLinks)
 		// protectedAdminShort.PUT("/:code/suspend", shortController.AdminSuspendShortLink)
 		// protectedAdminShort.PUT("/:code/unsuspend", shortController.AdminUnsuspendShortLink)
 		// protectedAdminShort.GET("stats/:code", shortController.AdminGetShortLinkStats)
