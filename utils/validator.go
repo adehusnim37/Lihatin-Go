@@ -27,28 +27,36 @@ type DetailError struct {
 
 // Indonesian error messages mapping
 var indonesianMessages = map[string]string{
-	"required":   "%s wajib diisi",
-	"min":        "%s minimal %s karakter/item",
-	"max":        "%s maksimal %s karakter/item",
-	"len":        "%s harus %s karakter/item",
-	"email":      "%s harus berupa email yang valid",
-	"url":        "%s harus berupa URL yang valid",
-	"alphanum":   "%s hanya boleh berisi huruf dan angka",
-	"alpha":      "%s hanya boleh berisi huruf",
-	"lowercase":  "%s harus berupa huruf kecil",
-	"uppercase":  "%s harus berupa huruf besar",
-	"numeric":    "%s harus berupa angka",
-	"oneof":      "%s harus salah satu dari: %s",
-	"matches":    "%s format tidak valid",
-	"unique":     "%s tidak boleh ada yang duplikat",
-	"no_space":   "%s tidak boleh mengandung spasi",
-	"pwdcomplex": "%s harus mengandung minimal 8 karakter, huruf besar, huruf kecil, angka, dan simbol",
-	"username":   "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
-	"gte":        "%s minimal %s",
-	"lte":        "%s maksimal %s",
-	"gt":         "%s harus lebih dari %s",
-	"lt":         "%s harus kurang dari %s",
-	"dive":       "item dalam %s",
+	"required":     "%s wajib diisi",
+	"min":          "%s minimal %s karakter/item",
+	"max":          "%s maksimal %s karakter/item",
+	"len":          "%s harus %s karakter/item",
+	"email":        "%s harus berupa email yang valid",
+	"url":          "%s harus berupa URL yang valid",
+	"alphanum":     "%s hanya boleh berisi huruf dan angka",
+	"alpha":        "%s hanya boleh berisi huruf",
+	"lowercase":    "%s harus berupa huruf kecil",
+	"uppercase":    "%s harus berupa huruf besar",
+	"numeric":      "%s harus berupa angka",
+	"oneof":        "%s harus salah satu dari: %s",
+	"matches":      "%s format tidak valid",
+	"unique":       "%s tidak boleh ada yang duplikat",
+	"no_space":     "%s tidak boleh mengandung spasi",
+	"no_special":   "%s tidak boleh mengandung karakter khusus",
+	"saveurlshort": "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
+	"eqfield":      "%s harus sama dengan %s",
+	"nefield":      "%s tidak boleh sama dengan %s",
+	"pwdcomplex":   "%s harus mengandung minimal 8 karakter, huruf besar, huruf kecil, angka, dan simbol",
+	"username":     "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
+	"gte":          "%s minimal %s",
+	"lte":          "%s maksimal %s",
+	"gt":           "%s harus lebih dari %s",
+	"lt":           "%s harus kurang dari %s",
+	"dive":         "item dalam %s",
+	"six_digit":    "%s harus tepat 6 digit angka",
+	"datetime":     "%s harus berupa tanggal dan waktu yang valid dengan format %s",
+	"required_if":  "%s wajib diisi ketika %s adalah %s",
+	"excluded_if":  "%s tidak boleh diisi ketika %s adalah %s",
 }
 
 // Type mapping for Indonesian error messages
@@ -189,9 +197,7 @@ func formatIndonesianMessage(err validator.FieldError, fieldLabel string) string
 				// For tags with parameters like min, max, len
 				if strings.Contains(template, "%s") {
 					template = strings.Replace(template, "%s", fieldLabel, 1)
-					if strings.Contains(template, "%s") {
-						template = strings.Replace(template, "%s", param, 1)
-					}
+					template = strings.Replace(template, "%s", param, 1)
 				}
 				return template
 			}
@@ -287,10 +293,30 @@ func validateNoSpace(fl validator.FieldLevel) bool {
 	return !strings.Contains(value, " ")
 }
 
+func validateNoSpecial(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	return regexp.MustCompile(`^[a-zA-Z0-9\s]+$`).MatchString(value)
+}
+
+func validateSaveUrlShort(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	return regexp.MustCompile(`^[a-zA-Z0-9-_]+$`).MatchString(value)
+}
+
+// validateSixDigit validates that integer has exactly 6 digits
+func validateSixDigit(fl validator.FieldLevel) bool {
+	value := fl.Field().Int()
+	// Check if value is exactly 6 digits (100000 <= value <= 999999)
+	return value >= 100000 && value <= 999999
+}
+
 // SetupCustomValidators registers custom validation rules
 func SetupCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("pwdcomplex", validatePasswordComplexity)
 	v.RegisterValidation("username", validateUsername)
 	v.RegisterValidation("unique", validateUnique)
 	v.RegisterValidation("no_space", validateNoSpace)
+	v.RegisterValidation("no_special", validateNoSpecial)
+	v.RegisterValidation("saveurlshort", validateSaveUrlShort)
+	v.RegisterValidation("six_digit", validateSixDigit)
 }

@@ -30,6 +30,17 @@ func GeneratePasswordResetToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
+func GeneratePasscodeResetCode() (string, error) {
+	// Generate 4 bytes of random data
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Convert to hex string (64 characters)
+	return hex.EncodeToString(bytes), nil
+}
+
 // GenerateRecoveryCode generates a recovery code for 2FA backup
 func GenerateRecoveryCode() (string, error) {
 	// Generate 8 bytes of random data

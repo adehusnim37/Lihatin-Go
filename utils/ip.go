@@ -101,6 +101,40 @@ func GetLocationString(ip string) string {
 	return "Unknown Location"
 }
 
+func GetCountryName(ip string) string {
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+		return "Local Machine"
+	}
+
+	resultCh := make(chan string, 1)
+	go func() {
+		locationResponse, err := IPGeolocation(ip)
+		if err != nil || locationResponse.Location.CountryName == "" {
+			resultCh <- "Unknown Country"
+			return
+		}
+		resultCh <- locationResponse.Location.CountryName
+	}()
+	return <-resultCh
+}
+
+func GetCityName(ip string) string {
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+		return "Local Machine"
+	}
+
+	resultCh := make(chan string, 1)
+	go func() {
+		locationResponse, err := IPGeolocation(ip)
+		if err != nil || locationResponse.Location.City == "" {
+			resultCh <- "Unknown City"
+			return
+		}
+		resultCh <- locationResponse.Location.City
+	}()
+	return <-resultCh
+}
+
 // Helper function to join strings with comma
 func joinWithComma(parts []string) string {
 	if len(parts) == 0 {

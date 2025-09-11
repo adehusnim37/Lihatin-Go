@@ -234,15 +234,15 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   map[string]string{"password": "Password must be 8-50 characters with letters, numbers, and symbols"},
-		})
-		return
-	}
+	//if err := c.Validate.Struct(req); err != nil {
+	//	ctx.JSON(http.StatusBadRequest, common.APIResponse{
+	//		Success: false,
+	//		Data:    nil,
+	//		Message: "Validation failed",
+	//		Error:   map[string]string{"password": "Password must be 8-50 characters with letters, numbers, and symbols"},
+	//	})
+	//	return
+	//}
 
 	// Validate reset token
 	_, err := c.repo.GetUserAuthRepository().ValidatePasswordResetToken(req.Token)
@@ -468,4 +468,3 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 		Error:   nil,
 	})
 }
-

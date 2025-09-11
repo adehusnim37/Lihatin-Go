@@ -39,8 +39,9 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
 		protectedAdminShort.DELETE("/:code", shortController.DeleteShortLink)
 		protectedAdminShort.DELETE("/bulk-delete", shortController.AdminBulkDeleteShortLinks)
-		// protectedAdminShort.PUT("/:code/suspend", shortController.AdminSuspendShortLink)
-		// protectedAdminShort.PUT("/:code/unsuspend", shortController.AdminUnsuspendShortLink)
+		protectedAdminShort.PUT("/:code/banned", shortController.AdminBannedShortLink)
+		protectedAdminShort.PUT("/:code/unban", shortController.AdminUnbanShortLink)
+		protectedAdminShort.POST("/:code/edotensei", shortController.ReviveShortLink) // Revive deleted short link
 		// protectedAdminShort.GET("stats/:code", shortController.AdminGetShortLinkStats)
 		// protectedAdminShort.GET("/stats", shortController.AdminGetAllShortLinksStats)
 		// protectedAdminShort.GET("/export", shortController.AdminExportShortLinks)

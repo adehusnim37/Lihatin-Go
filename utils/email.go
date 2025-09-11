@@ -229,7 +229,7 @@ The Lihatin Team
 func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAgent string) error {
 	subject := "New Login to Your Account"
 	loginTime := time.Now().Format("January 2, 2006 at 3:04 PM MST")
-    location := GetLocationString(ipAddress)
+	location := GetLocationString(ipAddress)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -290,6 +290,68 @@ If this wasn't you: Please change your password immediately and consider enablin
 Best regards,
 The Lihatin Team
 `, userName, loginTime, ipAddress, userAgent)
+
+	return es.sendEmail(toEmail, subject, textBody, htmlBody)
+}
+
+// SendPassccodeResetEmail sends passcode reset email
+func (es *EmailService) SendPasscodeResetEmail(toEmail, short, userName, token string) error {
+	subject := "Reset Your Passcode"
+	resetURL := fmt.Sprintf("http://localhost:8080/v1/shorts/reset-passcode?token=%s", token)
+
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #FF5722; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .button { background-color: #FF5722; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+        .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Passcode Reset Request</h1>
+        </div>
+        <div class="content">
+            <h2>Hello %s,</h2>
+            <p>We received a request to reset the passcode for your short link: <strong>%s</strong>. Click the button below to reset your passcode:</p>
+            <a href="%s" class="button">Reset Passcode</a>
+            <p>Or copy and paste this link in your browser:</p>
+            <p><a href="%s">%s</a></p>
+            <div class="warning">
+                <strong>Important:</strong> This reset link will expire in 1 hour for security reasons.
+            </div>
+            <p>If you didn't request a passcode reset, please ignore this email or contact support if you have concerns.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 Lihatin. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+`, userName, short, resetURL, resetURL, resetURL)
+
+	textBody := fmt.Sprintf(`
+Hello %s,
+
+We received a request to reset the passcode for your short link: %s
+
+Please reset your passcode by visiting this link:
+%s
+
+This reset link will expire in 1 hour for security reasons.
+
+If you didn't request a passcode reset, please ignore this email or contact support if you have concerns.
+
+Best regards,
+The Lihatin Team
+`, userName, short, resetURL)
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

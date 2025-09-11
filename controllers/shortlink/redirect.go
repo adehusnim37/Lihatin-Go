@@ -2,8 +2,8 @@ package shortlink
 
 import (
 	"net/http"
-	"strconv"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
@@ -11,29 +11,23 @@ import (
 
 // Redirect handles short link redirection and tracking
 func (c *Controller) Redirect(ctx *gin.Context) {
-	shortCode := ctx.Param("code")
-	passcodeStr := ctx.Query("passcode")
-
-	// Parse passcode if provided, default to 0 if not provided or invalid
-	passcode := 0
-	if passcodeStr != "" {
-		if parsedPasscode, err := strconv.Atoi(passcodeStr); err == nil {
-			passcode = parsedPasscode
-		}
-		// If parsing fails, passcode remains 0 (no passcode)
-	}
-
-	if shortCode == "" {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Short code is required",
-			Error:   map[string]string{"code": "Short code tidak boleh kosong"},
-		})
+	// 1. Bind URI parameter untuk code (required)
+	var codeData dto.CodeRequest
+	if err := ctx.ShouldBindUri(&codeData); err != nil {
+		utils.SendValidationError(ctx, err, &codeData)
 		return
 	}
 
-	// Capture user data for tracking
+	// 2. Bind query parameter untuk passcode (optional)
+	var passcodeData dto.PasscodeRequest
+	if err := ctx.ShouldBindQuery(&passcodeData); err != nil {
+		// Untuk query parameter yang optional, kita ignore error jika tidak ada
+		// Karena passcode sekarang optional, set ke 0
+		passcodeData.Passcode = 0
+		utils.SendValidationError(ctx, err, &passcodeData)
+		return
+	}
+
 	ipAddress := ctx.ClientIP()
 	userAgent := ctx.Request.UserAgent()
 	referer := ctx.Request.Referer()
@@ -42,7 +36,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	}
 
 	// Get short link and track the view
-	link, err := c.repo.RedirectByShortCode(shortCode, ipAddress, userAgent, referer, passcode)
+	link, err := c.repo.RedirectByShortCode(codeData.Code, ipAddress, userAgent, referer, passcodeData.Passcode)
 	if err != nil {
 		switch err {
 		case utils.ErrShortLinkNotFound:

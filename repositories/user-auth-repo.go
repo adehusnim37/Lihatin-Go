@@ -129,7 +129,7 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.Use
 // ResetPassword updates password and clears reset token
 func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 	result := r.db.Model(&user.UserAuth{}).
-		Where("password_reset_token = ? AND password_reset_token_expires_at > ?", token, time.Now()).
+		Where("password_reset_token = ? AND password_reset_token_expires_at IS NOT NULL AND password_reset_token_expires_at > ?", token, time.Now()).
 		Updates(map[string]interface{}{
 			"password_hash":                   hashedPassword,
 			"password_reset_token":            "",

@@ -151,5 +151,13 @@ type DeleteRequest struct {
 }
 
 type CodeRequest struct {
-	Code string `json:"code" label:"Kode Short Link" binding:"required,min=1,max=100" uri:"code"`
+	Code string `json:"code" label:"Kode Short Link" binding:"required,min=1,max=100,no_space,saveurlshort" uri:"code"`
+}
+
+type BannedRequest struct {
+	Reason string `json:"reason" label:"Alasan Pemblokiran" binding:"required,min=3,max=255,no_special"`
+}
+
+type PasscodeRequest struct {
+	Passcode int `form:"passcode" label:"Kode Akses" binding:"omitempty,six_digit"`
 }
