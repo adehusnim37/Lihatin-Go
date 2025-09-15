@@ -526,6 +526,7 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 	}
 
 	return &dto.ShortLinkWithStatsResponse{
+		ShortCode:      link.ShortCode,
 		TotalClicks:    int(totalCount),
 		UniqueVisitors: int(uniqueVisitors),
 		Last24h:        int(last24hCount),
@@ -534,6 +535,91 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		TopReferrers:   referrers,
 		TopDevices:     devices,
 		TopCountries:   countries,
+	}, nil
+}
+
+func (r *ShortLinkRepository) GetStatsAllShortLinks(userId string, userRole string, page, limit int, sort, orderBy string) (*dto.PaginatedShortLinkWithStatsResponse, error) {
+	var links []shortlink.ShortLink
+
+	offset := (page - 1) * limit
+	orderClause := fmt.Sprintf("%s %s", sort, orderBy)
+
+	if userRole != "admin" {
+		err := r.db.Where("user_id = ?", userId).Order(orderClause).Offset(offset).Limit(limit).Find(&links).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, utils.ErrShortLinkNotFound
+			}
+			utils.Logger.Error("Database error while fetching short links",
+				"user_id", userId,
+				"error", err.Error(),
+			)
+			return nil, err
+		}
+	} else {
+		err := r.db.Order(orderClause).Offset(offset).Limit(limit).Find(&links).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, utils.ErrShortLinkNotFound
+			}
+			utils.Logger.Error("Database error while fetching short links",
+				"error", err.Error(),
+			)
+			return nil, err
+		}
+	}
+
+	shortLinksStats := make([]dto.ShortLinkWithStatsResponse, 0, len(links))
+	for _, link := range links {
+		var totalCount int64
+		var uniqueVisitors int64
+		var countries []dto.Country
+		var devices []dto.TopDevice
+		var referrers []dto.TopReferrer
+		var last24hCount int64
+		var last7dCount int64
+		var last30dCount int64
+
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Count(&totalCount)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Distinct("ip_address").Count(&uniqueVisitors)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Select("country, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("country").Order("count DESC").Limit(5).Scan(&countries)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Select("device, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("device").Order("count DESC").Limit(5).Scan(&devices)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Select("referer, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("referer").Order("count DESC").Limit(5).Scan(&referrers)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-24*time.Hour)).Count(&last24hCount)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-7*24*time.Hour)).Count(&last7dCount)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-30*24*time.Hour)).Count(&last30dCount)
+
+		shortLinksStats = append(shortLinksStats, dto.ShortLinkWithStatsResponse{
+			ShortCode:      link.ShortCode,
+			TotalClicks:    int(totalCount),
+			UniqueVisitors: int(uniqueVisitors),
+			Last24h:        int(last24hCount),
+			Last7d:         int(last7dCount),
+			Last30d:        int(last30dCount),
+			TopReferrers:   referrers,
+			TopDevices:     devices,
+			TopCountries:   countries,
+		})
+	}
+
+	// Get total count of all short links for pagination
+	var totalLinks int64
+	if userRole != "admin" {
+		r.db.Model(&shortlink.ShortLink{}).Where("user_id = ?", userId).Count(&totalLinks)
+	} else {
+		r.db.Model(&shortlink.ShortLink{}).Count(&totalLinks)
+	}
+
+	totalPages := int((totalLinks + int64(limit) - 1) / int64(limit))
+
+	return &dto.PaginatedShortLinkWithStatsResponse{
+		ShortLinks: shortLinksStats,
+		TotalCount: totalLinks,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		Sort:       sort,
+		OrderBy:    orderBy,
 	}, nil
 }
 

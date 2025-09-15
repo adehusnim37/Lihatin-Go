@@ -42,7 +42,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.PUT("/:code/banned", shortController.AdminBannedShortLink)
 		protectedAdminShort.PUT("/:code/unban", shortController.AdminUnbanShortLink)
 		protectedAdminShort.POST("/:code/edotensei", shortController.ReviveShortLink) // Revive deleted short link
-		// protectedAdminShort.GET("stats/:code", shortController.AdminGetShortLinkStats)
+		protectedAdminShort.GET("/short/stats", shortController.GetAllStatsShorts)
 		// protectedAdminShort.GET("/stats", shortController.AdminGetAllShortLinksStats)
 		// protectedAdminShort.GET("/export", shortController.AdminExportShortLinks)
 	}

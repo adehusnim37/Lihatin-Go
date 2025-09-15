@@ -95,6 +95,7 @@ type Country struct {
 }
 
 type ShortLinkWithStatsResponse struct {
+	ShortCode      string        `json:"short"`
 	TotalClicks    int           `json:"total_clicks"`
 	UniqueVisitors int           `json:"unique_visitors"`
 	Last24h        int           `json:"last_24h"`
@@ -103,6 +104,16 @@ type ShortLinkWithStatsResponse struct {
 	TopReferrers   []TopReferrer `json:"top_referrers"`
 	TopDevices     []TopDevice   `json:"top_devices"`
 	TopCountries   []Country     `json:"top_countries"`
+}
+
+type PaginatedShortLinkWithStatsResponse struct {
+	ShortLinks []ShortLinkWithStatsResponse `json:"short_links"`
+	TotalCount int64                        `json:"total_count"`
+	Page       int                          `json:"page"`
+	Limit      int                          `json:"limit"`
+	TotalPages int                          `json:"total_pages"`
+	Sort       string                       `json:"sort"`
+	OrderBy    string                       `json:"order_by"`
 }
 
 type PaginatedShortLinkDetailWithStatsResponse struct {

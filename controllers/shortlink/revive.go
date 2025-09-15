@@ -28,6 +28,7 @@ func (c *Controller) ReviveShortLink(ctx *gin.Context) {
 				Success: false,
 				Data:    nil,
 			})
+			return
 		case utils.ErrShortIsNotDeleted:
 			ctx.JSON(http.StatusBadRequest, common.APIResponse{
 				Success: false,
@@ -35,6 +36,7 @@ func (c *Controller) ReviveShortLink(ctx *gin.Context) {
 				Message: "Failed to revive short link",
 				Error:   map[string]string{"code": "Link dengan kode tersebut tidak dalam status dihapus"},
 			})
+			return
 		default:
 			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 				Success: false,
@@ -45,11 +47,11 @@ func (c *Controller) ReviveShortLink(ctx *gin.Context) {
 			return
 		}
 	}
+
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    codeData,
 		Message: "Short link revived successfully",
 		Error:   nil,
 	})
-
 }

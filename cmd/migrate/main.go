@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -16,6 +17,7 @@ import (
 func main() {
 	// Database connection
 	dsn := "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?charset=utf8mb4&parseTime=True&loc=Local"
+	ensureDatabase()
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect database: %v", err)
@@ -41,6 +43,25 @@ func main() {
 		showMigrationStatus(db)
 	default:
 		log.Fatalf("Unknown command: %s. Available: migrate, fresh, rollback, status", command)
+	}
+}
+
+func ensureDatabase() {
+	dsnRoot := "adehusnim:ryugamine123A@tcp(localhost:3306)/"
+	db, err := sql.Open("mysql", dsnRoot)
+	log.Printf("Connecting to database with DSN: %s", dsnRoot)
+	if err != nil {
+		log.Fatalf("Failed to connect root: %v", err)
+	}
+	log.Printf("Checking/creating database LihatinGo...")
+	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS LihatinGo DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+	if err != nil {
+		log.Fatalf("Failed to create database: %v", err)
+	}
+	log.Printf("Database created/exists. Testing connection...")
+	err = db.Close()
+	if err != nil {
+		return
 	}
 }
 

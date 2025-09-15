@@ -11,23 +11,10 @@ import (
 // ListShortLinks handles both user and admin requests with role-based filtering
 func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	// Get user info from context (set by auth middleware)
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication required",
-			Error:   map[string]string{"auth": "User ID not found in context"},
-		})
-		return
-	}
+	userID, _ := ctx.Get("user_id")
 
 	// Get user role from context (set by auth middleware)
-	userRole, roleExists := ctx.Get("role")
-	if !roleExists {
-		// Default to "user" role if not specified
-		userRole = "user"
-	}
+	userRole, _ := ctx.Get("role")
 
 	// Convert to strings
 	userIDStr := userID.(string)
