@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/repositories"
@@ -38,7 +39,7 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 
 // Register creates a new user account
 func (c *Controller) Register(ctx *gin.Context) {
-	var req user.RegisterRequest
+	var req dto.RegisterRequest
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -627,12 +628,12 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 	}
 
 	// Convert to response format (hide sensitive data)
-	responses := make([]user.APIKeyResponse, len(apiKeys))
+	responses := make([]dto.APIKeyResponse, len(apiKeys))
 	for i, key := range apiKeys {
-		responses[i] = user.APIKeyResponse{
+		responses[i] = dto.APIKeyResponse{
 			ID:          key.ID,
 			Name:        key.Name,
-			KeyPreview:  key.KeyPreview(), // Use method to get preview
+			KeyPreview:  utils.GetKeyPreview(key.Key), // Use method to get preview
 			LastUsedAt:  key.LastUsedAt,
 			ExpiresAt:   key.ExpiresAt,
 			IsActive:    key.IsActive,
@@ -652,36 +653,13 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 // CreateAPIKey creates a new API key
 func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 	// Get user ID from JWT token context
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication required",
-			Error:   map[string]string{"auth": "Please authenticate to access this resource"},
-		})
-		return
-	}
+	userID, _ := ctx.Get("user_id")
 
-	var req user.APIKeyRequest
+	var req dto.APIKeyRequest
+
+	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid input",
-			Error:   map[string]string{"input": "Invalid input format or missing fields"},
-		})
-		return
-	}
-
-	// Validate request
-	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   map[string]string{"name": "API key name is required and must be between 3-100 characters"},
-		})
+		utils.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -815,7 +793,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	}
 
 	// Bind and validate request
-	var req user.UpdateAPIKeyRequest
+	var req dto.UpdateAPIKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -925,7 +903,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	}
 
 	// Convert to response model
-	response := user.APIKeyResponse{
+	response := dto.APIKeyResponse{
 		ID:          updatedKey.ID,
 		Name:        updatedKey.Name,
 		KeyPreview:  updatedKey.KeyPreview(),

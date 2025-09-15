@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/dto"
 )
 
 // SystemVerification provides methods to verify the authentication system
@@ -26,7 +26,7 @@ func NewSystemVerification(baseURL string) *SystemVerification {
 func (sv *SystemVerification) VerifyRegistration() error {
 	url := sv.BaseURL + "/api/auth/register"
 
-	payload := user.RegisterRequest{
+	payload := dto.RegisterRequest{
 		Username: "testuser_" + fmt.Sprintf("%d", time.Now().Unix()),
 		Email:    "test_" + fmt.Sprintf("%d", time.Now().Unix()) + "@example.com",
 		Password: "TestPassword123!",
@@ -54,7 +54,7 @@ func (sv *SystemVerification) VerifyLogin() error {
 	email := "logintest_" + fmt.Sprintf("%d", time.Now().Unix()) + "@example.com"
 	password := "TestPassword123!"
 
-	regPayload := user.RegisterRequest{
+	regPayload := dto.RegisterRequest{
 		Username: username,
 		Email:    email,
 		Password: password,
@@ -68,7 +68,7 @@ func (sv *SystemVerification) VerifyLogin() error {
 	regResp.Body.Close()
 
 	// Now try to login
-	loginPayload := user.LoginRequest{
+	loginPayload := dto.LoginRequest{
 		EmailOrUsername: email,
 		Password:        password,
 	}
@@ -85,7 +85,7 @@ func (sv *SystemVerification) VerifyLogin() error {
 	}
 
 	// Parse response to get token
-	var loginResponse user.LoginResponse
+	var loginResponse dto.LoginResponse
 	if err := json.NewDecoder(loginResp.Body).Decode(&loginResponse); err != nil {
 		return fmt.Errorf("failed to parse login response: %w", err)
 	}
@@ -106,7 +106,7 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 	password := "TestPassword123!"
 
 	// Register
-	regPayload := user.RegisterRequest{
+	regPayload := dto.RegisterRequest{
 		Username: username,
 		Email:    email,
 		Password: password,
@@ -120,7 +120,7 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 	regResp.Body.Close()
 
 	// Login
-	loginPayload := user.LoginRequest{
+	loginPayload := dto.LoginRequest{
 		EmailOrUsername: email,
 		Password:        password,
 	}
@@ -132,7 +132,7 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 	}
 	defer loginResp.Body.Close()
 
-	var loginResponse user.LoginResponse
+	var loginResponse dto.LoginResponse
 	if err := json.NewDecoder(loginResp.Body).Decode(&loginResponse); err != nil {
 		return fmt.Errorf("failed to parse login response: %w", err)
 	}

@@ -4,15 +4,15 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
 
 // Login authenticates a user with email/username and password
 func (c *Controller) Login(ctx *gin.Context) {
-	var loginReq user.LoginRequest
+	var loginReq dto.LoginRequest
 
 	// Bind and validate the request body
 	if err := ctx.ShouldBindJSON(&loginReq); err != nil {
