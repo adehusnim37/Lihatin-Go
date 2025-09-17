@@ -4,15 +4,15 @@ import "time"
 
 // APIKeyRequest represents the request to create a new API key
 type APIKeyRequest struct {
-	Name        string     `json:"name" validate:"required,min=3,max=100,alpha_dash"`
+	Name        string     `json:"name" binding:"required,min=3,max=100,no_special"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty"`
+	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete admin"`
 }
 
 type UpdateAPIKeyRequest struct {
-	Name        *string    `json:"name,omitempty" validate:"omitempty,min=3,max=100"`
+	Name        *string    `json:"name,omitempty" binding:"omitempty,min=3,max=100,no_special"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty"`
+	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete admin"`
 	IsActive    *bool      `json:"is_active,omitempty"`
 }
 

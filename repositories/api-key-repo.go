@@ -34,6 +34,12 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 		"key_preview", keyPreview,
 	)
 
+	if permissions == nil {
+		permissions = []string{
+			"read", "write",
+		} // Default permissions
+	}
+
 	apiKey := &user.APIKey{
 		ID:          uuid.New().String(),
 		UserID:      userID,
@@ -92,7 +98,7 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 	utils.Logger.Info("Validating API key", "key_preview", utils.GetKeyPreview(fullAPIKey))
 
 	// Parse the full API key (format: keyID.secretKey)
-	keyParts := splitAPIKey(fullAPIKey)
+	keyParts := utils.SplitAPIKey(fullAPIKey)
 	if len(keyParts) != 2 {
 		utils.Logger.Warn("Invalid API key format - missing separator", "key_preview", utils.GetKeyPreview(fullAPIKey))
 		return nil, nil, fmt.Errorf("invalid API key format")
@@ -109,7 +115,7 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 
 	// Find API key by key ID
 	var apiKey user.APIKey
-	if err := r.db.Where("key = ? AND is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+	if err := r.db.Where("`key` = ? AND is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
 		keyID, true, time.Now()).First(&apiKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			utils.Logger.Warn("API key not found", "key_id", keyID)
@@ -146,30 +152,6 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 	)
 
 	return &user, &apiKey, nil
-}
-
-// Helper function to split API key into keyID and secretKey
-func splitAPIKey(fullAPIKey string) []string {
-	// Look for the first dot after the prefix to split keyID from secretKey
-	prefixEnd := -1
-	for i := 0; i < len(fullAPIKey); i++ {
-		if fullAPIKey[i] == '_' {
-			// Find the end of prefix (after last underscore in prefix)
-			for j := i + 1; j < len(fullAPIKey); j++ {
-				if fullAPIKey[j] == '.' {
-					prefixEnd = j
-					break
-				}
-			}
-			break
-		}
-	}
-
-	if prefixEnd == -1 {
-		return []string{fullAPIKey} // No separator found
-	}
-
-	return []string{fullAPIKey[:prefixEnd], fullAPIKey[prefixEnd+1:]}
 }
 
 // UpdateAPIKey updates an API key

@@ -7,14 +7,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo repositories.UserRepository) {
+func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo repositories.UserRepository, authRepo *repositories.AuthRepository) {
 	shortGroup := rg.Group("/short")
 	{
 		shortGroup.Use(middleware.RateLimitMiddleware(3))
 		shortGroup.Use(middleware.OptionalAuth(userRepo))
 		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)
-		shortGroup.GET("/:code/check", shortController.CheckShortLink)
+		shortGroup.GET("check/:code", shortController.CheckShortLink)
+	}
+
+	// ✅ API ROUTES: Accessible by API key authentication (service-to-service)
+	apiShort := rg.Group("api/short")
+	{
+		apiShort.Use(middleware.AuthRepositoryAPIKeyMiddleware(authRepo))
+		apiShort.Use(middleware.RateLimitMiddleware(1000)) // Higher rate limit for API access
+		apiShort.POST("", shortController.Create)
+		apiShort.GET("/:code", shortController.GetShortLink)
+		apiShort.PUT("/:code", shortController.UpdateShortLink)
+		apiShort.GET("", shortController.ListShortLinks)
+		apiShort.GET("/:code/stats", shortController.GetShortLinkStats)
+		apiShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
+		apiShort.DELETE("/:code", shortController.DeleteShortLink)
+		apiShort.GET("/stats", shortController.GetAllStatsShorts)
 	}
 
 	// ✅ PROTECTED ROUTES: Accessible by authenticated users (user or admin)
@@ -23,6 +38,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	{
 		protectedShort.Use(middleware.AuthMiddleware(userRepo))
 		protectedShort.Use(middleware.RateLimitMiddleware(100))
+		protectedShort.POST("", shortController.Create)
 		protectedShort.GET("/:code", shortController.GetShortLink)
 		protectedShort.PUT("/:code", shortController.UpdateShortLink)
 		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
@@ -48,5 +64,12 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.PUT("/:code", shortController.UpdateShortLink)            // Admin update any short link
 		protectedAdminShort.POST("/:code/edotensei", shortController.ReviveShortLink) // Revive deleted short link
 		protectedAdminShort.GET("/short/stats", shortController.GetAllStatsShorts)
+	}
+
+	protectedApiKeyShort := rg.Group("api/shorts")
+	{
+		protectedApiKeyShort.Use(middleware.ApiKeyAuthMiddleware())
+		protectedApiKeyShort.GET("/:code/stats", shortController.GetShortLinkStats)
+		protectedApiKeyShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated) // New route for paginated views
 	}
 }

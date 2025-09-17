@@ -46,6 +46,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	loggerRepo := repositories.NewLoggerRepository(gormDB)
 	userRepo := repositories.NewUserRepository(db)
 	loginAttemptRepo := repositories.NewLoginAttemptRepository(gormDB)
+	authRepo := repositories.NewAuthRepository(gormDB) // Add auth repository for API key middleware
 
 	// Apply global middleware for activity logging
 	r.Use(middleware.ActivityLogger(loggerRepo))
@@ -55,7 +56,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	RegisterUserRoutes(v1, userController)
 	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo)
 	RegisterLoggerRoutes(v1, loggerController)
-	RegisterShortRoutes(v1, shortController, userRepo)
+	RegisterShortRoutes(v1, shortController, userRepo, authRepo)
 
 	// Route health check
 	v1.GET("/health", func(c *gin.Context) {

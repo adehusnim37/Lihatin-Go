@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -258,7 +259,7 @@ func IPWhitelistMiddleware(whitelist []string) gin.HandlerFunc {
 }
 
 // APIKeyMiddleware validates API keys for service-to-service communication
-func APIKeyMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
+func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey == "" {
@@ -272,10 +273,13 @@ func APIKeyMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			return
 		}
 
-		// Validate API key (implementation depends on your API key storage)
-		// This is a placeholder - implement based on your UserAPIClient model
-		valid := validateAPIKey(apiKey, userRepo)
-		if !valid {
+		// Validate API key using the repository
+		user, apiKeyRecord, err := apiKeyRepo.ValidateAPIKey(apiKey)
+		if err != nil {
+			utils.Logger.Warn("API key validation failed",
+				"key_preview", utils.GetKeyPreview(apiKey),
+				"error", err.Error(),
+			)
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
@@ -286,15 +290,152 @@ func APIKeyMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			return
 		}
 
+		// Set user and API key information in context for use by handlers
+		c.Set("user_id", user.ID)
+		c.Set("username", user.Username)
+		c.Set("email", user.Email)
+		c.Set("role", user.Role)
+		c.Set("is_premium", user.IsPremium)
+		c.Set("user", user)
+		c.Set("api_key", apiKeyRecord)
+		c.Set("api_key_id", apiKeyRecord.ID)
+		c.Set("api_key_name", apiKeyRecord.Name)
+		c.Set("api_key_permissions", apiKeyRecord.Permissions)
+		c.Set("is_api_authenticated", true)
+
+		utils.Logger.Info("API key authentication successful",
+			"user_id", user.ID,
+			"api_key_id", apiKeyRecord.ID,
+			"api_key_name", apiKeyRecord.Name,
+		)
+
 		c.Next()
 	}
 }
 
-// validateAPIKey validates an API key against the database
-func validateAPIKey(apiKey string, userRepo repositories.UserRepository) bool {
-	// TODO: Implement API key validation based on UserAPIClient model
-	// This should check if the API key exists, is active, and not expired
-	return false // Placeholder
+// AuthRepositoryAPIKeyMiddleware validates API keys using AuthRepository
+func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKey := c.GetHeader("X-API-Key")
+		if apiKey == "" {
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "API key required",
+				Error:   map[string]string{"api_key": "Missing X-API-Key header"},
+			})
+			c.Abort()
+			return
+		}
+
+		// Validate API key using the auth repository
+		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().ValidateAPIKey(apiKey)
+		if err != nil {
+			utils.Logger.Warn("API key validation failed",
+				"key_preview", utils.GetKeyPreview(apiKey),
+				"error", err.Error(),
+			)
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Invalid API key",
+				Error:   map[string]string{"api_key": "The provided API key is invalid or expired"},
+			})
+			c.Abort()
+			return
+		}
+
+		// Set user and API key information in context for use by handlers
+		c.Set("user_id", user.ID)
+		c.Set("username", user.Username)
+		c.Set("email", user.Email)
+		c.Set("role", user.Role)
+		c.Set("is_premium", user.IsPremium)
+		c.Set("user", user)
+		c.Set("api_key", apiKeyRecord)
+		c.Set("api_key_id", apiKeyRecord.ID)
+		c.Set("api_key_name", apiKeyRecord.Name)
+		c.Set("api_key_permissions", apiKeyRecord.Permissions)
+		c.Set("is_api_authenticated", true)
+
+		utils.Logger.Info("API key authentication successful",
+			"user_id", user.ID,
+			"api_key_id", apiKeyRecord.ID,
+			"api_key_name", apiKeyRecord.Name,
+		)
+
+		c.Next()
+	}
+}
+
+// ApiKeyAuthMiddleware is an alias for backward compatibility (deprecated)
+func ApiKeyAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "API key middleware not properly initialized",
+			Error:   map[string]string{"config": "Please use APIKeyMiddleware or AuthRepositoryAPIKeyMiddleware instead"},
+		})
+		c.Abort()
+	}
+}
+
+// APIKeyPermissionMiddleware checks if the API key has specific permissions
+func APIKeyPermissionMiddleware(requiredPermission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		permissions, exists := c.Get("api_key_permissions")
+		if !exists {
+			c.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "API key permissions not found",
+				Error:   map[string]string{"permission": "Unable to verify API key permissions"},
+			})
+			c.Abort()
+			return
+		}
+
+		permissionList, ok := permissions.([]string)
+		if !ok {
+			c.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Invalid permission format",
+				Error:   map[string]string{"permission": "Unable to parse API key permissions"},
+			})
+			c.Abort()
+			return
+		}
+
+		// Check if the required permission exists in the API key permissions
+		hasPermission := false
+		for _, perm := range permissionList {
+			if perm == requiredPermission || perm == "*" { // "*" means all permissions
+				hasPermission = true
+				break
+			}
+		}
+
+		if !hasPermission {
+			apiKeyName, _ := c.Get("api_key_name")
+			utils.Logger.Warn("API key missing required permission",
+				"api_key_name", apiKeyName,
+				"required_permission", requiredPermission,
+				"available_permissions", permissionList,
+			)
+			c.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Insufficient API key permissions",
+				Error:   map[string]string{"permission": fmt.Sprintf("API key does not have '%s' permission", requiredPermission)},
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 // RequestIDMiddleware adds a unique request ID to each request

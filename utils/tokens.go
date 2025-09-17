@@ -195,3 +195,27 @@ func splitKeyID(keyID string) []string {
 	}
 	return []string{keyID}
 }
+
+// Helper function to split API key into keyID and secretKey
+func SplitAPIKey(fullAPIKey string) []string {
+	// Look for the first dot after the prefix to split keyID from secretKey
+	prefixEnd := -1
+	for i := 0; i < len(fullAPIKey); i++ {
+		if fullAPIKey[i] == '_' {
+			// Find the end of prefix (after last underscore in prefix)
+			for j := i + 1; j < len(fullAPIKey); j++ {
+				if fullAPIKey[j] == '.' {
+					prefixEnd = j
+					break
+				}
+			}
+			break
+		}
+	}
+
+	if prefixEnd == -1 {
+		return []string{fullAPIKey} // No separator found
+	}
+
+	return []string{fullAPIKey[:prefixEnd], fullAPIKey[prefixEnd+1:]}
+}
