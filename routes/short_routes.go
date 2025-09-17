@@ -10,11 +10,14 @@ import (
 func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo repositories.UserRepository) {
 	shortGroup := rg.Group("/short")
 	{
-		shortGroup.Use(middleware.RateLimitMiddleware(20))
+		shortGroup.Use(middleware.RateLimitMiddleware(3))
 		shortGroup.Use(middleware.OptionalAuth(userRepo))
 		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)
+		shortGroup.GET("/:code/check", shortController.CheckShortLink)
 	}
+
+	// ✅ PROTECTED ROUTES: Accessible by authenticated users (user or admin)
 
 	protectedShort := rg.Group("users/me/shorts")
 	{
@@ -26,6 +29,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedShort.GET("/:code/stats", shortController.GetShortLinkStats)
 		protectedShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated) // New route for paginated views
 		protectedShort.DELETE("/:code", shortController.DeleteShortLink)
+		protectedShort.GET("/short/stats", shortController.GetAllStatsShorts)
 	}
 
 	// ✅ ADMIN ROUTES: Only accessible by admin users
@@ -41,9 +45,8 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.DELETE("/bulk-delete", shortController.AdminBulkDeleteShortLinks)
 		protectedAdminShort.PUT("/:code/banned", shortController.AdminBannedShortLink)
 		protectedAdminShort.PUT("/:code/unban", shortController.AdminUnbanShortLink)
+		protectedAdminShort.PUT("/:code", shortController.UpdateShortLink)            // Admin update any short link
 		protectedAdminShort.POST("/:code/edotensei", shortController.ReviveShortLink) // Revive deleted short link
 		protectedAdminShort.GET("/short/stats", shortController.GetAllStatsShorts)
-		// protectedAdminShort.GET("/stats", shortController.AdminGetAllShortLinksStats)
-		// protectedAdminShort.GET("/export", shortController.AdminExportShortLinks)
 	}
 }

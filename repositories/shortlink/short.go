@@ -239,6 +239,23 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		return nil, err
 	}
 
+	// Passcode checks
+	if detail.Passcode != 0 && passcode == 0 {
+		utils.Logger.Warn("Passcode required but not provided",
+			"short_code", code,
+			"ip_address", ipAddress,
+		)
+		return nil, utils.ErrPasscodeRequired
+	}
+
+	if detail.Passcode != 0 && passcode != detail.Passcode {
+		utils.Logger.Warn("Invalid passcode attempt",
+			"short_code", code,
+			"ip_address", ipAddress,
+		)
+		return nil, utils.ErrPasscodeIncorrect
+	}
+
 	if detail.IsBanned {
 		utils.Logger.Warn("Banned short link accessed",
 			"short_code", code,
@@ -247,16 +264,6 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		)
 
 		return nil, fmt.Errorf("%w: %s", utils.ErrLinkIsBanned, detail.BannedReason)
-	}
-
-	if passcode != 0 {
-		if detail.Passcode != passcode {
-			utils.Logger.Warn("Invalid passcode attempt",
-				"short_code", code,
-				"ip_address", ipAddress,
-			)
-			return nil, utils.ErrPasscodeIncorrect
-		}
 	}
 
 	if detail.ClickLimit > 0 && detail.CurrentClicks >= detail.ClickLimit {
@@ -773,46 +780,94 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 	}, nil
 }
 
-func (r *ShortLinkRepository) UpdateShortLink(code string, userID string, updateData *dto.UpdateShortLinkRequest) error {
+func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (bool, error) {
 	var link shortlink.ShortLink
 
-	err := r.db.Where("short_code = ? AND user_id = ?", code, userID).First(&link).Error
+	err := r.db.Where("short_code = ?", code.Code).First(&link).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil // Code does not exist
+		}
+		utils.Logger.Error("Database error while checking short code",
+			"short_code", code.Code,
+			"error", err.Error(),
+		)
+		return false, err // Some other database error
+	}
+
+	return true, nil // Code exists
+}
+
+func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in *dto.UpdateShortLinkRequest) error {
+	tx := r.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// 1) Ambil link sekali
+	var link shortlink.ShortLink
+	q := tx.Where("short_code = ?", code)
+	if userRole != "admin" {
+		q = q.Where("user_id = ?", userID)
+	}
+	if err := q.First(&link).Error; err != nil {
+		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.ErrShortLinkNotFound
 		}
-
-		utils.Logger.Error("Database error while fetching short link",
-			"short_code", code,
-			"error", err.Error(),
-		)
 		return err
 	}
 
-	// Update the link fields
-	if updateData.Title != nil {
-		link.Title = *updateData.Title
+	// 2) Bangun map updates agar hanya kolom yang berubah yang di-update
+	linkUpd := map[string]any{}
+	if in.Title != nil {
+		linkUpd["title"] = *in.Title
 	}
-	if updateData.Description != nil {
-		link.Description = *updateData.Description
+	if in.Description != nil {
+		linkUpd["description"] = *in.Description
 	}
-	if updateData.IsActive != nil {
-		link.IsActive = *updateData.IsActive
+	if in.IsActive != nil {
+		linkUpd["is_active"] = *in.IsActive
 	}
-	if updateData.ExpiresAt != nil {
-		link.ExpiresAt = updateData.ExpiresAt
-	}
-
-	// Save the updated link
-	if err := r.db.Save(&link).Error; err != nil {
-		utils.Logger.Error("Failed to update short link",
-			"short_code", code,
-			"error", err.Error(),
-		)
-		return err
+	if in.ExpiresAt != nil {
+		linkUpd["expires_at"] = in.ExpiresAt
 	}
 
-	return nil
+	if len(linkUpd) > 0 {
+		if err := tx.Model(&shortlink.ShortLink{}).
+			Where("id = ?", link.ID).
+			Updates(linkUpd).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	detailUpd := map[string]any{}
+	if in.Passcode != nil {
+		detailUpd["passcode"] = utils.StringToInt(*in.Passcode)
+	}
+	if in.ClickLimit != nil {
+		detailUpd["click_limit"] = *in.ClickLimit
+	}
+	if in.EnableStats != nil {
+		detailUpd["enable_stats"] = *in.EnableStats
+	}
+	if in.CustomDomain != nil {
+		detailUpd["custom_domain"] = *in.CustomDomain
+	}
+
+	if len(detailUpd) > 0 {
+		if err := tx.Model(&shortlink.ShortLinkDetail{}).
+			Where("short_link_id = ?", link.ID).
+			Updates(detailUpd).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }
 
 func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passcode int, roleUser string) error {

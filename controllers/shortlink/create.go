@@ -52,21 +52,21 @@ func (c *Controller) Create(ctx *gin.Context) {
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Failed to retrieve short link stats",
+				Message: "Failed to create short link",
 				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
 			})
 		case err == utils.ErrShortLinkUnauthorized:
 			ctx.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Failed to retrieve short link stats",
+				Message: "Failed to create short link",
 				Error:   map[string]string{"code": "Anda tidak memiliki akses ke link ini"},
 			})
 		default:
 			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 				Success: false,
 				Data:    nil,
-				Message: "Failed to retrieve short link stats",
+				Message: "Failed to create short link",
 				Error:   map[string]string{"code": "Terjadi kesalahan pada server"},
 			})
 		}

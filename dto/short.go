@@ -9,7 +9,7 @@ type CreateShortLinkRequest struct {
 	OriginalURL string     `json:"original_url" label:"URL Asli" binding:"required,url"`
 	Title       string     `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255"`
 	Description string     `json:"description,omitempty" label:"Deskripsi"`
-	CustomCode  string     `json:"custom_code,omitempty" label:"Kode Kustom" binding:"omitempty,max=10,alphanum,no_space"`
+	CustomCode  string     `json:"custom_code,omitempty" label:"Kode Kustom" binding:"omitempty,min=3,max=100,saveurlshort,no_space"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa"`
 }
 
@@ -124,11 +124,14 @@ type PaginatedShortLinkDetailWithStatsResponse struct {
 
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {
-	CodeRequest
-	Title       *string    `json:"title" label:"Judul" binding:"omitempty,max=255,min=3"`
-	Description *string    `json:"description" label:"Deskripsi" binding:"omitempty,max=500,min=3"`
-	IsActive    *bool      `json:"is_active" label:"Status Aktif" binding:"omitempty"`
-	ExpiresAt   *time.Time `json:"expires_at" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
+	Title        *string    `json:"title" label:"Judul" binding:"omitempty,max=255,min=3"`
+	Description  *string    `json:"description" label:"Deskripsi" binding:"omitempty,max=500,min=3"`
+	IsActive     *bool      `json:"is_active" label:"Status Aktif" binding:"omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
+	Passcode     *string    `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
+	ClickLimit   *int       `json:"click_limit" label:"Batas Klik" binding:"omitempty,min=0"` // 0 means unlimited
+	EnableStats  *bool      `json:"enable_stats" label:"Aktifkan Statistik" binding:"omitempty"`
+	CustomDomain *string    `json:"custom_domain" label:"Domain Kustom" binding:"omitempty,url"`
 }
 
 // PaginatedShortLinksResponse represents paginated short links
