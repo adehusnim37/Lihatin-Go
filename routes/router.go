@@ -54,7 +54,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")
 	RegisterUserRoutes(v1, userController)
-	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo)
+	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, baseAuthController)
 	RegisterLoggerRoutes(v1, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, authRepo)
 

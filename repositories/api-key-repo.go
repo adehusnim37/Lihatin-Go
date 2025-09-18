@@ -22,10 +22,19 @@ func NewAPIKeyRepository(db *gorm.DB) *APIKeyRepository {
 
 // CreateAPIKey creates a new API key using the improved GenerateAPIKeyPair method
 func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Time, permissions []string) (*user.APIKey, string, error) {
+	var apiKey user.APIKey
 	// Generate API key pair with structured format
 	keyID, secretKey, secretKeyHash, keyPreview, err := utils.GenerateAPIKeyPair("")
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate API key pair: %w", err)
+		return nil, "", utils.ErrAPIKeyCreateFailed
+	}
+
+	if err := r.db.Where("user_id = ? AND name = ? AND deleted_at IS NULL", userID, name).First(&apiKey).Error; err == nil {
+		return nil, "", utils.ErrAPIKeyNameExists
+	}
+
+	if !apiKey.IsActive {
+		return nil, "", utils.ErrAPIKeyInactive
 	}
 
 	utils.Logger.Info("Creating new API key",
@@ -40,7 +49,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 		} // Default permissions
 	}
 
-	apiKey := &user.APIKey{
+	apiKey = user.APIKey{
 		ID:          uuid.New().String(),
 		UserID:      userID,
 		Name:        name,
@@ -69,7 +78,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 
 	// Return the full secret key (this is the only time it will be shown)
 	fullAPIKey := keyID + "." + secretKey
-	return apiKey, fullAPIKey, nil
+	return &apiKey, fullAPIKey, nil
 }
 
 // GetAPIKeysByUserID retrieves all API keys for a user

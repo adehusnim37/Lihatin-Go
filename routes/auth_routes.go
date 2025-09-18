@@ -1,14 +1,18 @@
 package routes
 
 import (
+	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
+	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, baseController interface{}) {
+	// Create API key controller
+	apiKeyController := api.NewAPIKeyController(baseController.(*controllers.BaseController))
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
@@ -80,9 +84,10 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	apiKeyGroup := rg.Group("/api-keys")
 	apiKeyGroup.Use(middleware.AuthMiddleware(userRepo))
 	{
-		apiKeyGroup.GET("/", authController.GetAPIKeys)
-		apiKeyGroup.POST("/", authController.CreateAPIKey)
-		apiKeyGroup.DELETE("/:id", authController.RevokeAPIKey)
-		apiKeyGroup.PUT("/:id", authController.UpdateAPIKey)
+		apiKeyGroup.GET("/", apiKeyController.GetAPIKeys)
+		apiKeyGroup.GET("/:id", apiKeyController.GetAPIKey)
+		apiKeyGroup.POST("/", apiKeyController.CreateAPIKey)
+		apiKeyGroup.DELETE("/:id", apiKeyController.RevokeAPIKey)
+		apiKeyGroup.PUT("/:id", apiKeyController.UpdateAPIKey)
 	}
 }

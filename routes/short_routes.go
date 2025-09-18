@@ -53,7 +53,6 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	{
 		protectedAdminShort.Use(middleware.AuthMiddleware(userRepo))
 		protectedAdminShort.Use(middleware.RequireRole("admin")) // Ensures only admin access
-
 		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
 		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
 		protectedAdminShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
@@ -64,12 +63,5 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.PUT("/:code", shortController.UpdateShortLink)            // Admin update any short link
 		protectedAdminShort.POST("/:code/edotensei", shortController.ReviveShortLink) // Revive deleted short link
 		protectedAdminShort.GET("/short/stats", shortController.GetAllStatsShorts)
-	}
-
-	protectedApiKeyShort := rg.Group("api/shorts")
-	{
-		protectedApiKeyShort.Use(middleware.ApiKeyAuthMiddleware())
-		protectedApiKeyShort.GET("/:code/stats", shortController.GetShortLinkStats)
-		protectedApiKeyShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated) // New route for paginated views
 	}
 }
