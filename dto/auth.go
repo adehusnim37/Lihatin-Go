@@ -7,7 +7,7 @@ package dto
 // LoginRequest represents the login request payload
 type LoginRequest struct {
 	EmailOrUsername string `json:"email_or_username" label:"Email atau Username" binding:"required,min=3,max=100"`
-	Password        string `json:"password" label:"Kata Sandi" binding:"required,min=8,max=50"`
+	Password        string `json:"password" label:"Kata Sandi" binding:"required,min=8,max=50,pwdcomplex"`
 }
 
 // LoginResponse represents the successful login response
@@ -35,5 +35,5 @@ type RegisterRequest struct {
 	LastName  string `json:"last_name" binding:"required,min=2,max=50"`
 	Username  string `json:"username" binding:"required,min=3,max=30,alphanum"`
 	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=8,max=50,password"`
+	Password  string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
 }

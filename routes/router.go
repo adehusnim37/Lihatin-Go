@@ -37,14 +37,14 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	baseAuthController := controllers.NewBaseControllerWithGorm(db, gormDB, validate)
 
 	// Inisialisasi controller spesifik
-	userController := user.NewController(baseController)
+	userController := user.NewController(baseAuthController) // Use baseAuthController for GORM access
 	authController := auth.NewAuthController(baseAuthController)
 	loggerController := logger.NewLoggerController(baseController)
 	shortController := shortlink.NewController(baseAuthController) // Use baseAuthController for GORM access
 
 	// Setup repositories for middleware
 	loggerRepo := repositories.NewLoggerRepository(gormDB)
-	userRepo := repositories.NewUserRepository(db)
+	userRepo := repositories.NewUserRepository(gormDB) // Changed to use GORM
 	loginAttemptRepo := repositories.NewLoginAttemptRepository(gormDB)
 	authRepo := repositories.NewAuthRepository(gormDB) // Add auth repository for API key middleware
 

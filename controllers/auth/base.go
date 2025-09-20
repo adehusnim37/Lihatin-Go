@@ -43,23 +43,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid input",
-			Error:   map[string]string{"input": "Invalid input format or missing fields"},
-		})
-		return
-	}
-
-	// Validate the request
-	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   map[string]string{"validation": err.Error()},
-		})
+		utils.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -132,6 +116,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 
 	// Create user auth record for email verification
 	userAuth := &user.UserAuth{
+		ID:                              utils.GenerateUUIDV7(),
 		UserID:                          newUser.ID,
 		PasswordHash:                    hashedPassword, // Use the same hashed password
 		IsEmailVerified:                 false,

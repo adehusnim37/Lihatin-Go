@@ -32,6 +32,7 @@ var (
 
 var (
 	// API key errors
+	ErrAPIKeyFailedFetching    = errors.New("failed to fetch API key")
 	ErrAPIKeyNotFound          = errors.New("API key not found")
 	ErrAPIKeyRevoked           = errors.New("API key has been revoked")
 	ErrAPIKeyUnauthorized      = errors.New("unauthorized: invalid API key")
@@ -46,4 +47,28 @@ var (
 	ErrAPIKeyExpired           = errors.New("API key has expired")
 	ErrAPIKeyCreateFailed      = errors.New("failed to create API key")
 	ErrAPIKeyUpdateFailed      = errors.New("failed to update API key")
+)
+
+var (
+	// User errors
+	ErrUserNotFound           = errors.New("user not found")
+	ErrUserAlreadyExists      = errors.New("user already exists")
+	ErrUserEmailExists        = errors.New("email already exists")
+	ErrUserUsernameExists     = errors.New("username already exists")
+	ErrUserCreationFailed     = errors.New("failed to create user")
+	ErrUserUpdateFailed       = errors.New("failed to update user")
+	ErrUserDeleteFailed       = errors.New("failed to delete user")
+	ErrUserLockFailed         = errors.New("failed to lock user")
+	ErrUserUnlockFailed       = errors.New("failed to unlock user")
+	ErrUserAlreadyLocked      = errors.New("user is already locked")
+	ErrUserNotLocked          = errors.New("user is not locked")
+	ErrUserInvalidCredentials = errors.New("invalid email/username or password")
+	ErrUserAccountLocked      = errors.New("user account is locked")
+	ErrUserAccountDeleted     = errors.New("user account has been deleted")
+	ErrUserPasswordHashFailed = errors.New("failed to hash user password")
+	ErrUserInvalidInput       = errors.New("invalid user input data")
+	ErrUserUnauthorized       = errors.New("user is not authorized to perform this action")
+	ErrUserValidationFailed   = errors.New("user data validation failed")
+	ErrUserDuplicateEntry     = errors.New("duplicate entry for user data")
+	ErrUserDatabaseError      = errors.New("database error while processing user request")
 )

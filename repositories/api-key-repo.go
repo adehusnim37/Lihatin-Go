@@ -33,10 +33,6 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 		return nil, "", utils.ErrAPIKeyNameExists
 	}
 
-	if !apiKey.IsActive {
-		return nil, "", utils.ErrAPIKeyInactive
-	}
-
 	utils.Logger.Info("Creating new API key",
 		"user_id", userID,
 		"key_name", name,
@@ -84,9 +80,39 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 // GetAPIKeysByUserID retrieves all API keys for a user
 func (r *APIKeyRepository) GetAPIKeysByUserID(userID string) ([]user.APIKey, error) {
 	var apiKeys []user.APIKey
-	if err := r.db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&apiKeys).Error; err != nil {
-		return nil, fmt.Errorf("failed to get API keys: %w", err)
+	var user user.User
+
+	// Start a transaction
+	tx := r.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Check if the user exists
+	if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
+		tx.Rollback()
+		return nil, utils.ErrUserNotFound
 	}
+
+	// Build the query for fetching API keys
+	q := tx.Where("deleted_at IS NULL")
+	if user.Role != "admin" {
+		q = q.Where("user_id = ?", userID)
+	}
+
+	// Fetch the API keys
+	if err := q.Find(&apiKeys).Error; err != nil {
+		tx.Rollback()
+		return nil, utils.ErrAPIKeyNotFound
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return nil, utils.ErrAPIKeyFailedFetching
+	}
+
 	return apiKeys, nil
 }
 

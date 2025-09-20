@@ -1,14 +1,14 @@
 package repositories
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // UserRepository defines the methods for user-related database operations
@@ -29,88 +29,74 @@ type UserRepository interface {
 }
 
 type userRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
-func NewUserRepository(db *sql.DB) UserRepository {
+func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepository{
 		db: db,
 	}
 }
 
 func (ur *userRepository) GetAllUsers() ([]user.User, error) {
-	rows, err := ur.db.Query("SELECT id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username FROM users")
-	if err != nil {
-		log.Printf(`Error executing query: %v`, err)
-		return nil, err
-	}
-	defer rows.Close()
-
 	var users []user.User
-	for rows.Next() {
-		var user user.User
 
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
-			&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar, &user.Username); err != nil {
-			log.Printf(`Error scanning user: %v`, err)
-			return nil, err
-		}
-
-		users = append(users, user)
+	result := ur.db.Where("deleted_at IS NULL").Find(&users)
+	if result.Error != nil {
+		utils.Logger.Error("Failed to get all users", "error", result.Error)
+		return nil, utils.ErrUserDatabaseError
 	}
 
+	utils.Logger.Info("Successfully retrieved users", "count", len(users))
 	return users, nil
 }
 
 func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
-	// First log the query we're about to execute for debugging
-	log.Printf("GetUserByID: Executing query for ID: %s", id)
-
-	row := ur.db.QueryRow("SELECT id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username FROM users WHERE id = ?", id)
+	utils.Logger.Info("Getting user by ID", "user_id", id)
 
 	var user user.User
+	result := ur.db.Where("id = ? AND deleted_at IS NULL", id).First(&user)
 
-	if err := row.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
-		&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar, &user.Username); err != nil {
-		log.Printf("Error scanning user by ID %s: %v", id, err)
-		return nil, err
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			utils.Logger.Warn("User not found", "user_id", id)
+			return nil, utils.ErrUserNotFound
+		}
+		utils.Logger.Error("Database error while getting user", "user_id", id, "error", result.Error)
+		return nil, utils.ErrUserDatabaseError
 	}
 
-	log.Printf(" ID=%s, Username=%s", user.ID, user.Username)
+	utils.Logger.Info("User found successfully", "user_id", user.ID, "username", user.Username)
 	return &user, nil
 }
 
 func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error) {
-	row := ur.db.QueryRow("SELECT is_premium FROM users WHERE username = ? OR email = ?", inputs, inputs)
-
 	var user user.User
-	if err := row.Scan(&user.IsPremium); err != nil {
-		if err == sql.ErrNoRows {
-			// No user found with this username/email
-			return nil, err
+	result := ur.db.Select("is_premium").Where("(username = ? OR email = ?) AND deleted_at IS NULL", inputs, inputs).First(&user)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrUserNotFound
 		}
-		// Other database error
-		return nil, err
+		utils.Logger.Error("Database error while checking premium status", "input", inputs, "error", result.Error)
+		return nil, utils.ErrUserDatabaseError
 	}
+
 	return &user, nil
 }
 
 func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {
-	// Check if it's an email or username
-	row := ur.db.QueryRow("SELECT id, email, username FROM users WHERE email = ? OR username = ?", input, input)
-
 	var user user.User
-	err := row.Scan(&user.ID, &user.Email, &user.Username)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// No user found with this email/username
-			return nil, err
+	result := ur.db.Select("id, email, username").Where("(email = ? OR username = ?) AND deleted_at IS NULL", input, input).First(&user)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrUserNotFound
 		}
-		// Other database error
-		return nil, err
+		utils.Logger.Error("Database error while getting user by email/username", "input", input, "error", result.Error)
+		return nil, utils.ErrUserDatabaseError
 	}
 
-	// User found
 	return &user, nil
 }
 
@@ -118,203 +104,187 @@ func (ur *userRepository) CreateUser(user *user.User) error {
 	// Hash the password before storing
 	hashedPassword, err := utils.HashPassword(user.Password)
 	if err != nil {
-		log.Printf("CreateUser: Error hashing password: %v", err)
-		return err
+		utils.Logger.Error("Error hashing password", "error", err)
+		return utils.ErrUserPasswordHashFailed
 	}
 
+	// Generate UUID if not provided
+	if user.ID == "" {
+		user.ID = uuid.New().String()
+	}
+
+	// Set hashed password and timestamps
+	user.Password = hashedPassword
 	now := time.Now()
-	u := uuid.Must(uuid.NewRandom())
-	user.ID = u.String() // Set the generated ID back to the user struct
+	user.CreatedAt = now
+	user.UpdatedAt = now
 
-	_, err = ur.db.Exec("INSERT INTO users (id, first_name, last_name, email, password, created_at, updated_at, deleted_at, is_premium, avatar, username) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		user.ID, user.FirstName, user.LastName, user.Email, hashedPassword, now, now, nil, user.IsPremium, user.Avatar, user.Username)
-	if err != nil {
-		log.Printf("CreateUser error: %v", err)
+	// Create user using GORM
+	result := ur.db.Create(user)
+	if result.Error != nil {
+		utils.Logger.Error("Failed to create user", "error", result.Error, "email", user.Email)
+		// Check for duplicate entry errors
+		if fmt.Sprintf("%v", result.Error) == "Error 1062 (23000): Duplicate entry" ||
+			result.Error.Error() == "UNIQUE constraint failed: users.email" ||
+			result.Error.Error() == "UNIQUE constraint failed: users.username" {
+			return utils.ErrUserDuplicateEntry
+		}
+		return utils.ErrUserCreationFailed
 	}
-	return err
+
+	utils.Logger.Info("User created successfully", "user_id", user.ID, "email", user.Email)
+	return nil
 }
 
-func (ur *userRepository) UpdateUser(id string, user *user.UpdateUser) error {
+func (ur *userRepository) UpdateUser(id string, updateUser *user.UpdateUser) error {
 	// First, get the current user data to compare
 	currentUser, err := ur.GetUserByID(id)
 	if err != nil {
-		log.Printf("UpdateUser: Error getting current user: %v", err)
+		utils.Logger.Error("Error getting current user for update", "user_id", id, "error", err)
 		return err
 	}
 
-	// Build dynamic update query based on what's changed
-	/*
-		setParts: slice of string yang akan menampung potongan–potongan SQL SET, misalnya "first_name = ?".
-	*/
-	var setParts []string
-	/*
-		args: slice of interface{} (empty interface) — aliasnya “any type” — yang akan menampung nilai-nilai parameter untuk setiap ? di query.
-		— Karena kita tidak tahu tipe apa saja yang akan dikirim (string, time.Time, bool, dll), kita gunakan interface{} agar bisa menampung semuanya.
-	*/
-	var args []interface{}
+	// Prepare updates map
+	updates := make(map[string]interface{})
 
 	// Check each field and only update if different
-	if user.FirstName != currentUser.FirstName {
-		setParts = append(setParts, "first_name = ?")
-		args = append(args, user.FirstName)
+	if updateUser.FirstName != "" && updateUser.FirstName != currentUser.FirstName {
+		updates["first_name"] = updateUser.FirstName
 	}
 
-	if user.LastName != currentUser.LastName {
-		setParts = append(setParts, "last_name = ?")
-		args = append(args, user.LastName)
+	if updateUser.LastName != "" && updateUser.LastName != currentUser.LastName {
+		updates["last_name"] = updateUser.LastName
 	}
 
 	// Only update email if it's different from current email
-	if user.Email != "" && user.Email != currentUser.Email {
+	if updateUser.Email != "" && updateUser.Email != currentUser.Email {
 		// Check if the new email already exists for another user
-		existingUser, err := ur.GetUserByEmailOrUsername(user.Email)
+		existingUser, err := ur.GetUserByEmailOrUsername(updateUser.Email)
 		if err == nil && existingUser != nil && existingUser.ID != id {
 			// Email already exists for another user
-			return fmt.Errorf("email already exists")
+			return utils.ErrUserEmailExists
 		}
-		setParts = append(setParts, "email = ?")
-		args = append(args, user.Email)
+		updates["email"] = updateUser.Email
 	}
 
-	if user.Avatar != "" && user.Avatar != currentUser.Avatar {
-		setParts = append(setParts, "avatar = ?")
-		args = append(args, user.Avatar)
+	if updateUser.Avatar != "" && updateUser.Avatar != currentUser.Avatar {
+		updates["avatar"] = updateUser.Avatar
 	}
 
 	// Handle password separately since it needs hashing
-	if user.Password != "" {
-		hashedPassword, err := utils.HashPassword(user.Password)
+	if updateUser.Password != "" {
+		hashedPassword, err := utils.HashPassword(updateUser.Password)
 		if err != nil {
-			log.Printf("UpdateUser: Error hashing password: %v", err)
-			return err
+			utils.Logger.Error("Error hashing password during update", "user_id", id, "error", err)
+			return utils.ErrUserPasswordHashFailed
 		}
-		setParts = append(setParts, "password = ?")
-		args = append(args, hashedPassword)
+		updates["password"] = hashedPassword
 	}
 
 	// If no fields to update, return early
-	if len(setParts) == 0 {
-		log.Printf("UpdateUser: No fields to update for user ID %s", id)
+	if len(updates) == 0 {
+		utils.Logger.Info("No fields to update for user", "user_id", id)
 		return nil
 	}
 
 	// Always update the updated_at timestamp when there are changes
-	setParts = append(setParts, "updated_at = ?")
-	args = append(args, time.Now())
+	updates["updated_at"] = time.Now()
 
-	// Add the WHERE clause parameter
-	args = append(args, id)
-
-	/*
-		Ringkasnya tentang append dan []interface{}
-		append(slice, value)
-		– Menambahkan value di ujung slice.
-		– Jika kapasitas (cap) tidak cukup, Go membuat backing array baru di belakang layar.
-		– Oleh karena itu kita tulis slice = append(slice, value).
-
-		interface{}
-		– Tipe kosong yang bisa memuat apa pun (int, string, struct, time.Time, dll).
-		– Berguna untuk kumpulkan argumen dinamis ketika memanggil fungsi variadik seperti Exec(query, args ...).
-	*/
-
-	// Build the final query - manually join the setParts
-	query := "UPDATE users SET "
-	for i, part := range setParts {
-		if i > 0 {
-			query += ", "
-		}
-		query += part
+	// Perform the update using GORM
+	result := ur.db.Model(&user.User{}).Where("id = ?", id).Updates(updates)
+	if result.Error != nil {
+		utils.Logger.Error("Failed to update user", "user_id", id, "error", result.Error)
+		return utils.ErrUserUpdateFailed
 	}
-	query += " WHERE id = ?"
 
-	_, err = ur.db.Exec(query, args...)
-	if err != nil {
-		log.Printf("UpdateUser error for ID %s: %v", id, err)
-	}
-	return err
+	utils.Logger.Info("User updated successfully", "user_id", id, "fields_updated", len(updates))
+	return nil
 }
 
 func (ur *userRepository) GetUserForLogin(emailOrUsername string) (*user.User, error) {
-	log.Printf("GetUserForLogin: Attempting login for: %s", emailOrUsername)
-
-	row := ur.db.QueryRow(`
-		SELECT id, username, first_name, last_name, email, password, 
-		       created_at, updated_at, deleted_at, is_premium, avatar 
-		FROM users 
-		WHERE (email = ? OR username = ?) AND deleted_at IS NULL`,
-		emailOrUsername, emailOrUsername)
+	utils.Logger.Info("Attempting user login", "email_or_username", emailOrUsername)
 
 	var user user.User
-	if err := row.Scan(&user.ID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt,
-		&user.DeletedAt, &user.IsPremium, &user.Avatar); err != nil {
+	result := ur.db.Where("(email = ? OR username = ?) AND deleted_at IS NULL", emailOrUsername, emailOrUsername).First(&user)
 
-		if err == sql.ErrNoRows {
-			log.Printf("No user found with email/username: %s", emailOrUsername)
-			return nil, err
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			utils.Logger.Warn("No user found for login", "email_or_username", emailOrUsername)
+			return nil, utils.ErrUserNotFound
 		}
-		log.Printf("Error scanning user for login: %v", err)
-		return nil, err
+		utils.Logger.Error("Database error during login attempt", "email_or_username", emailOrUsername, "error", result.Error)
+		return nil, utils.ErrUserDatabaseError
 	}
 
-	log.Printf("User found for login: ID=%s, Username=%s", user.ID, user.Username)
+	utils.Logger.Info("User found for login", "user_id", user.ID, "username", user.Username)
 	return &user, nil
 }
 
 func (ur *userRepository) DeleteUserPermanent(id string) error {
-	_, err := ur.db.Exec("DELETE FROM users WHERE id = ?", id)
-	return err
+	result := ur.db.Unscoped().Delete(&user.User{}, "id = ?", id)
+	if result.Error != nil {
+		utils.Logger.Error("Failed to permanently delete user", "user_id", id, "error", result.Error)
+		return utils.ErrUserDeleteFailed
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrUserNotFound
+	}
+
+	utils.Logger.Info("User permanently deleted", "user_id", id)
+	return nil
 }
 
 // GetAllUsersWithPagination retrieves all users with pagination (admin only)
 func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error) {
-	// Get total count
+	var users []user.User
 	var totalCount int64
-	row := ur.db.QueryRow("SELECT COUNT(*) FROM users WHERE deleted_at IS NULL")
-	if err := row.Scan(&totalCount); err != nil {
-		log.Printf("GetAllUsersWithPagination: Error getting total count: %v", err)
-		return nil, 0, err
+
+	// Get total count
+	countResult := ur.db.Model(&user.User{}).Where("deleted_at IS NULL").Count(&totalCount)
+	if countResult.Error != nil {
+		utils.Logger.Error("Error getting total user count", "error", countResult.Error)
+		return nil, 0, utils.ErrUserDatabaseError
 	}
 
 	// Get users with pagination
-	query := `SELECT id, first_name, last_name, email, password, created_at, updated_at, 
-	          deleted_at, is_premium, avatar, username, COALESCE(is_locked, false), 
-	          locked_at, COALESCE(locked_reason, ''), COALESCE(role, 'user')
-	          FROM users WHERE deleted_at IS NULL 
-	          ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	result := ur.db.Where("deleted_at IS NULL").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&users)
 
-	rows, err := ur.db.Query(query, limit, offset)
-	if err != nil {
-		log.Printf("GetAllUsersWithPagination: Error executing query: %v", err)
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	var users []user.User
-	for rows.Next() {
-		var user user.User
-		if err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password,
-			&user.CreatedAt, &user.UpdatedAt, &user.DeletedAt, &user.IsPremium, &user.Avatar,
-			&user.Username, &user.IsLocked, &user.LockedAt, &user.LockedReason, &user.Role); err != nil {
-			log.Printf("GetAllUsersWithPagination: Error scanning user: %v", err)
-			return nil, 0, err
-		}
-		users = append(users, user)
+	if result.Error != nil {
+		utils.Logger.Error("Error getting paginated users", "error", result.Error)
+		return nil, 0, utils.ErrUserDatabaseError
 	}
 
+	utils.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
 	return users, totalCount, nil
 }
 
 // LockUser locks a user account with a reason
 func (ur *userRepository) LockUser(userID, reason string) error {
 	now := time.Now()
-	_, err := ur.db.Exec(`UPDATE users SET is_locked = ?, locked_at = ?, locked_reason = ?, updated_at = ? 
-	                      WHERE id = ? AND deleted_at IS NULL`,
-		true, now, reason, now, userID)
-	if err != nil {
-		log.Printf("LockUser: Error locking user %s: %v", userID, err)
+	updates := map[string]interface{}{
+		"is_locked":     true,
+		"locked_at":     &now,
+		"locked_reason": reason,
+		"updated_at":    now,
 	}
-	return err
+
+	result := ur.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
+	if result.Error != nil {
+		utils.Logger.Error("Failed to lock user", "user_id", userID, "error", result.Error)
+		return utils.ErrUserLockFailed
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrUserNotFound
+	}
+
+	utils.Logger.Info("User locked successfully", "user_id", userID, "reason", reason)
+	return nil
 }
 
 // UnlockUser unlocks a user account
@@ -325,23 +295,39 @@ func (ur *userRepository) UnlockUser(userID, reason string) error {
 		unlockReason = reason
 	}
 
-	_, err := ur.db.Exec(`UPDATE users SET is_locked = ?, locked_at = NULL, locked_reason = ?, updated_at = ? 
-	                      WHERE id = ? AND deleted_at IS NULL`,
-		false, unlockReason, now, userID)
-	if err != nil {
-		log.Printf("UnlockUser: Error unlocking user %s: %v", userID, err)
+	updates := map[string]interface{}{
+		"is_locked":     false,
+		"locked_at":     nil,
+		"locked_reason": unlockReason,
+		"updated_at":    now,
 	}
-	return err
+
+	result := ur.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
+	if result.Error != nil {
+		utils.Logger.Error("Failed to unlock user", "user_id", userID, "error", result.Error)
+		return utils.ErrUserUnlockFailed
+	}
+
+	if result.RowsAffected == 0 {
+		return utils.ErrUserNotFound
+	}
+
+	utils.Logger.Info("User unlocked successfully", "user_id", userID, "reason", unlockReason)
+	return nil
 }
 
 // IsUserLocked checks if a user account is locked
 func (ur *userRepository) IsUserLocked(userID string) (bool, error) {
-	var isLocked bool
-	row := ur.db.QueryRow("SELECT COALESCE(is_locked, false) FROM users WHERE id = ? AND deleted_at IS NULL", userID)
-	err := row.Scan(&isLocked)
-	if err != nil {
-		log.Printf("IsUserLocked: Error checking lock status for user %s: %v", userID, err)
-		return false, err
+	var user user.User
+	result := ur.db.Select("is_locked").Where("id = ? AND deleted_at IS NULL", userID).First(&user)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return false, utils.ErrUserNotFound
+		}
+		utils.Logger.Error("Error checking user lock status", "user_id", userID, "error", result.Error)
+		return false, utils.ErrUserDatabaseError
 	}
-	return isLocked, nil
+
+	return user.IsLocked, nil
 }

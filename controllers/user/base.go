@@ -13,7 +13,14 @@ type Controller struct {
 
 // NewController membuat instance baru controller user
 func NewController(base *controllers.BaseController) *Controller {
-	userRepo := repositories.NewUserRepository(base.DB)
+	// Use GORM database for user repository
+	var userRepo repositories.UserRepository
+	if base.GormDB != nil {
+		userRepo = repositories.NewUserRepository(base.GormDB)
+	} else {
+		// Fallback to SQL DB if GORM is not available (shouldn't happen in normal flow)
+		panic("GORM database connection is required for user repository")
+	}
 	return &Controller{
 		BaseController: base,
 		repo:           userRepo,

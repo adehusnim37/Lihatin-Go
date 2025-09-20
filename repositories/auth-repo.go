@@ -45,9 +45,9 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 	}
 }
 
-// GetUserRepository returns a traditional SQL-based user repository
+// GetUserRepository returns a GORM-based user repository
 func (r *AuthRepository) GetUserRepository() UserRepository {
-	return NewUserRepository(r.sqlDB)
+	return NewUserRepository(r.db)
 }
 
 // GetUserAuthRepository returns the user auth repository

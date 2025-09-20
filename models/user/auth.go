@@ -3,7 +3,7 @@ package user
 import "time"
 
 type UserAuth struct {
-	ID     string `json:"id" gorm:"primaryKey"`                                                              // Primary Key
+	ID     string `json:"id" gorm:"primaryKey;type:char(36);default:(uuid_generate_v7())"`                   // Primary Key with UUID v7 auto-generation
 	UserID string `json:"user_id" gorm:"size:191;not null;uniqueIndex"`                                      // Foreign Key to User.ID, same size as User.ID
 	User   *User  `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
 
@@ -55,7 +55,7 @@ const (
 // This allows for multiple factors like TOTP, FIDO2 keys, OAuth, etc.
 type AuthMethod struct {
 	ID         string    `json:"id" gorm:"primaryKey"`                                                     // Primary Key
-	UserAuthID string    `json:"user_auth_id" gorm:"size:191;not null;index"`                              // Foreign Key to UserAuth.ID
+	UserAuthID string    `json:"user_auth_id" gorm:"type:char(36);not null;index"`                         // Foreign Key to UserAuth.ID, matching UserAuth ID type
 	UserAuth   *UserAuth `json:"-" gorm:"foreignKey:UserAuthID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading
 
 	Type AuthMethodType `json:"type" gorm:"size:50;not null" validate:"required"` // Type of authentication method (e.g., "totp", "oauth_google")
@@ -112,5 +112,3 @@ type LoginAttempt struct {
 func (LoginAttempt) TableName() string {
 	return "login_attempts"
 }
-
-
