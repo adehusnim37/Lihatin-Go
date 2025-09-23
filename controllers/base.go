@@ -14,13 +14,6 @@ type BaseController struct {
 	Validate *validator.Validate
 }
 
-// NewBaseController membuat instance baru base controller
-func NewBaseController(db *sql.DB, validate *validator.Validate) *BaseController {
-	return &BaseController{
-		DB:       db,
-		Validate: validate,
-	}
-}
 
 // NewBaseControllerWithGorm creates a base controller with both SQL and GORM DB connections
 func NewBaseControllerWithGorm(db *sql.DB, gormDB *gorm.DB, validate *validator.Validate) *BaseController {

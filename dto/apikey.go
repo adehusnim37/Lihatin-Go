@@ -30,8 +30,13 @@ type APIKeyResponse struct {
 
 // CreateAPIKeyResponse represents the response when creating a new API key
 type CreateAPIKeyResponse struct {
-	APIKey *APIKeyResponse `json:"api_key"`
-	Key    string          `json:"key"` // Only shown once during creation
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	CreatedAt   time.Time  `json:"created_at"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	Permissions []string   `json:"permissions"`
+	Key         string     `json:"key"`     // Only shown once during creation
+	Warning     string     `json:"warning"` // Warning message
 }
 
 // PaginatedAPIKeysResponse represents paginated API keys

@@ -65,7 +65,7 @@ func (c *Controller) GetAPIKey(ctx *gin.Context) {
 		LastUsedAt:  apiKey.LastUsedAt,
 		ExpiresAt:   apiKey.ExpiresAt,
 		IsActive:    apiKey.IsActive,
-		Permissions: apiKey.Permissions,
+		Permissions: []string(apiKey.Permissions),
 		CreatedAt:   apiKey.CreatedAt,
 	}
 

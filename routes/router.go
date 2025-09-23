@@ -30,17 +30,14 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 		panic("Failed to connect to database with GORM: " + err.Error())
 	}
 
-	// Buat base controller yang akan digunakan oleh semua controller
-	baseController := controllers.NewBaseController(db, validate)
-
 	// Create base controller with GORM for auth
-	baseAuthController := controllers.NewBaseControllerWithGorm(db, gormDB, validate)
+	baseController := controllers.NewBaseControllerWithGorm(db, gormDB, validate)
 
 	// Inisialisasi controller spesifik
-	userController := user.NewController(baseAuthController) // Use baseAuthController for GORM access
-	authController := auth.NewAuthController(baseAuthController)
+	userController := user.NewController(baseController) // Use baseAuthController for GORM access
+	authController := auth.NewAuthController(baseController)
 	loggerController := logger.NewLoggerController(baseController)
-	shortController := shortlink.NewController(baseAuthController) // Use baseAuthController for GORM access
+	shortController := shortlink.NewController(baseController) // Use baseAuthController for GORM access
 
 	// Setup repositories for middleware
 	loggerRepo := repositories.NewLoggerRepository(gormDB)
@@ -54,7 +51,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")
 	RegisterUserRoutes(v1, userController)
-	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, baseAuthController)
+	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, baseController)
 	RegisterLoggerRoutes(v1, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, authRepo)
 

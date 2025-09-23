@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,52 +21,111 @@ func NewAPIKeyRepository(db *gorm.DB) *APIKeyRepository {
 	return &APIKeyRepository{db: db}
 }
 
-// CreateAPIKey creates a new API key using the improved GenerateAPIKeyPair method
+// CreateAPIKey creates a new API key using improved atomic operations
 func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Time, permissions []string) (*user.APIKey, string, error) {
-	var apiKey user.APIKey
-	// Generate API key pair with structured format
+	// Set default permissions if none provided
+	if len(permissions) == 0 {
+		permissions = []string{"read", "write", "delete", "update"}
+	}
+
+	// Generate API key pair first (fail fast if generation fails)
 	keyID, secretKey, secretKeyHash, keyPreview, err := utils.GenerateAPIKeyPair("")
 	if err != nil {
+		utils.Logger.Error("Failed to generate API key pair", "error", err.Error())
 		return nil, "", utils.ErrAPIKeyCreateFailed
 	}
 
-	if err := r.db.Where("user_id = ? AND name = ? AND deleted_at IS NULL", userID, name).First(&apiKey).Error; err == nil {
-		return nil, "", utils.ErrAPIKeyNameExists
-	}
-
-	utils.Logger.Info("Creating new API key",
+	utils.Logger.Info("Starting API key creation process",
 		"user_id", userID,
 		"key_name", name,
 		"key_preview", keyPreview,
+		"permissions", permissions,
 	)
 
-	if permissions == nil {
-		permissions = []string{
-			"read", "write",
-		} // Default permissions
-	}
+	// Use atomic transaction for all database operations
+	var apiKey user.APIKey
+	err = r.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Validate user exists, is active, and verified (single query)
+		var userAuth user.UserAuth
+		if err := tx.Where("user_id = ? AND is_email_verified = ? AND is_active = ?",
+			userID, true, true).First(&userAuth).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				utils.Logger.Warn("User not found or not eligible for API key creation",
+					"user_id", userID)
+				return utils.ErrUserNotFound
+			}
+			utils.Logger.Error("Failed to validate user for API key creation",
+				"user_id", userID, "error", err.Error())
+			return utils.ErrAPIKeyFailedFetching
+		}
 
-	apiKey = user.APIKey{
-		ID:          uuid.New().String(),
-		UserID:      userID,
-		Name:        name,
-		Key:         keyID,         // Store the key ID (safe to display)
-		KeyHash:     secretKeyHash, // Store the hashed secret key
-		ExpiresAt:   expiresAt,
-		IsActive:    true,
-		Permissions: permissions,
-	}
+		// 2. Check for duplicate name and count limit in one query
+		var existingKeys []user.APIKey
+		if err := tx.Where("user_id = ? AND deleted_at IS NULL", userID).
+			Find(&existingKeys).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.Logger.Error("Failed to fetch existing API keys",
+				"user_id", userID, "error", err.Error())
+			return utils.ErrAPIKeyFailedFetching
+		}
 
-	if err := r.db.Create(apiKey).Error; err != nil {
-		utils.Logger.Error("Failed to create API key in database",
+		// Check for duplicate name and count limit
+		for _, key := range existingKeys {
+			if key.Name == name {
+				utils.Logger.Warn("API key name already exists",
+					"user_id", userID, "name", name)
+				return utils.ErrAPIKeyNameExists
+			}
+		}
+
+		if len(existingKeys) >= 3 {
+			utils.Logger.Warn("API key limit reached",
+				"user_id", userID, "current_count", len(existingKeys))
+			return utils.ErrAPIKeyLimitReached
+		}
+
+		// 3. Create the new API key with explicit timestamp handling
+		now := time.Now()
+		apiKey = user.APIKey{
+			ID:          uuid.New().String(),
+			UserID:      userID,
+			Name:        name,
+			Key:         keyID,
+			KeyHash:     secretKeyHash,
+			ExpiresAt:   expiresAt,
+			IsActive:    true,
+			Permissions: user.PermissionsList(permissions),
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+
+		// Create using GORM with explicit handling
+		if err := tx.Create(&apiKey).Error; err != nil {
+			utils.Logger.Error("Failed to create API key in database",
+				"user_id", userID,
+				"key_name", name,
+				"error", err.Error(),
+				"permissions", permissions,
+			)
+			return utils.ErrAPIKeyCreateFailed
+		}
+
+		utils.Logger.Info("API key created successfully in transaction",
 			"user_id", userID,
+			"key_id", apiKey.ID,
 			"key_name", name,
-			"error", err.Error(),
+			"key_preview", keyPreview,
 		)
-		return nil, "", fmt.Errorf("failed to create API key: %w", err)
+
+		return nil
+	})
+
+	// Handle transaction errors
+	if err != nil {
+		return nil, "", err
 	}
 
-	utils.Logger.Info("API key created successfully",
+	// Log final success
+	utils.Logger.Info("API key creation completed successfully",
 		"user_id", userID,
 		"key_id", apiKey.ID,
 		"key_name", name,
@@ -274,7 +334,7 @@ func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix str
 		KeyHash:     secretKeyHash,
 		ExpiresAt:   expiresAt,
 		IsActive:    true,
-		Permissions: permissions,
+		Permissions: user.PermissionsList(permissions),
 	}
 
 	if err := r.db.Create(apiKey).Error; err != nil {

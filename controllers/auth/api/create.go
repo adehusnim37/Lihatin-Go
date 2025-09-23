@@ -1,10 +1,7 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -22,37 +19,36 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 	}
 
 	// Create API key
-	apiKey, keyString, err := c.repo.GetAPIKeyRepository().CreateAPIKey(
+	apiKey, fullAPIKey, err := c.repo.GetAPIKeyRepository().CreateAPIKey(
 		userID.(string),
 		req.Name,
 		req.ExpiresAt,
 		req.Permissions,
 	)
+
+	// Handle errors using universal error handler
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to create API key",
-			Error:   map[string]string{"error": "Failed to create API key, please try again later"},
-		})
+		utils.HandleError(ctx, err, userID)
 		return
 	}
 
-	// Return the key with the full key string (this is the only time it's shown)
-	response := map[string]interface{}{
-		"id":          apiKey.ID,
-		"name":        apiKey.Name,
-		"key":         keyString, // Full key shown only once
-		"expires_at":  apiKey.ExpiresAt,
-		"permissions": apiKey.Permissions,
-		"created_at":  apiKey.CreatedAt,
-		"warning":     "This is the only time the full API key will be shown. Please save it securely.",
+	// Success response using proper DTO
+	utils.Logger.Info("API key created successfully",
+		"user_id", userID,
+		"api_key_id", apiKey.ID,
+		"api_key_name", apiKey.Name,
+	)
+
+	// Create response using DTO
+	response := dto.CreateAPIKeyResponse{
+		ID:          apiKey.ID,
+		Name:        apiKey.Name,
+		CreatedAt:   apiKey.CreatedAt,
+		ExpiresAt:   apiKey.ExpiresAt,
+		Permissions: []string(apiKey.Permissions),
+		Key:         fullAPIKey, // Full key with secret (only shown once!)
+		Warning:     "Please save this key as it will not be shown again.",
 	}
 
-	ctx.JSON(http.StatusCreated, common.APIResponse{
-		Success: true,
-		Data:    response,
-		Message: "API key created successfully",
-		Error:   nil,
-	})
+	utils.SendCreatedResponse(ctx, response, "API key created successfully")
 }

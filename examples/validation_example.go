@@ -40,7 +40,7 @@ func main() {
 	r.POST("/bulk-delete", handleBulkDelete)
 	r.POST("/register", handleUserRegistration)
 
-	fmt.Println("=== CONTOH OUTPUT VALIDASI ===\n")
+	fmt.Println("=== CONTOH OUTPUT VALIDASI ===")
 
 	// Test scenarios
 	testScenarios := []struct {
