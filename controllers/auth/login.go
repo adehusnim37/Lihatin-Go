@@ -3,10 +3,13 @@ package auth
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
+	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
+	"github.com/adehusnim37/lihatin-go/utils/session"
 	"github.com/gin-gonic/gin"
 )
 
@@ -106,9 +109,29 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
+	sessionID, err := session.GenerateSessionID(
+		user.ID,                  // User ID
+		"login",                  // Purpose
+		ctx.ClientIP(),          // IP Address
+		ctx.GetHeader("User-Agent"), // User Agent
+		24*time.Hour,                // Expires in 24 hours
+	)
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Message: "Failed to create session",
+			Error:   map[string]string{"server": "Session creation failed"},
+		})
+		return
+	}
+	// Create user auth record for email verification
+	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+
+
 	// Generate JWT token
 	role := user.Role
-	token, err := utils.GenerateJWT(user.ID, *userAuth.SessionID, *userAuth.DeviceID, *userAuth.LastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
+	token, err := utils.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,

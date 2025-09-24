@@ -103,7 +103,12 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 				return
 			}
 
-			
+			// Log successful session validation
+			utils.Logger.Info("Session validated successfully",
+				"user_id", claims.UserID,
+				"session_preview", utils.GetKeyPreview(claims.SessionID),
+				"purpose", validMetadata.Purpose,
+			)
 
 			// Add session metadata to context
 			c.Set("session_metadata", validMetadata)
@@ -359,6 +364,87 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 		c.Next()
 	}
 }
+
+
+// ✅ NEW: Multiple permissions middleware
+func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermissions []string, requireAll bool) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // First ensure API key authentication has run
+        apiKeyID, exists := c.Get("api_key_id")
+        if !exists {
+            c.JSON(http.StatusUnauthorized, common.APIResponse{
+                Success: false,
+                Data:    nil,
+                Message: "API key authentication required",
+                Error:   map[string]string{"auth": "API key must be authenticated first"},
+            })
+            c.Abort()
+            return
+        }
+
+        // Check permissions using repository
+        var hasPermission bool
+        var err error
+
+        keyIDStr := apiKeyID.(string)
+        if requireAll {
+            hasPermission, err = authRepo.GetAPIKeyRepository().APIKeyCheckAllPermissions(keyIDStr, requiredPermissions)
+        } else {
+            hasPermission, err = authRepo.GetAPIKeyRepository().APIKeyCheckPermissions(keyIDStr, requiredPermissions)
+        }
+
+        if err != nil {
+            utils.Logger.Error("Error checking API key permissions from database",
+                "key_id", keyIDStr,
+                "error", err.Error(),
+            )
+            c.JSON(http.StatusInternalServerError, common.APIResponse{
+                Success: false,
+                Data:    nil,
+                Message: "Permission check failed",
+                Error:   map[string]string{"permission": "Failed to verify API key permissions"},
+            })
+            c.Abort()
+            return
+        }
+
+        if !hasPermission {
+            apiKeyName, _ := c.Get("api_key_name")
+            utils.Logger.Warn("API key lacks required permissions (database check)",
+                "api_key_name", apiKeyName,
+                "key_id", keyIDStr,
+                "required_permissions", requiredPermissions,
+                "require_all", requireAll,
+            )
+
+            permissionType := "any of"
+            if requireAll {
+                permissionType = "all of"
+            }
+
+            c.JSON(http.StatusForbidden, common.APIResponse{
+                Success: false,
+                Data:    nil,
+                Message: "Insufficient API key permissions.",
+                Error: map[string]string{
+                    "permission": fmt.Sprintf("API key requires %s these permissions: %v", permissionType, requiredPermissions),
+                },
+            })
+            c.Abort()
+            return
+        }
+
+        // Log successful permission check
+        utils.Logger.Info("API key permission check passed (database)",
+            "key_id", keyIDStr,
+            "required_permissions", requiredPermissions,
+            "require_all", requireAll,
+        )
+
+        c.Next()
+    }
+}
+
 
 // AuthRepositoryAPIKeyMiddleware validates API keys using AuthRepository
 func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.HandlerFunc {

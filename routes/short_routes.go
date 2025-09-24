@@ -21,15 +21,16 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	apiShort := rg.Group("api/short")
 	{
 		apiShort.Use(middleware.AuthRepositoryAPIKeyMiddleware(authRepo))
-		apiShort.Use(middleware.RateLimitMiddleware(1000)) // Higher rate limit for API access
-		apiShort.POST("", shortController.Create)
-		apiShort.GET("/:code", shortController.GetShortLink)
-		apiShort.PUT("/:code", shortController.UpdateShortLink)
-		apiShort.GET("", shortController.ListShortLinks)
-		apiShort.GET("/:code/stats", shortController.GetShortLinkStats)
-		apiShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
-		apiShort.DELETE("/:code", shortController.DeleteShortLink)
-		apiShort.GET("/stats", shortController.GetAllStatsShorts)
+		apiShort.Use(middleware.RateLimitMiddleware(1000))
+		// Higher rate limit for API access
+		apiShort.POST("", middleware.CheckPermissionAPIKey(authRepo, []string{"create"}, false), shortController.Create)
+		apiShort.GET("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetShortLink)
+		apiShort.PUT("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"update"}, false), shortController.UpdateShortLink)
+		apiShort.GET("", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.ListShortLinks)
+		apiShort.GET("/:code/stats", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetShortLinkStats)
+		apiShort.GET("/:code/views", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetShortLinkViewsPaginated)
+		apiShort.DELETE("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"delete"}, false), shortController.DeleteShortLink)
+		apiShort.GET("/stats", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetAllStatsShorts)
 	}
 
 	// ✅ PROTECTED ROUTES: Accessible by authenticated users (user or admin)

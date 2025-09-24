@@ -286,6 +286,123 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 	return &user, &apiKey, nil
 }
 
+// repositories/api-key-repo.go - Add these methods
+
+// APIKeyCheckPermissions checks if API key has ANY of the required permissions
+func (r *APIKeyRepository) APIKeyCheckPermissions(apiKeyID string, requiredPermissions []string) (bool, error) {
+    var apiKey user.APIKey
+    
+    // Get API key from database
+    if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
+        First(&apiKey).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
+            return false, utils.ErrAPIKeyNotFound
+        }
+        utils.Logger.Error("Database error while checking API key permissions", 
+            "key_id", apiKeyID, "error", err.Error())
+        return false, fmt.Errorf("failed to check API key permissions: %w", err)
+    }
+
+    // Check if API key has ANY of the required permissions
+    keyPermissions := []string(apiKey.Permissions)
+    for _, requiredPerm := range requiredPermissions {
+        for _, perm := range keyPermissions {
+            if perm == requiredPerm || perm == "*" {
+                utils.Logger.Info("API key has required permission (ANY match)",
+                    "key_id", apiKeyID,
+                    "key_name", apiKey.Name,
+                    "required_permissions", requiredPermissions,
+                    "matched_permission", perm,
+                )
+                return true, nil
+            }
+        }
+    }
+
+    utils.Logger.Warn("API key lacks required permissions (ANY match)",
+        "key_id", apiKeyID,
+        "key_name", apiKey.Name,
+        "required_permissions", requiredPermissions,
+        "available_permissions", keyPermissions,
+    )
+    return false, nil
+}
+
+// APIKeyCheckAllPermissions checks if API key has ALL required permissions
+func (r *APIKeyRepository) APIKeyCheckAllPermissions(apiKeyID string, requiredPermissions []string) (bool, error) {
+    var apiKey user.APIKey
+    
+    // Get API key from database
+    if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
+        First(&apiKey).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
+            return false, utils.ErrAPIKeyNotFound
+        }
+        utils.Logger.Error("Database error while checking API key permissions", 
+            "key_id", apiKeyID, "error", err.Error())
+        return false, fmt.Errorf("failed to check API key permissions: %w", err)
+    }
+
+    // Check if API key has ALL required permissions
+    keyPermissions := []string(apiKey.Permissions)
+    
+    for _, requiredPerm := range requiredPermissions {
+        hasPermission := false
+        for _, perm := range keyPermissions {
+            if perm == requiredPerm || perm == "*" {
+                hasPermission = true
+                break
+            }
+        }
+        if !hasPermission {
+            utils.Logger.Warn("API key missing required permission (ALL match)",
+                "key_id", apiKeyID,
+                "key_name", apiKey.Name,
+                "missing_permission", requiredPerm,
+                "required_permissions", requiredPermissions,
+                "available_permissions", keyPermissions,
+            )
+            return false, nil
+        }
+    }
+
+    utils.Logger.Info("API key has all required permissions",
+        "key_id", apiKeyID,
+        "key_name", apiKey.Name,
+        "required_permissions", requiredPermissions,
+        "available_permissions", keyPermissions,
+    )
+    return true, nil
+}
+
+// Enhanced permission validation with full API key (for direct validation)
+func (r *APIKeyRepository) ValidateAPIKeyWithPermissions(fullAPIKey string, requiredPermissions []string, requireAll bool) (*user.User, *user.APIKey, bool, error) {
+    // First validate the API key and get user/key info
+    user, apiKeyRecord, err := r.ValidateAPIKey(fullAPIKey)
+    if err != nil {
+        utils.Logger.Warn("Invalid API key during permission check", 
+            "key_preview", utils.GetKeyPreview(fullAPIKey),
+            "error", err.Error())
+        return nil, nil, false, fmt.Errorf("invalid API key: %w", err)
+    }
+
+    // Check permissions using repository methods
+    var hasPermission bool
+    if requireAll {
+        hasPermission, err = r.APIKeyCheckAllPermissions(apiKeyRecord.ID, requiredPermissions)
+    } else {
+        hasPermission, err = r.APIKeyCheckPermissions(apiKeyRecord.ID, requiredPermissions)
+    }
+
+    if err != nil {
+        return user, apiKeyRecord, false, err
+    }
+
+    return user, apiKeyRecord, hasPermission, nil
+}
+
 // UpdateAPIKey updates an API key with proper validation and type handling
 func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest , userID string, req dto.UpdateAPIKeyRequest) (*user.APIKey, error) {
 	var apiKey user.APIKey
