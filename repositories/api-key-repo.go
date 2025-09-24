@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
@@ -61,7 +62,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 
 		// 2. Check for duplicate name and count limit in one query
 		var existingKeys []user.APIKey
-		if err := tx.Where("user_id = ? AND deleted_at IS NULL", userID).
+		if err := tx.Where("user_id = ? AND is_active = ? AND deleted_at IS NULL", userID, true).
 			Find(&existingKeys).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.Logger.Error("Failed to fetch existing API keys",
 				"user_id", userID, "error", err.Error())
@@ -177,15 +178,51 @@ func (r *APIKeyRepository) GetAPIKeysByUserID(userID string) ([]user.APIKey, err
 }
 
 // GetAPIKeyByID retrieves an API key by ID
-func (r *APIKeyRepository) GetAPIKeyByID(id string) (*user.APIKey, error) {
+func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) (dto.APIKeyResponse, error) {
 	var apiKey user.APIKey
-	if err := r.db.Where("id = ? AND deleted_at IS NULL", id).First(&apiKey).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf("API key not found")
+	var user user.User
+
+	// Start a transaction
+	tx := r.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
 		}
-		return nil, fmt.Errorf("failed to get API key: %w", err)
+	}()
+
+	// Check if the user exists
+	if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
+		tx.Rollback()
+		return dto.APIKeyResponse{}, utils.ErrUserNotFound
 	}
-	return &apiKey, nil
+
+	// Build the query for fetching API keys
+	q := tx.Where("deleted_at IS NULL")
+	if user.Role != "admin" {
+		q = q.Where("user_id = ?", userID)
+	}
+
+	// Fetch the API keys
+	if err := q.First(&apiKey).Error; err != nil {
+		tx.Rollback()
+		return dto.APIKeyResponse{}, utils.ErrAPIKeyNotFound
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return dto.APIKeyResponse{}, utils.ErrAPIKeyFailedFetching
+	}
+
+	return dto.APIKeyResponse{
+		ID:          apiKey.ID,
+		Name:        apiKey.Name,
+		KeyPreview:  utils.GetKeyPreview(apiKey.Key),
+		LastUsedAt:  apiKey.LastUsedAt,
+		ExpiresAt:   apiKey.ExpiresAt,
+		IsActive:    apiKey.IsActive,
+		Permissions: []string(apiKey.Permissions),
+		CreatedAt:   apiKey.CreatedAt,
+	}, nil
 }
 
 // ValidateAPIKey validates an API key and returns the associated user
@@ -249,33 +286,159 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 	return &user, &apiKey, nil
 }
 
-// UpdateAPIKey updates an API key
-func (r *APIKeyRepository) UpdateAPIKey(id string, updates map[string]interface{}) error {
-	result := r.db.Model(&user.APIKey{}).Where("id = ? AND deleted_at IS NULL", id).Updates(updates)
-	if result.Error != nil {
-		return fmt.Errorf("failed to update API key: %w", result.Error)
+// UpdateAPIKey updates an API key with proper validation and type handling
+func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest , userID string, req dto.UpdateAPIKeyRequest) (*user.APIKey, error) {
+	var apiKey user.APIKey
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Check if API key exists and belongs to user (or user is admin)
+		var userModel user.User
+		if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&userModel).Error; err != nil {
+			return utils.ErrUserNotFound
+		}
+
+		// Build query based on user role
+		query := tx.Where("id = ? AND is_active = ? AND deleted_at IS NULL", keyID.ID, true)
+		if userModel.Role != "admin" {
+			query = query.Where("user_id = ?", userID)
+		}
+
+		if err := query.First(&apiKey).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return utils.ErrAPIKeyNotFound
+			}
+			return fmt.Errorf("failed to fetch API key: %w", err)
+		}
+
+		// 2. Prepare update map with only non-nil fields
+		updates := make(map[string]any)
+
+		if req.Name != nil {
+			// Check for duplicate name (exclude current key)
+			var existingKey user.APIKey
+			if err := tx.Where("user_id = ? AND name = ? AND id != ? AND deleted_at IS NULL",
+				apiKey.UserID, *req.Name, keyID).First(&existingKey).Error; err == nil {
+				return utils.ErrAPIKeyNameExists
+			}
+			updates["name"] = *req.Name
+		}
+
+		if req.ExpiresAt != nil {
+			// Validate expiration date is in the future
+			if req.ExpiresAt.Before(time.Now()) {
+				return fmt.Errorf("expiration date must be in the future")
+			}
+			updates["expires_at"] = *req.ExpiresAt
+		}
+
+		if req.Permissions != nil {
+			// Validate permissions
+			validPermissions := []string{"read", "write", "delete", "update"}
+			for _, perm := range req.Permissions {
+				valid := false
+				for _, validPerm := range validPermissions {
+					if perm == validPerm {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					return fmt.Errorf("invalid permission: %s", perm)
+				}
+			}
+			updates["permissions"] = user.PermissionsList(req.Permissions)
+		}
+
+		if req.IsActive != nil {
+			updates["is_active"] = *req.IsActive
+		}
+
+		// Always update timestamp
+		updates["updated_at"] = time.Now()
+
+		// 3. Perform the update
+		if len(updates) > 1 { // More than just updated_at
+			result := tx.Model(&apiKey).Updates(updates)
+			if result.Error != nil {
+				return fmt.Errorf("failed to update API key: %w", result.Error)
+			}
+
+			// Reload the updated model
+			if err := tx.Where("id = ?", keyID).First(&apiKey).Error; err != nil {
+				return fmt.Errorf("failed to reload updated API key: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("API key not found")
-	}
-	return nil
+
+	utils.Logger.Info("API key updated successfully",
+		"user_id", userID,
+		"key_id", keyID,
+		"key_name", apiKey.Name,
+	)
+
+	return &apiKey, nil
 }
 
-// RevokeAPIKey soft deletes an API key
-func (r *APIKeyRepository) RevokeAPIKey(id string) error {
-	result := r.db.Where("id = ?", id).Delete(&user.APIKey{})
-	if result.Error != nil {
-		return fmt.Errorf("failed to revoke API key: %w", result.Error)
+// RevokeAPIKey soft deletes an API key with proper user validation and transaction handling
+func (r *APIKeyRepository) RevokeAPIKey(id dto.APIKeyIDRequest, UserID string) error {
+	var apiKey user.APIKey
+	var user user.User
+
+	// Start a transaction
+	tx := r.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Check if the user exists
+	if err := tx.Where("id = ? AND deleted_at IS NULL", UserID).First(&user).Error; err != nil {
+		tx.Rollback()
+		return utils.ErrUserNotFound
 	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("API key not found")
+
+	// Build the query for fetching API keys
+	q := tx.Where("id = ? AND deleted_at IS NULL", id.ID)
+	if user.Role != "admin" {
+		q = q.Where("user_id = ?", UserID)
 	}
+
+	// Fetch the API key
+	if err := q.First(&apiKey).Error; err != nil {
+		tx.Rollback()
+		return utils.ErrAPIKeyNotFound
+	}
+
+	// Update the API key to set is_active to false and mark as deleted
+	if err := tx.Model(&apiKey).Updates(map[string]any{
+		"is_active":  false,
+		"deleted_at": time.Now(),
+	}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to revoke API key: %w", err)
+	}
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return utils.ErrAPIKeyFailedFetching
+	}
+	utils.Logger.Info("API key revoked successfully",
+		"user_id", UserID,
+		"key_id", id,
+		"key_name", apiKey.Name,
+	)
 	return nil
 }
 
 // DeleteExpiredAPIKeys removes expired API keys
-func (r *APIKeyRepository) DeleteExpiredAPIKeys() error {
-	err := r.db.Where("expires_at IS NOT NULL AND expires_at < ?", time.Now()).Delete(&user.APIKey{}).Error
+func (r *APIKeyRepository) DeleteExpiredAPIKeys(id dto.APIKeyIDRequest) error {
+	err := r.db.Where("id = ? AND expires_at IS NOT NULL AND expires_at < ?", id, time.Now()).Delete(&user.APIKey{}).Error
 	if err != nil {
 		return fmt.Errorf("failed to delete expired API keys: %w", err)
 	}
@@ -364,7 +527,8 @@ func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix str
 func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.APIKey, string, error) {
 	// First, get the existing API key
 	var existingKey user.APIKey
-	if err := r.db.Where("id = ? AND user_id = ? AND deleted_at IS NULL", keyID, userID).First(&existingKey).Error; err != nil {
+	
+	if err := r.db.Where("id = ? AND user_id = ? AND is_active = ? AND deleted_at IS NULL", keyID, userID, true).First(&existingKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, "", fmt.Errorf("API key not found")
 		}
@@ -386,15 +550,16 @@ func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.
 		"new_key_preview", newKeyPreview,
 	)
 
-	// Update the existing record with new key data
+	// Update the existing record with new key data using direct GORM updates
 	updates := map[string]interface{}{
 		"key":          newKeyID,
 		"key_hash":     newSecretKeyHash,
 		"updated_at":   time.Now(),
 		"last_used_at": nil, // Reset last used timestamp
+		"last_ip_used": nil, // Reset last IP used
 	}
 
-	if err := r.UpdateAPIKey(keyID, updates); err != nil {
+	if err := r.db.Model(&existingKey).Where("id = ?", keyID).Updates(updates).Error; err != nil {
 		utils.Logger.Error("Failed to update API key with new values",
 			"key_id", keyID,
 			"user_id", userID,

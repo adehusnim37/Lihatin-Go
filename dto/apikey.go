@@ -6,14 +6,18 @@ import "time"
 type APIKeyRequest struct {
 	Name        string     `json:"name" binding:"required,min=3,max=100,no_special"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete admin"`
+	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
 }
 
 type UpdateAPIKeyRequest struct {
 	Name        *string    `json:"name,omitempty" binding:"omitempty,min=3,max=100,no_special"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete admin"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=Now,datetime,"` // Must be in the future
+	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
 	IsActive    *bool      `json:"is_active,omitempty"`
+}
+
+type APIKeyIDRequest struct {
+	ID string `json:"id" binding:"required,uuid4" uri:"id"`
 }
 
 // APIKeyResponse represents the API key response (without sensitive data)

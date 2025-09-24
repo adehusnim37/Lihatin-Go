@@ -1,29 +1,17 @@
 package api
 
 import (
-	"time"
-
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
 
 // UpdateAPIKey updates an API key
 func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
+	var reqId dto.APIKeyIDRequest
 	// Get user ID from context
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		utils.HandleError(ctx, utils.ErrUserUnauthorized, nil)
-		return
-	}
-
-	// Get API key ID from URL
-	keyID := ctx.Param("id")
-	if keyID == "" {
-		utils.SendErrorResponse(ctx, 400, "INVALID_REQUEST", "API key ID is required", "id", userID)
-		return
-	}
+	userID, _ := ctx.Get("user_id")
+	userIDStr := userID.(string)
 
 	// Bind and validate request
 	var req dto.UpdateAPIKeyRequest
@@ -32,71 +20,16 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	// Check if API key exists and belongs to user
-	apiKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(keyID)
+	// Bind and validate URI parameters
+	if err := ctx.ShouldBindUri(&reqId); err != nil {
+		utils.SendValidationError(ctx, err, &reqId)
+		return
+	}
+
+	// Update the API key using the corrected repository method
+	updatedKey, err := c.repo.GetAPIKeyRepository().UpdateAPIKey(reqId, userIDStr, req)
 	if err != nil {
-		utils.HandleError(ctx, utils.ErrAPIKeyNotFound, userID)
-		return
-	}
-
-	// Verify ownership
-	if apiKey.UserID != userID.(string) {
-		utils.HandleError(ctx, utils.ErrAPIKeyUnauthorized, userID)
-		return
-	}
-
-	// Prepare updates map
-	updates := make(map[string]interface{})
-
-	if req.Name != nil {
-		updates["name"] = *req.Name
-	}
-
-	if req.ExpiresAt != nil {
-		// Validate expiration date is in the future
-		if req.ExpiresAt.Before(time.Now()) {
-			utils.SendErrorResponse(ctx, 400, "INVALID_EXPIRATION_DATE", "Expiration date must be in the future", "expires_at", userID)
-			return
-		}
-		updates["expires_at"] = *req.ExpiresAt
-	}
-
-	if req.Permissions != nil {
-		// Validate permissions
-		validPermissions := []string{"read", "write", "delete", "admin"}
-		for _, perm := range req.Permissions {
-			valid := false
-			for _, validPerm := range validPermissions {
-				if perm == validPerm {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				utils.SendErrorResponse(ctx, 400, "INVALID_PERMISSION", "Invalid permission: "+perm, "permissions", userID)
-				return
-			}
-		}
-		updates["permissions"] = user.PermissionsList(req.Permissions)
-	}
-
-	if req.IsActive != nil {
-		updates["is_active"] = *req.IsActive
-	}
-
-	// Always update the updated_at timestamp
-	updates["updated_at"] = time.Now()
-
-	// Update the API key
-	if err := c.repo.GetAPIKeyRepository().UpdateAPIKey(keyID, updates); err != nil {
-		utils.HandleError(ctx, utils.ErrAPIKeyUpdateFailed, userID)
-		return
-	}
-
-	// Fetch the updated API key to return
-	updatedKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(keyID)
-	if err != nil {
-		utils.HandleError(ctx, utils.ErrAPIKeyFailedFetching, userID)
+		utils.HandleError(ctx, err, userID)
 		return
 	}
 

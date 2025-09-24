@@ -11,6 +11,8 @@ import (
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/utils"
+	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
+	"github.com/adehusnim37/lihatin-go/utils/session"
 	"github.com/gin-gonic/gin"
 )
 
@@ -113,10 +115,30 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 	expirationTime := time.Now().Add(time.Duration(jwtExpiredHours) * time.Hour)
+	sessionID, err := session.GenerateSessionID(
+		newUser.ID,                  // User ID
+		"registration",              // Purpose
+		ctx.ClientIP(),              // IP Address
+		ctx.GetHeader("User-Agent"), // User Agent
+		24*time.Hour,                // Expires in 24 hours
+	)
 
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Message: "Failed to create session",
+			Error:   map[string]string{"server": "Session creation failed"},
+		})
+		return
+	}
 	// Create user auth record for email verification
+	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+
 	userAuth := &user.UserAuth{
 		ID:                              utils.GenerateUUIDV7(),
+		SessionID:                       &sessionID,
+		DeviceID:                        deviceID,
+		LastIP:                          lastIP,
 		UserID:                          newUser.ID,
 		PasswordHash:                    hashedPassword, // Use the same hashed password
 		IsEmailVerified:                 false,
@@ -400,23 +422,13 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 
 	var req user.AdminLockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid input",
-			Error:   map[string]string{"input": "Invalid input format or missing fields"},
-		})
+		utils.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Validate request
-	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   map[string]string{"reason": "Lock reason is required and must be between 10-500 characters"},
-		})
+	if err := ctx.ShouldBindUri(&req); err != nil {
+		utils.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -483,13 +495,8 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 
 	// Validate request if reason is provided
 	if req.Reason != "" {
-		if err := c.Validate.Struct(req); err != nil {
-			ctx.JSON(http.StatusBadRequest, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Validation failed",
-				Error:   map[string]string{"reason": "Unlock reason must not exceed 500 characters"},
-			})
+		if err := ctx.ShouldBindUri(&req); err != nil {
+			utils.SendValidationError(ctx, err, &req)
 			return
 		}
 	}

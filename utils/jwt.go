@@ -12,6 +12,9 @@ var jwtSecret = []byte(GetRequiredEnv(EnvJWTSecret))
 // JWTClaims represents the JWT claims structure
 type JWTClaims struct {
 	UserID     string `json:"user_id"`
+	SessionID  string `json:"session_id,omitempty"`
+	DeviceID   string `json:"device_id,omitempty"`
+	LastIP     string `json:"last_ip,omitempty"`
 	Username   string `json:"username"`
 	Email      string `json:"email"`
 	Role       string `json:"role"`
@@ -21,9 +24,12 @@ type JWTClaims struct {
 }
 
 // GenerateJWT creates a new JWT token for a user
-func GenerateJWT(userID, username, email, role string, isPremium, isVerified bool) (string, error) {
+func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role string, isPremium, isVerified bool) (string, error) {
 	claims := JWTClaims{
 		UserID:     userID,
+		SessionID:  session_id,
+		DeviceID:   device_id,
+		LastIP:     last_ip,
 		Username:   username,
 		Email:      email,
 		Role:       role,

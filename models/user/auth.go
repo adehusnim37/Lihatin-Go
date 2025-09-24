@@ -20,6 +20,9 @@ type UserAuth struct {
 	PasswordResetTokenExpiresAt *time.Time `json:"-"`                 // Expiry for the reset token
 
 	// Account status & security
+	SessionID           *string    `json:"session_id,omitempty" gorm:"size:255;index"` // Current active session ID, if any
+	DeviceID            *string    `json:"device_id,omitempty" gorm:"size:255;index"`  // Current active device ID, if any
+	LastIP              *string    `json:"last_ip,omitempty" gorm:"size:45"`           // Last IP address used, if any
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
 	FailedLoginAttempts int        `json:"-" gorm:"default:0"`                   // Counter for failed login attempts
 	LockoutUntil        *time.Time `json:"-"`                                    // Timestamp until which the account is locked

@@ -341,7 +341,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 
 	// Generate new access token
 	role := map[bool]string{true: "premium", false: "regular"}[user.IsPremium]
-	newToken, err := utils.GenerateJWT(user.ID, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
+	newToken, err := utils.GenerateJWT(user.ID, *userAuth.SessionID, *userAuth.DeviceID, *userAuth.LastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,

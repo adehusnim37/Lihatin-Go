@@ -37,3 +37,25 @@ func GenerateUUIDV7() string {
 
     return uuid
 }
+
+func ValidateUUIDV7(uuid string) bool {
+    if len(uuid) != 36 {
+        return false
+    }
+    // Check version (should be '7' at position 14)
+    if uuid[14] != '7' {
+        return false
+    }
+    // Check variant (should be one of '8', '9', 'a', or 'b' at position 19)
+    if uuid[19] != '8' && uuid[19] != '9' && uuid[19] != 'a' && uuid[19] != 'b' {
+        return false
+    }
+    return true
+}
+
+func PtrToString(s *string) string {
+    if s == nil {
+        return ""
+    }
+    return *s
+}

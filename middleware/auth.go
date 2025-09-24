@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/utils/session"
 	"github.com/gin-gonic/gin"
 )
 
@@ -62,6 +64,51 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			})
 			c.Abort()
 			return
+		}
+
+		if claims.SessionID != "" {
+			// Basic validation
+			_, isValid := session.ValidateSessionID(claims.SessionID)
+			if !isValid {
+				c.JSON(http.StatusUnauthorized, common.APIResponse{
+					Success: false,
+					Data:    nil,
+					Message: "Invalid session",
+					Error:   map[string]string{"session": "Invalid session"},
+				})
+				c.Abort()
+				return
+			}
+
+			// Advanced validation with user/IP/UA check
+			validMetadata, err := session.ValidateSessionForUser(
+				claims.SessionID,
+				claims.UserID,
+				c.ClientIP(),
+				c.GetHeader("User-Agent"),
+			)
+
+			if err != nil {
+				utils.Logger.Warn("Session validation failed",
+					"user_id", claims.UserID,
+					"error", err.Error(),
+				)
+				c.JSON(http.StatusUnauthorized, common.APIResponse{
+					Success: false,
+					Data:    nil,
+					Message: "Session validation failed",
+					Error:   map[string]string{"session": "Session validation failed"},
+				})
+				c.Abort()
+				return
+			}
+
+			
+
+			// Add session metadata to context
+			c.Set("session_metadata", validMetadata)
+			c.Set("session_purpose", validMetadata.Purpose)
+			c.Set("session_issued_at", time.Unix(validMetadata.IssuedAt, 0))
 		}
 
 		// Set user information in context for use by handlers

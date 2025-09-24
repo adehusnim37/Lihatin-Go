@@ -49,6 +49,9 @@ type APIKey struct {
 	Name        string          `json:"name" gorm:"size:100;not null" validate:"required,min=3,max=100"`
 	Key         string          `json:"key" gorm:"uniqueIndex;size:255;not null"`
 	KeyHash     string          `json:"-" gorm:"column:key_hash;size:255;not null"` // Store hashed version
+	UsageCount  int64           `json:"usage_count" gorm:"default:0"`
+	LimitUsage  *int64          `json:"limit_usage,omitempty" gorm:"default:null"` // nil means unlimited
+	LastIPUsed  *string         `json:"last_ip_used,omitempty" gorm:"size:45"` // IPv6 max length is 45 characters
 	LastUsedAt  *time.Time      `json:"last_used_at,omitempty"`
 	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
 	IsActive    bool            `json:"is_active" gorm:"default:true"`

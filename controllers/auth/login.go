@@ -108,7 +108,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Generate JWT token
 	role := user.Role
-	token, err := utils.GenerateJWT(user.ID, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
+	token, err := utils.GenerateJWT(user.ID, *userAuth.SessionID, *userAuth.DeviceID, *userAuth.LastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
