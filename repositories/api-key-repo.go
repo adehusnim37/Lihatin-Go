@@ -647,18 +647,15 @@ func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.
 	
 	if err := r.db.Where("id = ? AND user_id = ? AND is_active = ? AND deleted_at IS NULL", keyID, userID, true).First(&existingKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, "", fmt.Errorf("API key not found")
+			return nil, "", utils.ErrAPIKeyNotFound
 		}
-		return nil, "", fmt.Errorf("failed to get API key: %w", err)
+		return nil, "", utils.ErrAPIKeyInactive
 	}
 
-	// Extract prefix from existing key
-	existingPrefix := extractPrefixFromKey(existingKey.Key)
-
 	// Generate new API key pair with same prefix
-	newKeyID, newSecretKey, newSecretKeyHash, newKeyPreview, err := utils.GenerateAPIKeyPair(existingPrefix)
+	newKeyID, newSecretKey, newSecretKeyHash, newKeyPreview, err := utils.GenerateAPIKeyPair("")
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate new API key pair: %w", err)
+		return nil, "", utils.ErrAPIKeyCreateFailed
 	}
 
 	utils.Logger.Info("Regenerating API key",
@@ -682,13 +679,13 @@ func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		return nil, "", fmt.Errorf("failed to update API key: %w", err)
+		return nil, "", utils.ErrAPIKeyUpdateFailed
 	}
 
 	// Get updated API key
 	var updatedKey user.APIKey
 	if err := r.db.Where("id = ?", keyID).First(&updatedKey).Error; err != nil {
-		return nil, "", fmt.Errorf("failed to get updated API key: %w", err)
+		return nil, "", utils.ErrAPIKeyFailedFetching
 	}
 
 	utils.Logger.Info("API key regenerated successfully",

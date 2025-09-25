@@ -51,3 +51,32 @@ type PaginatedAPIKeysResponse struct {
 	Limit      int              `json:"limit"`
 	TotalPages int              `json:"total_pages"`
 }
+
+// dto/api_key.go - Add enhanced response struct
+
+type APIKeyRefreshResponse struct {
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	KeyPreview  string     `json:"key_preview"`
+	IsActive    bool       `json:"is_active"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	Permissions []string   `json:"permissions"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	Secret      APIKeySecretInfo `json:"secret"`
+	Usage       APIKeyUsageInfo `json:"usage"`
+}
+
+type APIKeySecretInfo struct {
+	FullAPIKey string `json:"full_api_key"`
+	Warning    string `json:"warning"`
+	Format     string `json:"format"`
+	ExpiresIn  string `json:"expires_in"`
+}
+
+type APIKeyUsageInfo struct {
+	LastUsedAt         *time.Time `json:"last_used_at,omitempty"`
+	LastIPUsed         *string    `json:"last_ip_used,omitempty"`
+	IsRegenerated      bool       `json:"is_regenerated"`
+	PreviousUsageReset bool       `json:"previous_usage_reset"`
+}

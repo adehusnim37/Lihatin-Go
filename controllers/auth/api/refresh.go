@@ -1,29 +1,77 @@
 package api
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
 
-// RefreshAPIKey refreshes an API key's expiration date
+// RefreshAPIKey refreshes an API key's expiration date and regenerates the secret key
 func (c *Controller) RefreshAPIKey(ctx *gin.Context) {
-	var reqId dto.APIKeyIDRequest
-	// Get user ID from JWT token context
-	userID, _ := ctx.Get("user_id")
+    var reqId dto.APIKeyIDRequest
+    userID, _ := ctx.Get("user_id")
 
-	// Bind and validate URI parameters
-	if err := ctx.ShouldBindUri(&reqId); err != nil {
-		utils.SendValidationError(ctx, err, &reqId)
-		return
-	}
+    if err := ctx.ShouldBindUri(&reqId); err != nil {
+        utils.SendValidationError(ctx, err, &reqId)
+        return
+    }
 
-	// Refresh the API key's expiration date
-	updatedKey, _, err := c.repo.GetAPIKeyRepository().RegenerateAPIKey(reqId.ID, userID.(string))
-	if err != nil {
-		utils.HandleError(ctx, err, userID)
-		return
-	}
+    updatedKey, fullAPIKey, err := c.repo.GetAPIKeyRepository().RegenerateAPIKey(reqId.ID, userID.(string))
+    if err != nil {
+        utils.HandleError(ctx, err, userID)
+        return
+    }
 
-	utils.SendOKResponse(ctx, updatedKey, "API key refreshed successfully")
+    // ✅ STRUCTURED RESPONSE WITH SEPARATION
+   response := dto.APIKeyRefreshResponse{
+        ID:          updatedKey.ID,
+        Name:        updatedKey.Name,
+        KeyPreview:  utils.GetKeyPreview(updatedKey.Key),
+        IsActive:    updatedKey.IsActive,
+        ExpiresAt:   updatedKey.ExpiresAt,
+        Permissions: []string(updatedKey.Permissions),
+        CreatedAt:   updatedKey.CreatedAt,
+        UpdatedAt:   updatedKey.UpdatedAt,
+        Secret: dto.APIKeySecretInfo{
+            FullAPIKey: fullAPIKey,
+            Warning:    "Save this key securely - it will not be shown again",
+            Format:     "Use as: X-API-Key: " + fullAPIKey,
+            ExpiresIn:  calculateExpirationTime(updatedKey.ExpiresAt),
+        },
+        Usage: dto.APIKeyUsageInfo{
+            LastUsedAt:         updatedKey.LastUsedAt,
+            LastIPUsed:         updatedKey.LastIPUsed,
+            IsRegenerated:      true,
+            PreviousUsageReset: true,
+        },
+    }
+
+    utils.SendOKResponse(ctx, response, "API key refreshed successfully")
+}
+
+// Helper function
+func calculateExpirationTime(expiresAt *time.Time) string {
+    if expiresAt == nil {
+        return "never"
+    }
+    
+    duration := time.Until(*expiresAt)
+    if duration < 0 {
+        return "expired"
+    }
+    
+    days := int(duration.Hours() / 24)
+    if days > 0 {
+        return fmt.Sprintf("%d days", days)
+    }
+    
+    hours := int(duration.Hours())
+    if hours > 0 {
+        return fmt.Sprintf("%d hours", hours)
+    }
+    
+    return fmt.Sprintf("%d minutes", int(duration.Minutes()))
 }
