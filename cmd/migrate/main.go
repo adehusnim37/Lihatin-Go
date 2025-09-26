@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/adehusnim37/lihatin-go/models/logging"
-	"github.com/adehusnim37/lihatin-go/models/migrations"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/driver/mysql"
@@ -84,9 +83,6 @@ func runMigrations(db *gorm.DB) {
 
 		// Logging models
 		&logging.ActivityLog{},
-
-		// Migration tracking
-		&migrations.Migration{},
 	}
 
 	for _, model := range models {

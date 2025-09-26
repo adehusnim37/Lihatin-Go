@@ -10,7 +10,9 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/mssola/useragent"
 )
 
 type bodyLogWriter struct {
@@ -27,7 +29,7 @@ func (w bodyLogWriter) WriteString(s string) (int, error) {
 	w.body.WriteString(s)
 	return w.ResponseWriter.WriteString(s)
 }
-	
+
 // ActivityLogger middleware for logging user activities
 func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -39,7 +41,7 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 
 		// Capture request body for POST, PUT, PATCH requests
 		var requestBody string
-		if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH" {
+		if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH" || c.Request.Method == "DELETE" {
 			bodyBytes, err := captureRequestBody(c)
 			if err == nil {
 				requestBody = sanitizeRequestBody(string(bodyBytes))
@@ -68,13 +70,22 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		statusCode := c.Writer.Status()
 
 		// Extract browser and system information
-		userAgent := c.Request.UserAgent()
+		ua := useragent.New(c.Request.UserAgent())
+		userAgent := ua.UA()
 		browserInfo := parseUserAgent(userAgent)
 
 		// Get username from context (if user is authenticated)
 		username, exists := c.Get("username")
 		if !exists {
-			username = "anonymous"
+			username = "anonymous user"
+		}
+
+		// Get user_id from context and handle type conversion properly
+		var userID *string
+		if userIDValue, exists := c.Get("user_id"); exists {
+			if userIDStr, ok := userIDValue.(string); ok {
+				userID = &userIDStr // Convert string to *string
+			}
 		}
 
 		// Capture context locals (all context values) - ensure valid JSON for database constraint
@@ -105,25 +116,35 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 			requestBody = "{}" // Empty JSON object to satisfy database constraint
 		}
 
+		headersInfo := extractHeadersInfo(c)
+		apiKeyValue := extractAPIKey(c)
+		apiKeyID := extractIDApiKey(apiKeyValue)
+
+		// Convert API key to pointer if not empty
+	
+
 		// Create log entry
 		log := &logging.ActivityLog{
-			Level:         level,
-			Message:       message,
-			Username:      fmt.Sprintf("%v", username),
-			Timestamp:     startTime,
-			IPAddress:     c.ClientIP(),
-			UserAgent:     userAgent,
-			BrowserInfo:   browserInfo,
-			Action:        action,
-			Route:         path,
-			Method:        method,
-			StatusCode:    statusCode,
-			RequestBody:   requestBody,
-			QueryParams:   queryParams,
-			RouteParams:   routeParams,
-			ContextLocals: contextLocals,
-			ResponseTime:  responseTime,
-			ResponseBody:  responseBody,
+			Level:          level,
+			Message:        message,
+			Username:       fmt.Sprintf("%v", username),
+			Timestamp:      startTime,
+			IPAddress:      c.ClientIP(),
+			UserID:         userID,
+			RequestHeaders: headersInfo,
+			APIKey:         apiKeyID,
+			UserAgent:      userAgent,
+			BrowserInfo:    browserInfo,
+			Action:         action,
+			Route:          path,
+			Method:         method,
+			StatusCode:     statusCode,
+			RequestBody:    requestBody,
+			QueryParams:    queryParams,
+			RouteParams:    routeParams,
+			ContextLocals:  contextLocals,
+			ResponseTime:   responseTime,
+			ResponseBody:   responseBody,
 		}
 
 		// Save log asynchronously to not block the response
@@ -136,8 +157,6 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		}(log)
 	}
 }
-
-// Helper functions
 
 // captureRequestBody safely captures the request body without consuming it
 func captureRequestBody(c *gin.Context) ([]byte, error) {
@@ -261,9 +280,52 @@ func captureContextLocals(c *gin.Context) string {
 
 // parseUserAgent extracts browser and OS information from user agent string
 func parseUserAgent(userAgent string) string {
-	// This is a simplified version. For production, you might want to use
-	// a library like github.com/mssola/user_agent
-	return userAgent
+	ua := useragent.New(userAgent)
+	name, version := ua.Browser()
+	os := ua.OS()
+
+	return fmt.Sprintf("%s %s on %s", name, version, os)
+}
+
+// extract HeadersInfo extracts relevant headers information
+func extractHeadersInfo(c *gin.Context) string {
+	headersMap := make(map[string]string)
+
+	for key, values := range c.Request.Header {
+		if len(values) > 0 {
+			headersMap[key] = values[0] // ambil value pertama
+		}
+	}
+
+	// Ubah map jadi string JSON
+	headersJSON, err := json.Marshal(headersMap)
+	if err != nil {
+		fmt.Println("Error encoding headers:", err)
+		return ""
+	}
+
+	return string(headersJSON)
+}
+
+// extract X-API-Key from headers if present
+func extractAPIKey(c *gin.Context) string {
+	apiKey := c.GetHeader("X-API-Key")
+	if apiKey == "" {
+		return ""
+	}
+	return apiKey
+}
+
+// extractIDApiKey extracts the ID part from a full API key
+func extractIDApiKey(apikey string) *string {
+	keyParts := utils.SplitAPIKey(apikey)
+	if len(keyParts) != 2 {
+		utils.Logger.Warn("Invalid API key format - missing separator", "key_preview", utils.GetKeyPreview(apikey))
+		return nil
+	}
+
+	keyID := keyParts[0]
+	return &keyID
 }
 
 // determineAction determines what action the user is performing based on HTTP method and path
@@ -288,6 +350,10 @@ func determineLevel(statusCode int) string {
 		return "ERROR"
 	} else if statusCode >= 400 {
 		return "WARNING"
+	} else if statusCode >= 100 && statusCode < 200 {
+		return "DEBUG"
+	} else if statusCode >= 200 && statusCode < 300 {
+		return "SUCCESS"
 	} else {
 		return "INFO"
 	}

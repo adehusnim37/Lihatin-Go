@@ -21,7 +21,11 @@ func NewLoggerRepository(db *gorm.DB) *LoggerRepository {
 // CreateLog inserts a new activity log into the database
 func (r *LoggerRepository) CreateLog(log *logging.ActivityLog) error {
 	if log.ID == "" {
-		log.ID = uuid.New().String()
+		uuidV7, err := uuid.NewV7()
+		if err != nil {
+			return err
+		}
+		log.ID = uuidV7.String()
 	}
 
 	return r.DB.Create(log).Error

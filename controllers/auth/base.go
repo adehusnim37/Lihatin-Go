@@ -14,6 +14,7 @@ import (
 	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
 	"github.com/adehusnim37/lihatin-go/utils/session"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Controller provides all handlers for authentication operations
@@ -134,8 +135,17 @@ func (c *Controller) Register(ctx *gin.Context) {
 	// Create user auth record for email verification
 	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
 
+	uuidV7, err := uuid.NewV7()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Message: "Failed to create user authentication record",
+			Error:   map[string]string{"server": "Failed to generate UUID"},
+		})
+		return
+	}
 	userAuth := &user.UserAuth{
-		ID:                              utils.GenerateUUIDV7(),
+		ID:                              uuidV7.String(),
 		SessionID:                       &sessionID,
 		DeviceID:                        deviceID,
 		LastIP:                          lastIP,
