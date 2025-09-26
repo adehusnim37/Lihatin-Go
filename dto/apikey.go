@@ -20,6 +20,10 @@ type APIKeyIDRequest struct {
 	ID string `json:"id" binding:"required,uuid4" uri:"id"`
 }
 
+type ActivateAccountRequest struct {
+	
+}
+
 // APIKeyResponse represents the API key response (without sensitive data)
 type APIKeyResponse struct {
 	ID          string     `json:"id"`

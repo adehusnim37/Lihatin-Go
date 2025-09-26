@@ -32,3 +32,17 @@ go.work.sum
 # .vscode/
 
 bin/
+
+# Logs
+*.log
+
+# Compiled object files
+*.o
+*.a
+*.lo
+*.la
+
+# Compiled dynamic libraries
+test-build
+lihatin-go
+main

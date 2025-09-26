@@ -35,7 +35,7 @@ var (
 	ErrAPIKeyFailedFetching    = errors.New("failed to fetch API key")
 	ErrAPIKeyNotFound          = errors.New("API key not found")
 	ErrAPIKeyRevoked           = errors.New("API key has been revoked")
-	ErrAPIKeyUnauthorized      = errors.New("unauthorized: invalid API key")
+	ErrAPIKeyUnauthorized      = errors.New("unauthorized to access this API key")
 	ErrAPIKeyNameExists        = errors.New("API key with the same name already exists")
 	ErrAPIKeyInvalidFormat     = errors.New("invalid API key format")
 	ErrAPIKeyInsufficientPerm  = errors.New("insufficient permissions for this API key")

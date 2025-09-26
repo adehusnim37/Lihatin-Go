@@ -290,121 +290,121 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 
 // APIKeyCheckPermissions checks if API key has ANY of the required permissions
 func (r *APIKeyRepository) APIKeyCheckPermissions(apiKeyID string, requiredPermissions []string) (bool, error) {
-    var apiKey user.APIKey
-    
-    // Get API key from database
-    if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
-        First(&apiKey).Error; err != nil {
-        if err == gorm.ErrRecordNotFound {
-            utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
-            return false, utils.ErrAPIKeyNotFound
-        }
-        utils.Logger.Error("Database error while checking API key permissions", 
-            "key_id", apiKeyID, "error", err.Error())
-        return false, fmt.Errorf("failed to check API key permissions: %w", err)
-    }
+	var apiKey user.APIKey
 
-    // Check if API key has ANY of the required permissions
-    keyPermissions := []string(apiKey.Permissions)
-    for _, requiredPerm := range requiredPermissions {
-        for _, perm := range keyPermissions {
-            if perm == requiredPerm || perm == "*" {
-                utils.Logger.Info("API key has required permission (ANY match)",
-                    "key_id", apiKeyID,
-                    "key_name", apiKey.Name,
-                    "required_permissions", requiredPermissions,
-                    "matched_permission", perm,
-                )
-                return true, nil
-            }
-        }
-    }
+	// Get API key from database
+	if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
+		First(&apiKey).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
+			return false, utils.ErrAPIKeyNotFound
+		}
+		utils.Logger.Error("Database error while checking API key permissions",
+			"key_id", apiKeyID, "error", err.Error())
+		return false, fmt.Errorf("failed to check API key permissions: %w", err)
+	}
 
-    utils.Logger.Warn("API key lacks required permissions (ANY match)",
-        "key_id", apiKeyID,
-        "key_name", apiKey.Name,
-        "required_permissions", requiredPermissions,
-        "available_permissions", keyPermissions,
-    )
-    return false, nil
+	// Check if API key has ANY of the required permissions
+	keyPermissions := []string(apiKey.Permissions)
+	for _, requiredPerm := range requiredPermissions {
+		for _, perm := range keyPermissions {
+			if perm == requiredPerm || perm == "*" {
+				utils.Logger.Info("API key has required permission (ANY match)",
+					"key_id", apiKeyID,
+					"key_name", apiKey.Name,
+					"required_permissions", requiredPermissions,
+					"matched_permission", perm,
+				)
+				return true, nil
+			}
+		}
+	}
+
+	utils.Logger.Warn("API key lacks required permissions (ANY match)",
+		"key_id", apiKeyID,
+		"key_name", apiKey.Name,
+		"required_permissions", requiredPermissions,
+		"available_permissions", keyPermissions,
+	)
+	return false, nil
 }
 
 // APIKeyCheckAllPermissions checks if API key has ALL required permissions
 func (r *APIKeyRepository) APIKeyCheckAllPermissions(apiKeyID string, requiredPermissions []string) (bool, error) {
-    var apiKey user.APIKey
-    
-    // Get API key from database
-    if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
-        First(&apiKey).Error; err != nil {
-        if err == gorm.ErrRecordNotFound {
-            utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
-            return false, utils.ErrAPIKeyNotFound
-        }
-        utils.Logger.Error("Database error while checking API key permissions", 
-            "key_id", apiKeyID, "error", err.Error())
-        return false, fmt.Errorf("failed to check API key permissions: %w", err)
-    }
+	var apiKey user.APIKey
 
-    // Check if API key has ALL required permissions
-    keyPermissions := []string(apiKey.Permissions)
-    
-    for _, requiredPerm := range requiredPermissions {
-        hasPermission := false
-        for _, perm := range keyPermissions {
-            if perm == requiredPerm || perm == "*" {
-                hasPermission = true
-                break
-            }
-        }
-        if !hasPermission {
-            utils.Logger.Warn("API key missing required permission (ALL match)",
-                "key_id", apiKeyID,
-                "key_name", apiKey.Name,
-                "missing_permission", requiredPerm,
-                "required_permissions", requiredPermissions,
-                "available_permissions", keyPermissions,
-            )
-            return false, nil
-        }
-    }
+	// Get API key from database
+	if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
+		First(&apiKey).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
+			return false, utils.ErrAPIKeyNotFound
+		}
+		utils.Logger.Error("Database error while checking API key permissions",
+			"key_id", apiKeyID, "error", err.Error())
+		return false, fmt.Errorf("failed to check API key permissions: %w", err)
+	}
 
-    utils.Logger.Info("API key has all required permissions",
-        "key_id", apiKeyID,
-        "key_name", apiKey.Name,
-        "required_permissions", requiredPermissions,
-        "available_permissions", keyPermissions,
-    )
-    return true, nil
+	// Check if API key has ALL required permissions
+	keyPermissions := []string(apiKey.Permissions)
+
+	for _, requiredPerm := range requiredPermissions {
+		hasPermission := false
+		for _, perm := range keyPermissions {
+			if perm == requiredPerm || perm == "*" {
+				hasPermission = true
+				break
+			}
+		}
+		if !hasPermission {
+			utils.Logger.Warn("API key missing required permission (ALL match)",
+				"key_id", apiKeyID,
+				"key_name", apiKey.Name,
+				"missing_permission", requiredPerm,
+				"required_permissions", requiredPermissions,
+				"available_permissions", keyPermissions,
+			)
+			return false, nil
+		}
+	}
+
+	utils.Logger.Info("API key has all required permissions",
+		"key_id", apiKeyID,
+		"key_name", apiKey.Name,
+		"required_permissions", requiredPermissions,
+		"available_permissions", keyPermissions,
+	)
+	return true, nil
 }
 
 // Enhanced permission validation with full API key (for direct validation)
 func (r *APIKeyRepository) ValidateAPIKeyWithPermissions(fullAPIKey string, requiredPermissions []string, requireAll bool) (*user.User, *user.APIKey, bool, error) {
-    // First validate the API key and get user/key info
-    user, apiKeyRecord, err := r.ValidateAPIKey(fullAPIKey)
-    if err != nil {
-        utils.Logger.Warn("Invalid API key during permission check", 
-            "key_preview", utils.GetKeyPreview(fullAPIKey),
-            "error", err.Error())
-        return nil, nil, false, fmt.Errorf("invalid API key: %w", err)
-    }
+	// First validate the API key and get user/key info
+	user, apiKeyRecord, err := r.ValidateAPIKey(fullAPIKey)
+	if err != nil {
+		utils.Logger.Warn("Invalid API key during permission check",
+			"key_preview", utils.GetKeyPreview(fullAPIKey),
+			"error", err.Error())
+		return nil, nil, false, fmt.Errorf("invalid API key: %w", err)
+	}
 
-    // Check permissions using repository methods
-    var hasPermission bool
-    if requireAll {
-        hasPermission, err = r.APIKeyCheckAllPermissions(apiKeyRecord.ID, requiredPermissions)
-    } else {
-        hasPermission, err = r.APIKeyCheckPermissions(apiKeyRecord.ID, requiredPermissions)
-    }
+	// Check permissions using repository methods
+	var hasPermission bool
+	if requireAll {
+		hasPermission, err = r.APIKeyCheckAllPermissions(apiKeyRecord.ID, requiredPermissions)
+	} else {
+		hasPermission, err = r.APIKeyCheckPermissions(apiKeyRecord.ID, requiredPermissions)
+	}
 
-    if err != nil {
-        return user, apiKeyRecord, false, err
-    }
+	if err != nil {
+		return user, apiKeyRecord, false, err
+	}
 
-    return user, apiKeyRecord, hasPermission, nil
+	return user, apiKeyRecord, hasPermission, nil
 }
 
 // UpdateAPIKey updates an API key with proper validation and type handling
-func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest , userID string, req dto.UpdateAPIKeyRequest) (*user.APIKey, error) {
+func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string, req dto.UpdateAPIKeyRequest) (*user.APIKey, error) {
 	var apiKey user.APIKey
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
@@ -644,7 +644,7 @@ func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix str
 func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.APIKey, string, error) {
 	// First, get the existing API key
 	var existingKey user.APIKey
-	
+
 	if err := r.db.Where("id = ? AND user_id = ? AND is_active = ? AND deleted_at IS NULL", keyID, userID, true).First(&existingKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, "", utils.ErrAPIKeyNotFound
@@ -699,7 +699,95 @@ func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.
 	return &updatedKey, fullAPIKey, nil
 }
 
-// Helper function to extract prefix from existing key ID
+/*
+ActivateAPIKey activates a deactivated API key
+*/
+func (r *APIKeyRepository) ActivateAPIKey(keyID dto.APIKeyIDRequest, userID string, userRole string) (*user.APIKey, error) {
+	var apiKey user.APIKey
+
+	// Start a transaction
+	tx := r.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Build the query for fetching API keys
+	q := tx.Where("id = ? AND deleted_at IS NULL", keyID.ID)
+	if userRole != "admin" {
+		q = q.Where("user_id = ?", userID)
+	}
+
+	// Fetch the API key
+	if err := q.First(&apiKey).Error; err != nil {
+		tx.Rollback()
+		return nil, utils.ErrAPIKeyNotFound
+	}
+
+	// Update the API key to set is_active to true
+	if err := tx.Model(&apiKey).Updates(map[string]any{
+		"is_active":  true,
+		"updated_at": time.Now(),
+	}).Error; err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to activate API key: %w", err)
+	}
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return nil, utils.ErrAPIKeyFailedFetching
+	}
+	utils.Logger.Info("API key activated successfully",
+		"user_id", userID,
+		"key_id", keyID,
+		"key_name", apiKey.Name,
+	)
+	return &apiKey, nil
+}
+
+/*
+DeactivateAPIKey deactivates an active API key
+*/
+func (r *APIKeyRepository) DeactivateAPIKey(keyID dto.APIKeyIDRequest, userID string, userRole string) (*user.APIKey, error) {
+	var apiKey user.APIKey
+
+	// Start a transaction
+	if userRole != "admin" {
+		// Ensure the user owns the key if not admin
+		if err := r.db.Where("id = ? AND user_id = ? AND deleted_at IS NULL", keyID.ID, userID).First(&apiKey).Error; err != nil {
+			return nil, utils.ErrAPIKeyNotFound
+		}
+	} else {
+		// Admin can access any key
+		if err := r.db.Where("id = ? AND deleted_at IS NULL", keyID.ID).First(&apiKey).Error; err != nil {
+			return nil, utils.ErrAPIKeyNotFound
+		}
+	}
+	if !apiKey.IsActive {
+		return nil, utils.ErrAPIKeyInactive
+	}
+	if userRole != "admin" && apiKey.UserID != userID {
+		return nil, utils.ErrAPIKeyUnauthorized
+	}
+	// Update the API key to set is_active to false
+	if err := r.db.Model(&apiKey).Updates(map[string]any{
+		"is_active":  false,
+		"updated_at": time.Now(),
+	}).Error; err != nil {
+		return nil, fmt.Errorf("failed to deactivate API key: %w", err)
+	}
+
+	utils.Logger.Info("API key deactivated successfully",
+		"user_id", userID,
+		"key_id", keyID,
+		"key_name", apiKey.Name,
+	)
+	return &apiKey, nil
+}
+
+/*
+Helper function to extract prefix from existing key ID
+*/
 func extractPrefixFromKey(keyID string) string {
 	// Find the last underscore to separate prefix from random part
 	lastUnderscore := -1
