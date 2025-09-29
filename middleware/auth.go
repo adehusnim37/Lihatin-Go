@@ -476,12 +476,7 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.H
 				"key_preview", utils.GetKeyPreview(apiKey),
 				"error", err.Error(),
 			)
-			c.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Invalid API key",
-				Error:   map[string]string{"api_key": "The provided API key is invalid or expired"},
-			})
+			utils.HandleError(c, err, nil)
 			c.Abort()
 			return
 		}

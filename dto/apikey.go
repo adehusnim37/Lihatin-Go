@@ -2,18 +2,13 @@ package dto
 
 import "time"
 
-// APIKeyRequest represents the request to create a new API key
-type APIKeyRequest struct {
-	Name        string     `json:"name" binding:"required,min=3,max=100,no_special"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
-}
-
 type UpdateAPIKeyRequest struct {
 	Name        *string    `json:"name,omitempty" binding:"omitempty,min=3,max=100,no_special"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=CreatedAt"` // Must be in the future
 	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
 	IsActive    *bool      `json:"is_active,omitempty"`
+	BlockedIPs  []string   `json:"blocked_ips,omitempty" binding:"dive,ip"`
+	AllowedIPs  []string   `json:"allowed_ips,omitempty" binding:"dive,ip"`
 	LimitUsage  *int64     `json:"limit_usage,omitempty" binding:"omitempty,gte=0"` // nil means unlimited
 }
 
@@ -47,8 +42,25 @@ type CreateAPIKeyResponse struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	Permissions []string   `json:"permissions"`
+	BlockedIPs  []string   `json:"blocked_ips,omitempty"`
+	AllowedIPs  []string   `json:"allowed_ips,omitempty"`
+	LimitUsage  *int64     `json:"limit_usage,omitempty"`
+	UsageCount  int64      `json:"usage_count"`
+	IsActive    bool       `json:"is_active"`
+	// Sensitive info
 	Key         string     `json:"key"`     // Only shown once during creation
 	Warning     string     `json:"warning"` // Warning message
+}
+
+// CreateAPIKeyRequest represents the request to create a new API key
+type CreateAPIKeyRequest struct {
+	Name        string     `json:"name" binding:"required,min=3,max=100,no_special"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=CreatedAt"` // Must be in the future
+	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
+	BlockedIPs  []string   `json:"blocked_ips,omitempty" binding:"dive,ip"`
+	AllowedIPs  []string   `json:"allowed_ips,omitempty" binding:"dive,ip"`
+	LimitUsage  *int64     `json:"limit_usage,omitempty" binding:"omitempty,gte=0"` // nil means unlimited
+	IsActive    bool       `json:"is_active" binding:"omitempty"`
 }
 
 // PaginatedAPIKeysResponse represents paginated API keys

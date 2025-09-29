@@ -65,7 +65,17 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 		SendErrorResponse(ctx, http.StatusForbidden, "API_KEY_INSUFFICIENT_PERMISSIONS", "Insufficient permissions for this API key", "permissions", userID)
 	case ErrAPIKeyInactive:
 		SendErrorResponse(ctx, http.StatusForbidden, "API_KEY_INACTIVE", "API key is inactive", "api_key", userID)
-
+	case ErrAPIKeyInvalidFormat:
+		SendErrorResponse(ctx, http.StatusBadRequest, "API_KEY_INVALID_FORMAT", "Invalid API key format", "api_key", userID)
+	case ErrAPIKeyMissing:
+		SendErrorResponse(ctx, http.StatusBadRequest, "API_KEY_MISSING", "API key is missing", "api_key", userID)
+	case ErrAPIKeyInvalidIP:
+		SendErrorResponse(ctx, http.StatusForbidden, "API_KEY_INVALID_IP", "API key cannot be used from this IP address", "api_key", userID)
+	case ErrAPIKeyInvalidReferrer:
+		SendErrorResponse(ctx, http.StatusForbidden, "API_KEY_INVALID_REFERRER", "API key cannot be used from this referrer", "api_key", userID)
+	case ErrAPIKeyRateLimitExceeded:
+		SendErrorResponse(ctx, http.StatusTooManyRequests, "API_KEY_RATE_LIMIT_EXCEEDED", "API key rate limit exceeded", "api_key", userID)
+		
 	// Short Link-related errors
 	case ErrShortLinkNotFound:
 		SendErrorResponse(ctx, http.StatusNotFound, "SHORT_LINK_NOT_FOUND", "Short link not found", "short_link", userID)

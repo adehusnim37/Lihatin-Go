@@ -1,15 +1,12 @@
 package repositories
 
 import (
-	"database/sql"
-
 	"gorm.io/gorm"
 )
 
 // AuthRepository handles authentication-related database operations
 type AuthRepository struct {
 	db               *gorm.DB
-	sqlDB            *sql.DB
 	userAuthRepo     *UserAuthRepository
 	authMethodRepo   *AuthMethodRepository
 	apiKeyRepo       *APIKeyRepository
@@ -23,7 +20,7 @@ type AuthRepository struct {
 // NewAuthRepository creates a new auth repository
 func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 	// Get the underlying sql.DB from GORM
-	sqlDB, err := gormDB.DB()
+	_, err := gormDB.DB()
 	if err != nil {
 		panic("Failed to get SQL DB from GORM: " + err.Error())
 	}
@@ -33,7 +30,6 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 
 	return &AuthRepository{
 		db:               gormDB,
-		sqlDB:            sqlDB,
 		userAuthRepo:     NewUserAuthRepository(gormDB),
 		authMethodRepo:   NewAuthMethodRepository(gormDB),
 		apiKeyRepo:       apiKeyRepo,

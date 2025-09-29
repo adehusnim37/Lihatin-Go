@@ -10,7 +10,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 	// Get user ID from JWT token context
 	userID, _ := ctx.Get("user_id")
 
-	var req dto.APIKeyRequest
+	var req dto.CreateAPIKeyRequest
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -21,9 +21,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 	// Create API key
 	apiKey, fullAPIKey, err := c.repo.GetAPIKeyRepository().CreateAPIKey(
 		userID.(string),
-		req.Name,
-		req.ExpiresAt,
-		req.Permissions,
+		req,
 	)
 
 	// Handle errors using universal error handler
@@ -46,6 +44,12 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		CreatedAt:   apiKey.CreatedAt,
 		ExpiresAt:   apiKey.ExpiresAt,
 		Permissions: []string(apiKey.Permissions),
+		BlockedIPs:  apiKey.BlockedIPs,
+		AllowedIPs:  apiKey.AllowedIPs,
+		LimitUsage:  apiKey.LimitUsage,
+		UsageCount:  apiKey.UsageCount,
+		IsActive:    apiKey.IsActive,
+		// Sensitive info
 		Key:         fullAPIKey, // Full key with secret (only shown once!)
 		Warning:     "Please save this key as it will not be shown again.",
 	}

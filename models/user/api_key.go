@@ -3,6 +3,7 @@ package user
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/utils"
@@ -51,7 +52,9 @@ type APIKey struct {
 	KeyHash     string          `json:"-" gorm:"column:key_hash;size:255;not null"` // Store hashed version
 	UsageCount  int64           `json:"usage_count" gorm:"default:0"`
 	LimitUsage  *int64          `json:"limit_usage,omitempty" gorm:"default:null"` // nil means unlimited
-	LastIPUsed  *string         `json:"last_ip_used,omitempty" gorm:"size:45"` // IPv6 max length is 45 characters
+	LastIPUsed  *string         `json:"last_ip_used,omitempty" gorm:"size:45"`     // IPv6 max length is 45 characters
+	AllowedIPs  IPList          `json:"allowed_ips,omitempty" gorm:"type:json"`    // List of allowed IPs in JSON format
+	BlockedIPs  IPList          `json:"blocked_ips,omitempty" gorm:"type:json"`    // List of blocked IPs in JSON format
 	LastUsedAt  *time.Time      `json:"last_used_at,omitempty"`
 	ExpiresAt   *time.Time      `json:"expires_at,omitempty"`
 	IsActive    bool            `json:"is_active" gorm:"default:true"`
@@ -72,4 +75,86 @@ func (APIKey) TableName() string {
 // KeyPreview returns a preview of the API key for safe display
 func (a *APIKey) KeyPreview() string {
 	return utils.GetKeyPreview(a.Key)
+}
+
+// models/user/api_key.go - Enhanced IPList with validation
+
+type IPList []string
+
+// Value implements driver.Valuer for database storage
+func (ips IPList) Value() (driver.Value, error) {
+	if len(ips) == 0 {
+		return []byte("[]"), nil // Empty JSON array
+	}
+
+	// ✅ Add validation before marshaling
+	for _, ip := range ips {
+		if ip == "" {
+			return nil, fmt.Errorf("empty IP address not allowed")
+		}
+	}
+
+	jsonBytes, err := json.Marshal([]string(ips))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal IPList: %w", err)
+	}
+
+	return jsonBytes, nil
+}
+
+// Scan implements sql.Scanner for database retrieval
+func (ips *IPList) Scan(value interface{}) error {
+	if value == nil {
+		*ips = IPList{}
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("cannot scan %T into IPList", value)
+	}
+
+	// Handle empty or null JSON
+	if len(bytes) == 0 || string(bytes) == "null" {
+		*ips = IPList{}
+		return nil
+	}
+
+	var stringSlice []string
+	if err := json.Unmarshal(bytes, &stringSlice); err != nil {
+		return fmt.Errorf("failed to unmarshal IPList: %w", err)
+	}
+
+	*ips = IPList(stringSlice)
+	return nil
+}
+
+// Helper methods
+func (ips IPList) Contains(ip string) bool {
+	for _, allowedIP := range ips {
+		if allowedIP == ip {
+			return true
+		}
+	}
+	return false
+}
+
+func (ips IPList) IsEmpty() bool {
+	return len(ips) == 0
+}
+
+// Add method for validation
+func (ips IPList) IsValid() bool {
+	for _, ip := range ips {
+		if ip == "" {
+			return false
+		}
+		// Add more IP validation if needed
+	}
+	return true
 }

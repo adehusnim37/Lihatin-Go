@@ -3,6 +3,7 @@ package repositories
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -23,10 +24,10 @@ func NewAPIKeyRepository(db *gorm.DB) *APIKeyRepository {
 }
 
 // CreateAPIKey creates a new API key using improved atomic operations
-func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Time, permissions []string) (*user.APIKey, string, error) {
+func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyRequest) (*user.APIKey, string, error) {
 	// Set default permissions if none provided
-	if len(permissions) == 0 {
-		permissions = []string{"read", "write", "delete", "update"}
+	if len(req.Permissions) == 0 {
+		req.Permissions = []string{"read", "write", "delete", "update"}
 	}
 
 	// Generate API key pair first (fail fast if generation fails)
@@ -38,9 +39,9 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 
 	utils.Logger.Info("Starting API key creation process",
 		"user_id", userID,
-		"key_name", name,
+		"key_name", req.Name,
 		"key_preview", keyPreview,
-		"permissions", permissions,
+		"permissions", req.Permissions,
 	)
 
 	// Use atomic transaction for all database operations
@@ -71,9 +72,9 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 
 		// Check for duplicate name and count limit
 		for _, key := range existingKeys {
-			if key.Name == name {
+			if key.Name == req.Name {
 				utils.Logger.Warn("API key name already exists",
-					"user_id", userID, "name", name)
+					"user_id", userID, "name", req.Name)
 				return utils.ErrAPIKeyNameExists
 			}
 		}
@@ -84,17 +85,35 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 			return utils.ErrAPIKeyLimitReached
 		}
 
+		// Prepare IP lists
+		var allowedIPs user.IPList = user.IPList{} // Initialize as IPList, not []string
+		var blockedIPs user.IPList = user.IPList{} // Initialize as IPList, not []string
+
+		if len(req.AllowedIPs) > 0 {
+			allowedIPs = user.IPList(req.AllowedIPs) // Convert slice to IPList
+			utils.Logger.Debug("Setting allowed IPs", "allowed_ips", allowedIPs)
+		}
+
+		if len(req.BlockedIPs) > 0 {
+			blockedIPs = user.IPList(req.BlockedIPs) // Convert slice to IPList
+			utils.Logger.Debug("Setting blocked IPs", "blocked_ips", blockedIPs)
+		}
+
 		// 3. Create the new API key with explicit timestamp handling
 		now := time.Now()
 		apiKey = user.APIKey{
 			ID:          uuid.New().String(),
 			UserID:      userID,
-			Name:        name,
+			Name:        req.Name,
 			Key:         keyID,
 			KeyHash:     secretKeyHash,
-			ExpiresAt:   expiresAt,
+			ExpiresAt:   req.ExpiresAt,
 			IsActive:    true,
-			Permissions: user.PermissionsList(permissions),
+			BlockedIPs:  blockedIPs,
+			AllowedIPs:  allowedIPs,
+			LimitUsage:  req.LimitUsage,
+			UsageCount:  0,
+			Permissions: user.PermissionsList(req.Permissions),
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
@@ -103,9 +122,11 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 		if err := tx.Create(&apiKey).Error; err != nil {
 			utils.Logger.Error("Failed to create API key in database",
 				"user_id", userID,
-				"key_name", name,
+				"key_name", req.Name,
 				"error", err.Error(),
-				"permissions", permissions,
+				"permissions", req.Permissions,
+				"blocked_ips", req.BlockedIPs,
+				"allowed_ips", req.AllowedIPs,
 			)
 			return utils.ErrAPIKeyCreateFailed
 		}
@@ -113,7 +134,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 		utils.Logger.Info("API key created successfully in transaction",
 			"user_id", userID,
 			"key_id", apiKey.ID,
-			"key_name", name,
+			"key_name", req.Name,
 			"key_preview", keyPreview,
 		)
 
@@ -129,7 +150,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID, name string, expiresAt *time.Tim
 	utils.Logger.Info("API key creation completed successfully",
 		"user_id", userID,
 		"key_id", apiKey.ID,
-		"key_name", name,
+		"key_name", req.Name,
 		"key_preview", keyPreview,
 	)
 
@@ -262,6 +283,22 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 		utils.Logger.Warn("API key usage limit reached", "key_id", keyID)
 		return nil, nil, utils.ErrAPIKeyRateLimitExceeded
 	}
+
+	// validate IP restrictions
+	if len(apiKey.AllowedIPs) > 0 {
+		allowed := slices.Contains(apiKey.AllowedIPs, ip)
+		if !allowed {
+			utils.Logger.Warn("API key access from disallowed IP", "key_id", keyID, "ip", ip)
+			return nil, nil, utils.ErrAPIKeyIPNotAllowed
+		}
+	}
+
+	// check blocked IPs
+	if slices.Contains(apiKey.BlockedIPs, ip) {
+		utils.Logger.Warn("API key access from blocked IP", "key_id", keyID, "ip", ip)
+		return nil, nil, utils.ErrAPIKeyIPNotAllowed
+	}
+
 	// Validate the secret key against stored hash
 	if !utils.ValidateAPISecretKey(secretKey, apiKey.KeyHash) {
 		utils.Logger.Warn("Invalid secret key for API key", "key_id", keyID, "user_id", apiKey.UserID)
@@ -443,7 +480,7 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 			// Check for duplicate name (exclude current key)
 			var existingKey user.APIKey
 			if err := tx.Where("user_id = ? AND name = ? AND id != ? AND deleted_at IS NULL",
-				apiKey.UserID, *req.Name, keyID).First(&existingKey).Error; err == nil {
+				apiKey.UserID, *req.Name, keyID.ID).First(&existingKey).Error; err == nil {
 				return utils.ErrAPIKeyNameExists
 			}
 			updates["name"] = *req.Name
