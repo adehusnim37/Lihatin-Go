@@ -226,14 +226,14 @@ func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) 
 }
 
 // ValidateAPIKey validates an API key and returns the associated user
-func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.APIKey, error) {
+func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.User, *user.APIKey, error) {
 	utils.Logger.Info("Validating API key", "key_preview", utils.GetKeyPreview(fullAPIKey))
 
 	// Parse the full API key (format: keyID.secretKey)
 	keyParts := utils.SplitAPIKey(fullAPIKey)
 	if len(keyParts) != 2 {
 		utils.Logger.Warn("Invalid API key format - missing separator", "key_preview", utils.GetKeyPreview(fullAPIKey))
-		return nil, nil, fmt.Errorf("invalid API key format")
+		return nil, nil, utils.ErrAPIKeyInvalidFormat
 	}
 
 	keyID := keyParts[0]
@@ -242,7 +242,7 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 	// Validate key ID format
 	if !utils.ValidateAPIKeyIDFormat(keyID) {
 		utils.Logger.Warn("Invalid API key ID format", "key_id", keyID)
-		return nil, nil, fmt.Errorf("invalid API key ID format")
+		return nil, nil, utils.ErrAPIKeyIDFailedFormat
 	}
 
 	// Find API key by key ID
@@ -251,29 +251,38 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string) (*user.User, *user.
 		keyID, true, time.Now()).First(&apiKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			utils.Logger.Warn("API key not found", "key_id", keyID)
-			return nil, nil, fmt.Errorf("invalid API key")
+			return nil, nil, utils.ErrAPIKeyNotFound
 		}
 		utils.Logger.Error("Database error while validating API key", "error", err.Error())
 		return nil, nil, fmt.Errorf("failed to validate API key: %w", err)
 	}
 
+	// validate usage limit
+	if apiKey.LimitUsage != nil && apiKey.UsageCount >= *apiKey.LimitUsage {
+		utils.Logger.Warn("API key usage limit reached", "key_id", keyID)
+		return nil, nil, utils.ErrAPIKeyRateLimitExceeded
+	}
 	// Validate the secret key against stored hash
 	if !utils.ValidateAPISecretKey(secretKey, apiKey.KeyHash) {
 		utils.Logger.Warn("Invalid secret key for API key", "key_id", keyID, "user_id", apiKey.UserID)
-		return nil, nil, fmt.Errorf("invalid API key")
+		return nil, nil, utils.ErrAPIKeyInvalidFormat
 	}
 
 	// Get the associated user
 	var user user.User
 	if err := r.db.First(&user, "id = ?", apiKey.UserID).Error; err != nil {
 		utils.Logger.Error("User not found for valid API key", "user_id", apiKey.UserID, "key_id", keyID)
-		return nil, nil, fmt.Errorf("user not found")
+		return nil, nil, utils.ErrUserNotFound
 	}
 
-	// Update last used timestamp
+	// Update last used timestamp and increment usage count asynchronously and get last IP Used
 	go func() {
-		if err := r.db.Model(&apiKey).Update("last_used_at", time.Now()).Error; err != nil {
-			utils.Logger.Error("Failed to update last_used_at for API key", "key_id", keyID, "error", err.Error())
+		if err := r.db.Model(&apiKey).Updates(map[string]interface{}{
+			"last_used_at": time.Now(),
+			"usage_count":  gorm.Expr("usage_count + ?", 1),
+			"last_ip_used": ip,
+		}).Error; err != nil {
+			utils.Logger.Error("Failed to update usage stats for API key", "key_id", keyID, "error", err.Error())
 		}
 	}()
 
@@ -380,7 +389,7 @@ func (r *APIKeyRepository) APIKeyCheckAllPermissions(apiKeyID string, requiredPe
 // Enhanced permission validation with full API key (for direct validation)
 func (r *APIKeyRepository) ValidateAPIKeyWithPermissions(fullAPIKey string, requiredPermissions []string, requireAll bool) (*user.User, *user.APIKey, bool, error) {
 	// First validate the API key and get user/key info
-	user, apiKeyRecord, err := r.ValidateAPIKey(fullAPIKey)
+	user, apiKeyRecord, err := r.ValidateAPIKey(fullAPIKey, "")
 	if err != nil {
 		utils.Logger.Warn("Invalid API key during permission check",
 			"key_preview", utils.GetKeyPreview(fullAPIKey),
@@ -470,6 +479,13 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 			updates["is_active"] = *req.IsActive
 		}
 
+		if req.LimitUsage != nil {
+			if *req.LimitUsage < 0 {
+				return fmt.Errorf("limit_usage must be non-negative or null for unlimited")
+			}
+			updates["limit_usage"] = req.LimitUsage
+		}
+
 		// Always update timestamp
 		updates["updated_at"] = time.Now()
 
@@ -481,7 +497,7 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 			}
 
 			// Reload the updated model
-			if err := tx.Where("id = ?", keyID).First(&apiKey).Error; err != nil {
+			if err := tx.Where("id = ?", keyID.ID).First(&apiKey).Error; err != nil {
 				return fmt.Errorf("failed to reload updated API key: %w", err)
 			}
 		}

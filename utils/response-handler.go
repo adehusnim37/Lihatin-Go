@@ -15,7 +15,8 @@ type ErrorResponse struct {
 }
 
 // HandleError provides universal error handling for all controllers
-func HandleError(ctx *gin.Context, err error, userID interface{}) {
+func HandleError(ctx *gin.Context, err error, userID any) {
+	Logger.Error("Handling error", "error", err, "user_id", userID)
 	switch err {
 	// User-related errors
 	case ErrUserNotFound:

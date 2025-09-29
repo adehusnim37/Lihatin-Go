@@ -313,6 +313,7 @@ func IPWhitelistMiddleware(whitelist []string) gin.HandlerFunc {
 // APIKeyMiddleware validates API keys for service-to-service communication
 func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Get API key from request header
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey == "" {
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
@@ -325,19 +326,25 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 			return
 		}
 
+		utils.Logger.Info("Received API key for validation",
+			"key_preview", utils.GetKeyPreview(apiKey),
+			"client_ip", c.ClientIP(),
+			"user_agent", c.GetHeader("User-Agent"),
+			"path", c.Request.URL.Path,
+			"method", c.Request.Method,
+			"query", c.Request.URL.RawQuery,
+		)
+
+		ip := c.ClientIP()
+
 		// Validate API key using the repository
-		user, apiKeyRecord, err := apiKeyRepo.ValidateAPIKey(apiKey)
+		user, apiKeyRecord, err := apiKeyRepo.ValidateAPIKey(apiKey, ip)
 		if err != nil {
 			utils.Logger.Warn("API key validation failed",
 				"key_preview", utils.GetKeyPreview(apiKey),
 				"error", err.Error(),
 			)
-			c.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Invalid API key",
-				Error:   map[string]string{"api_key": "The provided API key is invalid or expired"},
-			})
+			utils.HandleError(c, err, nil)
 			c.Abort()
 			return
 		}
@@ -365,86 +372,84 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 	}
 }
 
-
 // ✅ NEW: Multiple permissions middleware
 func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermissions []string, requireAll bool) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // First ensure API key authentication has run
-        apiKeyID, exists := c.Get("api_key_id")
-        if !exists {
-            c.JSON(http.StatusUnauthorized, common.APIResponse{
-                Success: false,
-                Data:    nil,
-                Message: "API key authentication required",
-                Error:   map[string]string{"auth": "API key must be authenticated first"},
-            })
-            c.Abort()
-            return
-        }
+	return func(c *gin.Context) {
+		// First ensure API key authentication has run
+		apiKeyID, exists := c.Get("api_key_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "API key authentication required",
+				Error:   map[string]string{"auth": "API key must be authenticated first"},
+			})
+			c.Abort()
+			return
+		}
 
-        // Check permissions using repository
-        var hasPermission bool
-        var err error
+		// Check permissions using repository
+		var hasPermission bool
+		var err error
 
-        keyIDStr := apiKeyID.(string)
-        if requireAll {
-            hasPermission, err = authRepo.GetAPIKeyRepository().APIKeyCheckAllPermissions(keyIDStr, requiredPermissions)
-        } else {
-            hasPermission, err = authRepo.GetAPIKeyRepository().APIKeyCheckPermissions(keyIDStr, requiredPermissions)
-        }
+		keyIDStr := apiKeyID.(string)
+		if requireAll {
+			hasPermission, err = authRepo.GetAPIKeyRepository().APIKeyCheckAllPermissions(keyIDStr, requiredPermissions)
+		} else {
+			hasPermission, err = authRepo.GetAPIKeyRepository().APIKeyCheckPermissions(keyIDStr, requiredPermissions)
+		}
 
-        if err != nil {
-            utils.Logger.Error("Error checking API key permissions from database",
-                "key_id", keyIDStr,
-                "error", err.Error(),
-            )
-            c.JSON(http.StatusInternalServerError, common.APIResponse{
-                Success: false,
-                Data:    nil,
-                Message: "Permission check failed",
-                Error:   map[string]string{"permission": "Failed to verify API key permissions"},
-            })
-            c.Abort()
-            return
-        }
+		if err != nil {
+			utils.Logger.Error("Error checking API key permissions from database",
+				"key_id", keyIDStr,
+				"error", err.Error(),
+			)
+			c.JSON(http.StatusInternalServerError, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Permission check failed",
+				Error:   map[string]string{"permission": "Failed to verify API key permissions"},
+			})
+			c.Abort()
+			return
+		}
 
-        if !hasPermission {
-            apiKeyName, _ := c.Get("api_key_name")
-            utils.Logger.Warn("API key lacks required permissions (database check)",
-                "api_key_name", apiKeyName,
-                "key_id", keyIDStr,
-                "required_permissions", requiredPermissions,
-                "require_all", requireAll,
-            )
+		if !hasPermission {
+			apiKeyName, _ := c.Get("api_key_name")
+			utils.Logger.Warn("API key lacks required permissions (database check)",
+				"api_key_name", apiKeyName,
+				"key_id", keyIDStr,
+				"required_permissions", requiredPermissions,
+				"require_all", requireAll,
+			)
 
-            permissionType := "any of"
-            if requireAll {
-                permissionType = "all of"
-            }
+			permissionType := "any of"
+			if requireAll {
+				permissionType = "all of"
+			}
 
-            c.JSON(http.StatusForbidden, common.APIResponse{
-                Success: false,
-                Data:    nil,
-                Message: "Insufficient API key permissions.",
-                Error: map[string]string{
-                    "permission": fmt.Sprintf("API key requires %s these permissions: %v", permissionType, requiredPermissions),
-                },
-            })
-            c.Abort()
-            return
-        }
+			c.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Insufficient API key permissions.",
+				Error: map[string]string{
+					"permission": fmt.Sprintf("API key requires %s these permissions: %v", permissionType, requiredPermissions),
+				},
+			})
+			c.Abort()
+			return
+		}
 
-        // Log successful permission check
-        utils.Logger.Info("API key permission check passed (database)",
-            "key_id", keyIDStr,
-            "required_permissions", requiredPermissions,
-            "require_all", requireAll,
-        )
+		// Log successful permission check
+		utils.Logger.Info("API key permission check passed (database)",
+			"key_id", keyIDStr,
+			"required_permissions", requiredPermissions,
+			"require_all", requireAll,
+		)
 
-        c.Next()
-    }
+		c.Next()
+	}
 }
-
 
 // AuthRepositoryAPIKeyMiddleware validates API keys using AuthRepository
 func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.HandlerFunc {
@@ -461,8 +466,11 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.H
 			return
 		}
 
+		// Extract client IP
+		ip := c.ClientIP()
+
 		// Validate API key using the auth repository
-		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().ValidateAPIKey(apiKey)
+		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().ValidateAPIKey(apiKey, ip)
 		if err != nil {
 			utils.Logger.Warn("API key validation failed",
 				"key_preview", utils.GetKeyPreview(apiKey),

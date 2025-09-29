@@ -11,9 +11,10 @@ type APIKeyRequest struct {
 
 type UpdateAPIKeyRequest struct {
 	Name        *string    `json:"name,omitempty" binding:"omitempty,min=3,max=100,no_special"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=Now,datetime,"` // Must be in the future
+	ExpiresAt   *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=CreatedAt"` // Must be in the future
 	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
 	IsActive    *bool      `json:"is_active,omitempty"`
+	LimitUsage  *int64     `json:"limit_usage,omitempty" binding:"omitempty,gte=0"` // nil means unlimited
 }
 
 type APIKeyIDRequest struct {
@@ -31,6 +32,9 @@ type APIKeyResponse struct {
 	KeyPreview  string     `json:"key_preview"` // Only first 8 characters + "..."
 	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	LimitUsage  *int64     `json:"limit_usage,omitempty"`
+	UsageCount  int64      `json:"usage_count"`
+	LastIPUsed  *string    `json:"last_ip_used,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	Permissions []string   `json:"permissions"`
 	CreatedAt   time.Time  `json:"created_at"`

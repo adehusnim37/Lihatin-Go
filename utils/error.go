@@ -41,12 +41,14 @@ var (
 	ErrAPIKeyInsufficientPerm  = errors.New("insufficient permissions for this API key")
 	ErrAPIKeyMissing           = errors.New("API key is missing")
 	ErrAPIKeyInactive          = errors.New("API key is inactive")
-	ErrAPIKeyRateLimitExceeded = errors.New("API key rate limit exceeded")
 	ErrAPIKeyInvalidIP         = errors.New("API key cannot be used from this IP address")
 	ErrAPIKeyInvalidReferrer   = errors.New("API key cannot be used from this referrer")
 	ErrAPIKeyExpired           = errors.New("API key has expired")
 	ErrAPIKeyCreateFailed      = errors.New("failed to create API key")
 	ErrAPIKeyUpdateFailed      = errors.New("failed to update API key")
+	ErrAPIKeyIDFailedFormat    = errors.New("invalid API key ID format")
+	ErrAPIKeyLimitReached	 = errors.New("API key limit reached for user")
+	ErrAPIKeyRateLimitExceeded = errors.New("API key rate limit exceeded")
 )
 
 var (
@@ -72,5 +74,5 @@ var (
 	ErrUserDuplicateEntry     = errors.New("duplicate entry for user data")
 	ErrUserDatabaseError      = errors.New("database error while processing user request")
 	ErrUserEmailNotVerified   = errors.New("user email is not verified")
-	ErrAPIKeyLimitReached	 = errors.New("API key limit reached for user")
+	
 )
