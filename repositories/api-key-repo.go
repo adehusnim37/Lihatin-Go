@@ -8,6 +8,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -836,6 +837,83 @@ func (r *APIKeyRepository) DeactivateAPIKey(keyID dto.APIKeyIDRequest, userID st
 		"key_name", apiKey.Name,
 	)
 	return &apiKey, nil
+}
+
+func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID, userRole string, page, limit int) (*user.APIKey, []logging.ActivityLog, int64 ,error) {
+	var apiKeys user.APIKey
+	var activityLogs []logging.ActivityLog
+	var totalCount int64
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	// Start a transaction
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		query:= tx.Where("id = ? AND deleted_at IS NULL", keyID.ID)
+		if userRole != "admin" {
+			query = query.Where("user_id = ?", userID)
+		}
+		if err := query.First(&apiKeys).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return utils.ErrAPIKeyNotFound
+			}
+			return utils.ErrAPIKeyFailedFetching
+		}
+
+		utils.Logger.Info("Fetching API key usage history",
+			"user_id", userID,
+			"key_id", keyID,
+			"key", apiKeys.Key,
+			"key_name", apiKeys.Name,
+			"page", page,
+			"limit", limit,
+		)
+
+		// Count total activity logs for pagination
+		if err := tx.Model(&logging.ActivityLog{}).
+			Where("apikey = ?", apiKeys.Key).
+			Count(&totalCount).Error; err != nil {
+			return utils.ErrActivityLogNotFound
+		}
+
+		utils.Logger.Info("Total activity logs found",
+			"user_id", userID,
+			"key_id", keyID,
+			"key", apiKeys.Key,
+			"key_name", apiKeys.Name,
+			"total_logs", totalCount,
+		)
+
+		if err := tx.Where("apikey = ? AND deletedat IS NULL", apiKeys.Key).
+			Offset(offset).
+			Limit(limit).
+			Find(&activityLogs).Error; err != nil {
+			return utils.ErrActivityLogNotFound
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	utils.Logger.Info("Fetched API key usage history",
+		"user_id", userID,
+		"key_id", keyID,
+		"key_name", apiKeys.Name,
+		"page", page,
+		"limit", limit,
+		"total_logs", totalCount,
+	)
+
+	return &apiKeys, activityLogs, totalCount, nil
+
 }
 
 /*

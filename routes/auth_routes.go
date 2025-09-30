@@ -92,6 +92,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		apiKeyGroup.POST("/:id/refresh", apiKeyController.RefreshAPIKey)
 		apiKeyGroup.POST("/:id/activate", apiKeyController.ActivateAPIKey)
 		apiKeyGroup.POST("/:id/deactivate", apiKeyController.DeactivateAPIKey)
-		// apiKeyGroup.GET("/:id/usage", apiKeyController.GetAPIKeyUsage)
+		apiKeyGroup.GET("/:id/usage", apiKeyController.GetAPIKeyActivityLogs)
 	}
 }

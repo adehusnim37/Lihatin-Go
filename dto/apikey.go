@@ -17,7 +17,6 @@ type APIKeyIDRequest struct {
 }
 
 type ActivateAccountRequest struct {
-	
 }
 
 // APIKeyResponse represents the API key response (without sensitive data)
@@ -48,8 +47,8 @@ type CreateAPIKeyResponse struct {
 	UsageCount  int64      `json:"usage_count"`
 	IsActive    bool       `json:"is_active"`
 	// Sensitive info
-	Key         string     `json:"key"`     // Only shown once during creation
-	Warning     string     `json:"warning"` // Warning message
+	Key     string `json:"key"`     // Only shown once during creation
+	Warning string `json:"warning"` // Warning message
 }
 
 // CreateAPIKeyRequest represents the request to create a new API key
@@ -63,6 +62,35 @@ type CreateAPIKeyRequest struct {
 	IsActive    bool       `json:"is_active" binding:"omitempty"`
 }
 
+// Enhanced response with API key info and pagination
+type APIKeyActivityLogsResponse struct {
+    ActivityLogs []APIKeyActivityLogResponse `json:"activity_logs"`
+    TotalCount   int64                       `json:"total_count"`
+    Page         int                         `json:"page"`
+    Limit        int                         `json:"limit"`
+    TotalPages   int                         `json:"total_pages"`
+    HasNext      bool                        `json:"has_next"`
+    HasPrev      bool                        `json:"has_prev"`
+    APIKeyInfo   APIKeyBasicInfo             `json:"api_key_info"`
+}
+
+// Basic API key info for responses
+type APIKeyBasicInfo struct {
+    ID         string    `json:"id"`
+    Name       string    `json:"name"`
+    KeyPreview string    `json:"key_preview"`
+    IsActive   bool      `json:"is_active"`
+    CreatedAt  time.Time `json:"created_at"`
+}
+
+// Enhanced activity log response
+type APIKeyActivityLogResponse struct {
+    ID          string              `json:"id"`
+    APIKey      *string             `json:"api_key,omitempty"`
+    UserID      *string             `json:"user_id,omitempty"`
+    ActivityLog ActivityLogResponse `json:"activity_log"`
+}
+
 // PaginatedAPIKeysResponse represents paginated API keys
 type PaginatedAPIKeysResponse struct {
 	APIKeys    []APIKeyResponse `json:"api_keys"`
@@ -72,21 +100,21 @@ type PaginatedAPIKeysResponse struct {
 	TotalPages int              `json:"total_pages"`
 }
 
-// dto/api_key.go - Add enhanced response struct
-
+// APIKeyRefreshResponse represents the response when refreshing an API key
 type APIKeyRefreshResponse struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	KeyPreview  string     `json:"key_preview"`
-	IsActive    bool       `json:"is_active"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Permissions []string   `json:"permissions"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	KeyPreview  string           `json:"key_preview"`
+	IsActive    bool             `json:"is_active"`
+	ExpiresAt   *time.Time       `json:"expires_at,omitempty"`
+	Permissions []string         `json:"permissions"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
 	Secret      APIKeySecretInfo `json:"secret"`
-	Usage       APIKeyUsageInfo `json:"usage"`
+	Usage       APIKeyUsageInfo  `json:"usage"`
 }
 
+// APIKeySecretInfo contains sensitive API key information
 type APIKeySecretInfo struct {
 	FullAPIKey string `json:"full_api_key"`
 	Warning    string `json:"warning"`
@@ -94,6 +122,7 @@ type APIKeySecretInfo struct {
 	ExpiresIn  string `json:"expires_in"`
 }
 
+// APIKeyUsageInfo contains usage-related information about the API key
 type APIKeyUsageInfo struct {
 	LastUsedAt         *time.Time `json:"last_used_at,omitempty"`
 	LastIPUsed         *string    `json:"last_ip_used,omitempty"`

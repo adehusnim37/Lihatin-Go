@@ -98,6 +98,13 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 	case ErrPasscodeIncorrect:
 		SendErrorResponse(ctx, http.StatusUnauthorized, "PASSCODE_INCORRECT", "Incorrect passcode", "passcode", userID)
 
+
+	// Activity Log-related errors
+	case ErrActivityLogNotFound:
+		SendErrorResponse(ctx, http.StatusNotFound, "ACTIVITY_LOG_NOT_FOUND", "Activity log not found", "activity_log", userID)
+	case ErrActivityLogFailed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "ACTIVITY_LOG_FAILED", "Failed to process activity log", "activity_log", userID)
+
 	// Default case for unknown errors
 	default:
 		Logger.Error("Unhandled error occurred",

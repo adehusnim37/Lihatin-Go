@@ -76,3 +76,9 @@ var (
 	ErrUserDatabaseError      = errors.New("database error while processing user request")
 	ErrUserEmailNotVerified   = errors.New("user email is not verified")
 )
+
+var (
+	// Activity log errors
+	ErrActivityLogNotFound = errors.New("activity log not found")
+	ErrActivityLogFailed   = errors.New("failed to process activity log")
+)
