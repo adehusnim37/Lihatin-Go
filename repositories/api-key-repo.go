@@ -839,7 +839,10 @@ func (r *APIKeyRepository) DeactivateAPIKey(keyID dto.APIKeyIDRequest, userID st
 	return &apiKey, nil
 }
 
-func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID, userRole string, page, limit int) (*user.APIKey, []logging.ActivityLog, int64 ,error) {
+/*
+APIKeyUsageHistory retrieves usage history for an API key with pagination and sorting
+*/
+func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID, userRole string, page, limit int, sort, orderBy string) (*user.APIKey, []logging.ActivityLog, int64 ,error) {
 	var apiKeys user.APIKey
 	var activityLogs []logging.ActivityLog
 	var totalCount int64
@@ -851,6 +854,7 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 		limit = 10
 	}
 	offset := (page - 1) * limit
+	orderClause := sort + " " + orderBy
 
 	// Start a transaction
 	err := r.db.Transaction(func(tx *gorm.DB) error {
@@ -876,7 +880,7 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 
 		// Count total activity logs for pagination
 		if err := tx.Model(&logging.ActivityLog{}).
-			Where("apikey = ?", apiKeys.Key).
+			Where("api_key = ?", apiKeys.Key).
 			Count(&totalCount).Error; err != nil {
 			return utils.ErrActivityLogNotFound
 		}
@@ -889,9 +893,10 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 			"total_logs", totalCount,
 		)
 
-		if err := tx.Where("apikey = ? AND deletedat IS NULL", apiKeys.Key).
+		if err := tx.Where("api_key = ? AND deleted_at IS NULL", apiKeys.Key).
 			Offset(offset).
 			Limit(limit).
+			Order(orderClause).
 			Find(&activityLogs).Error; err != nil {
 			return utils.ErrActivityLogNotFound
 		}

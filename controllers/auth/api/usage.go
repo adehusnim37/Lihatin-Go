@@ -24,9 +24,11 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 	userRole := ctx.GetString("role")
 	pageStr := ctx.DefaultQuery("page", "1")
 	limitStr := ctx.DefaultQuery("limit", "10")
+	sort := ctx.DefaultQuery("sort", "created_at")
+	orderBy := ctx.DefaultQuery("order_by", "desc")
 	// Pagination parameters
 
-	page, limit, _, _, vErrs := utils.PaginateValidate(pageStr, limitStr, "created_at", "desc", utils.Role(userRole))
+	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sort, orderBy, utils.Role(userRole))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -40,7 +42,7 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 
 
 	// Fetch activity logs for the API key
-	apiKey, activityLogs, totalRecords, err := c.repo.GetAPIKeyRepository().APIKeyUsageHistory(reqId, userID, userRole, page, limit)
+	apiKey, activityLogs, totalRecords, err := c.repo.GetAPIKeyRepository().APIKeyUsageHistory(reqId, userID, userRole, page, limit, sort, orderBy)
 	if err != nil {
 		utils.HandleError(ctx, err, userID)
 		return
