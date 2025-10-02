@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/utils"
 	"gorm.io/gorm"
 )
 
@@ -60,7 +61,9 @@ func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 }
 
 // SetEmailVerificationToken sets email verification token and expiry
-func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, expiresAt time.Time) error {
+func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string) error {
+	// Set token expiry (2 hours from now)
+	var expiresAt = time.Now().Add(time.Duration(utils.GetEnvAsInt("EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS", 2)) * time.Hour)
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]any{
@@ -69,7 +72,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, exp
 		}).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to set email verification token: %w", err)
+		return utils.ErrCreateVerificationTokenFailed
 	}
 	return nil
 }
@@ -85,11 +88,11 @@ func (r *UserAuthRepository) VerifyEmail(token string) error {
 		})
 
 	if result.Error != nil {
-		return fmt.Errorf("failed to verify email: %w", result.Error)
+		return utils.ErrEmailVerificationFailed
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("invalid or expired verification token: %s", token)
+		return utils.ErrEmailVerificationTokenExpired
 	}
 
 	return nil

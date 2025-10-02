@@ -50,6 +50,7 @@ var (
 	ErrAPIKeyLimitReached      = errors.New("API key limit reached for user")
 	ErrAPIKeyRateLimitExceeded = errors.New("API key rate limit exceeded")
 	ErrAPIKeyIPNotAllowed      = errors.New("API key cannot be used from this IP address")
+	ErrGenerateAPIKeyFailed	 = errors.New("failed to generate API key")
 )
 
 var (
@@ -81,4 +82,20 @@ var (
 	// Activity log errors
 	ErrActivityLogNotFound = errors.New("activity log not found")
 	ErrActivityLogFailed   = errors.New("failed to process activity log")
+)
+
+var (
+	// Email verification errors
+	ErrEmailVerificationFailed       = errors.New("failed to verify email")
+	ErrEmailVerificationTokenInvalid = errors.New("invalid email verification token")
+	ErrEmailVerificationTokenExpired = errors.New("email verification token has expired")
+	ErrEmailAlreadyVerified          = errors.New("email is already verified")
+	ErrCreateVerificationTokenFailed = errors.New("failed to create email verification token")
+)
+
+var (
+	// Token generation errors
+	ErrTokenGenerationFailed = errors.New("failed to generate token")
+	ErrTokenInvalid          = errors.New("invalid token")
+	ErrTokenExpired          = errors.New("token has expired")
 )

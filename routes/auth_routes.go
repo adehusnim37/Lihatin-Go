@@ -4,13 +4,14 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
+	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, baseController interface{}) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, emailController *email.Controller, baseController interface{}) {
 	// Create API key controller
 	apiKeyController := api.NewAPIKeyController(baseController.(*controllers.BaseController))
 	// Public authentication routes (no auth required)
@@ -51,7 +52,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		}
 
 		// Email verification for authenticated users
-		protectedAuth.POST("/send-verification-email", authController.SendVerificationEmail)
+		protectedAuth.POST("/send-verification-email", emailController.SendVerificationEmail)
 	}
 
 	// Email verification routes that require email verification

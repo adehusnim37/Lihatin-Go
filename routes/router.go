@@ -6,6 +6,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
+	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
 	"github.com/adehusnim37/lihatin-go/controllers/logger"
 	"github.com/adehusnim37/lihatin-go/controllers/shortlink"
 	"github.com/adehusnim37/lihatin-go/controllers/user"
@@ -34,10 +35,11 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	baseController := controllers.NewBaseControllerWithGorm(db, gormDB, validate)
 
 	// Inisialisasi controller spesifik
-	userController := user.NewController(baseController) // Use baseAuthController for GORM access
+	userController := user.NewController(baseController)
 	authController := auth.NewAuthController(baseController)
 	loggerController := logger.NewLoggerController(baseController)
-	shortController := shortlink.NewController(baseController) // Use baseAuthController for GORM access
+	shortController := shortlink.NewController(baseController)
+	emailController := email.NewEmailController(baseController) 
 
 	// Setup repositories for middleware
 	loggerRepo := repositories.NewLoggerRepository(gormDB)
@@ -51,7 +53,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")
 	RegisterUserRoutes(v1, userController)
-	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, baseController)
+	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, emailController, baseController)
 	RegisterLoggerRoutes(v1, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, authRepo)
 
