@@ -1,4 +1,4 @@
-package utils
+package mail
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jordan-wright/email"
+    "github.com/adehusnim37/lihatin-go/utils"
 )
 
 // EmailConfig holds email configuration
@@ -37,12 +38,12 @@ type EmailService struct {
 func NewEmailService() *EmailService {
 	return &EmailService{
 		config: EmailConfig{
-			SMTPHost:     GetEnvOrDefault(EnvSMTPHost, "smtp.gmail.com"),
-			SMTPPort:     GetEnvOrDefault(EnvSMTPPort, "587"),
-			SMTPUsername: GetEnvOrDefault(EnvSMTPUser, ""),
-			SMTPPassword: GetEnvOrDefault(EnvSMTPPass, ""),
-			FromEmail:    GetEnvOrDefault(EnvFromEmail, "noreply@lihatin.com"),
-			FromName:     GetEnvOrDefault(EnvFromName, "Lihatin"),
+			SMTPHost:     utils.GetEnvOrDefault(utils.EnvSMTPHost, "smtp.gmail.com"),
+			SMTPPort:     utils.GetEnvOrDefault(utils.EnvSMTPPort, "587"),
+			SMTPUsername: utils.GetEnvOrDefault(utils.EnvSMTPUser, ""),
+			SMTPPassword: utils.GetEnvOrDefault(utils.EnvSMTPPass, ""),
+			FromEmail:    utils.GetEnvOrDefault(utils.EnvFromEmail, "noreply@lihatin.com"),
+			FromName:     utils.GetEnvOrDefault(utils.EnvFromName, "Lihatin"),
 		},
 	}
 }
@@ -52,7 +53,7 @@ func NewEmailService() *EmailService {
 
 func (es *EmailService) SendVerificationEmail(toEmail, userName, token string) error {
 	subject := "Email Verification Required - Lihatin"
-	verificationURL := fmt.Sprintf(GetRequiredEnv(EnvBackendURL)+`/v1/auth/verify-email?token=%s`, token)
+	verificationURL := fmt.Sprintf(utils.GetRequiredEnv(utils.EnvBackendURL)+`/v1/auth/verify-email?token=%s`, token)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -247,7 +248,7 @@ func (es *EmailService) SendVerificationEmail(toEmail, userName, token string) e
 </body>
 </html>
 `, userName, verificationURL, verificationURL, verificationURL,
-		GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+		utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL VERIFICATION REQUIRED
@@ -272,7 +273,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, userName, verificationURL, GetRequiredEnv(EnvBackendURL))
+`, userName, verificationURL, utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }
@@ -281,7 +282,7 @@ This is an automated message, please do not reply directly to this email.
 // utils/email.go - Enhanced SendPasswordResetEmail
 func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) error {
 	subject := "Password Reset Request - Lihatin"
-	resetURL := fmt.Sprintf(GetRequiredEnv(EnvBackendURL)+`/v1/auth/reset-password?token=%s`, token)
+	resetURL := fmt.Sprintf(utils.GetRequiredEnv(utils.EnvBackendURL)+`/v1/auth/reset-password?token=%s`, token)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -513,7 +514,7 @@ func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) 
 </body>
 </html>
 `, userName, resetURL, resetURL, resetURL,
-		GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+		utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - PASSWORD RESET REQUEST
@@ -543,7 +544,7 @@ The Lihatin Security Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated security message, please do not reply directly to this email.
-`, userName, resetURL, GetRequiredEnv(EnvBackendURL))
+`, userName, resetURL, utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }
@@ -767,7 +768,7 @@ func (es *EmailService) SendTOTPSetupEmail(toEmail, userName string) error {
     </div>
 </body>
 </html>
-`, userName, GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+`, userName, utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - TWO-FACTOR AUTHENTICATION ENABLED
@@ -799,7 +800,7 @@ The Lihatin Security Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated security notification.
-`, userName, GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+`, userName, utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }
@@ -808,7 +809,7 @@ This is an automated security notification.
 func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAgent string) error {
 	subject := "Security Alert: New Login Detected - Lihatin"
 	loginTime := time.Now().Format("January 2, 2006 at 3:04 PM MST")
-	location := GetLocationString(ipAddress)
+	location := utils.GetLocationString(ipAddress)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -1079,8 +1080,8 @@ func (es *EmailService) SendLoginAlertEmail(toEmail, userName, ipAddress, userAg
 </body>
 </html>
 `, userName, loginTime, location, ipAddress, userAgent,
-		GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL),
-		GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+		utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL),
+		utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - SECURITY ALERT: NEW LOGIN DETECTED
@@ -1117,7 +1118,7 @@ The Lihatin Security Team
 © 2025 Lihatin. All rights reserved.
 This is an automated security notification.
 `, userName, loginTime, location, ipAddress, userAgent,
-		GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+		utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }
@@ -1125,7 +1126,7 @@ This is an automated security notification.
 // SendPasscodeResetEmail sends passcode reset email
 func (es *EmailService) SendPasscodeResetEmail(toEmail, short, userName, token string) error {
 	subject := "Short Link Passcode Reset Request - Lihatin"
-	resetURL := fmt.Sprintf(GetRequiredEnv(EnvBackendURL)+"/v1/shorts/reset-passcode?token=%s", token)
+	resetURL := fmt.Sprintf(utils.GetRequiredEnv(utils.EnvBackendURL)+"/v1/shorts/reset-passcode?token=%s", token)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -1402,7 +1403,7 @@ func (es *EmailService) SendPasscodeResetEmail(toEmail, short, userName, token s
 </body>
 </html>
 `, userName, short, resetURL, resetURL, resetURL,
-		GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL), GetRequiredEnv(EnvBackendURL))
+		utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL), utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - SHORT LINK PASSCODE RESET REQUEST
@@ -1435,7 +1436,7 @@ The Lihatin Security Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated security message, please do not reply directly to this email.
-`, userName, short, resetURL, GetRequiredEnv(EnvBackendURL))
+`, userName, short, resetURL, utils.GetRequiredEnv(utils.EnvBackendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

@@ -76,6 +76,8 @@ var (
 	ErrUserDuplicateEntry     = errors.New("duplicate entry for user data")
 	ErrUserDatabaseError      = errors.New("database error while processing user request")
 	ErrUserEmailNotVerified   = errors.New("user email is not verified")
+	ErrUserFindFailed          = errors.New("failed to find user")
+	ErrUserFailed              = errors.New("failed to process user request")
 )
 
 var (

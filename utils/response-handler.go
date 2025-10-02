@@ -43,6 +43,22 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 		SendErrorResponse(ctx, http.StatusForbidden, "UNAUTHORIZED", "User is not authorized to perform this action", "auth", userID)
 	case ErrUserEmailNotVerified:
 		SendErrorResponse(ctx, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "User email is not verified", "email", userID)
+	case ErrUserFindFailed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "USER_FIND_FAILED", "Failed to find user", "user", userID)
+	case ErrUserFailed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "USER_FAILED", "Failed to process user request", "user", userID)
+
+	// Email verification-related errors
+	case ErrEmailVerificationTokenInvalid:
+		SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_VERIFICATION_TOKEN", "Invalid email verification token", "token", userID)
+	case ErrEmailVerificationTokenExpired:
+		SendErrorResponse(ctx, http.StatusBadRequest, "VERIFICATION_TOKEN_EXPIRED", "Email verification token has expired", "token", userID)
+	case ErrEmailAlreadyVerified:
+		SendErrorResponse(ctx, http.StatusBadRequest, "EMAIL_ALREADY_VERIFIED", "Email is already verified", "email", userID)
+	case ErrEmailVerificationFailed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "EMAIL_VERIFICATION_FAILED", "Failed to verify email", "email", userID)
+	case ErrCreateVerificationTokenFailed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "CREATE_VERIFICATION_TOKEN_FAILED", "Failed to create email verification token", "token", userID)
 
 	// API Key-related errors
 	case ErrAPIKeyNotFound:

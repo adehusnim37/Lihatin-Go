@@ -26,7 +26,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/reset-password", authController.ResetPassword)
 
 		// Email verification
-		authGroup.GET("/verify-email", authController.VerifyEmail)
+		authGroup.GET("/verify-email", emailController.VerifyEmail) // Token passed as query param
+		authGroup.POST("/resend-verification-email", emailController.ResendVerificationEmail)
 
 		// Token refresh
 		authGroup.POST("/refresh-token", authController.RefreshToken)
@@ -52,7 +53,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		}
 
 		// Email verification for authenticated users
-		protectedAuth.POST("/send-verification-email", emailController.SendVerificationEmail)
+		protectedAuth.POST("/send-verification-email", emailController.SendVerificationEmails)
 	}
 
 	// Email verification routes that require email verification

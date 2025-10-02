@@ -39,7 +39,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	authController := auth.NewAuthController(baseController)
 	loggerController := logger.NewLoggerController(baseController)
 	shortController := shortlink.NewController(baseController)
-	emailController := email.NewEmailController(baseController) 
+	emailController := email.NewController(baseController)
 
 	// Setup repositories for middleware
 	loggerRepo := repositories.NewLoggerRepository(gormDB)

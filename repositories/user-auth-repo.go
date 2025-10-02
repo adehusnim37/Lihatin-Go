@@ -23,7 +23,7 @@ func NewUserAuthRepository(db *gorm.DB) *UserAuthRepository {
 // CreateUserAuth creates a new UserAuth record
 func (r *UserAuthRepository) CreateUserAuth(userAuth *user.UserAuth) error {
 	if err := r.db.Create(userAuth).Error; err != nil {
-		return fmt.Errorf("failed to create user auth: %w", err)
+		return utils.ErrUserCreationFailed
 	}
 	return nil
 }
@@ -33,9 +33,9 @@ func (r *UserAuthRepository) GetUserAuthByUserID(userID string) (*user.UserAuth,
 	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, sql.ErrNoRows
+			return nil, utils.ErrUserNotFound
 		}
-		return nil, fmt.Errorf("failed to get user auth: %w", err)
+		return nil, utils.ErrUserFindFailed
 	}
 	return &userAuth, nil
 }
@@ -47,7 +47,7 @@ func (r *UserAuthRepository) GetUserAuthByID(id string) (*user.UserAuth, error) 
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
 		}
-		return nil, fmt.Errorf("failed to get user auth by ID: %w", err)
+		return nil, utils.ErrUserNotFound
 	}
 	return &userAuth, nil
 }
