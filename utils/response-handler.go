@@ -113,7 +113,30 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 		SendErrorResponse(ctx, http.StatusUnauthorized, "PASSCODE_REQUIRED", "Passcode required", "passcode", userID)
 	case ErrPasscodeIncorrect:
 		SendErrorResponse(ctx, http.StatusUnauthorized, "PASSCODE_INCORRECT", "Incorrect passcode", "passcode", userID)
+	case ErrStatsNotEnabled:
+		SendErrorResponse(ctx, http.StatusBadRequest, "STATS_NOT_ENABLED", "Statistics tracking is not enabled for this link", "short_link", userID)
+	case ErrShortLinkAlreadyDeleted:
+		SendErrorResponse(ctx, http.StatusBadRequest, "SHORT_LINK_ALREADY_DELETED", "Short link has already been deleted", "short_link", userID)
+	case ErrSomeShortLinksNotFound:
+		SendErrorResponse(ctx, http.StatusNotFound, "SOME_SHORT_LINKS_NOT_FOUND", "Some short links not found", "short_links", userID)
+	case ErrBulkCreateLimitExceeded:
+		SendErrorResponse(ctx, http.StatusBadRequest, "BULK_CREATE_LIMIT_EXCEEDED", "Bulk create limit exceeded, maximum 15 links per batch", "links", userID)
+	case ErrBulkCreateFailed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "BULK_CREATE_FAILED", "Failed to create bulk short links", "links", userID)
+	case ErrEmptyBulkLinksList:
+		SendErrorResponse(ctx, http.StatusBadRequest, "EMPTY_BULK_LINKS_LIST", "Bulk links list cannot be empty", "links", userID)
 
+	// Passcode-related errors
+	case ErrInvalidPasscode:
+		SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_PASSCODE", "Invalid passcode format", "passcode", userID)
+
+	// Click Limit-related errors
+	case ErrInvalidClickLimit:
+		SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_CLICK_LIMIT", "Click limit must be a positive integer", "click_limit", userID)
+
+	// Code Generation-related errors
+	case ErrFailedToGenerateCode:
+		SendErrorResponse(ctx, http.StatusInternalServerError, "CODE_GENERATION_FAILED", "Failed to generate unique short code", "short_code", userID)
 
 	// Activity Log-related errors
 	case ErrActivityLogNotFound:

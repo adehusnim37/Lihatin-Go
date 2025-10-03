@@ -4,17 +4,20 @@ import "errors"
 
 var (
 	// Repository errors
-	ErrShortLinkNotFound       = errors.New("short link not found")
-	ErrShortLinkExpired        = errors.New("short link has expired")
-	ErrShortLinkInactive       = errors.New("short link is inactive")
-	ErrShortLinkUnauthorized   = errors.New("unauthorized to access this link")
-	ErrDuplicateShortCode      = errors.New("short code already exists")
-	ErrInvalidOriginalURL      = errors.New("invalid original URL")
-	ErrShortLinkAlreadyDeleted = errors.New("short link has already been deleted")
-	ErrEmptyCodesList          = errors.New("codes list cannot be empty")
-	ErrSomeShortLinksNotFound  = errors.New("some short links not found")
-	ErrLinkIsBanned            = errors.New("the original URL is banned")
-	ErrShortIsNotDeleted       = errors.New("short link is not deleted")
+	ErrShortCreatedFailed       = errors.New("failed to create short link")
+	ErrShortDetailCreatedFailed = errors.New("failed to create short link detail")
+	ErrShortGetFailed           = errors.New("failed to get short link")
+	ErrShortLinkNotFound        = errors.New("short link not found")
+	ErrShortLinkExpired         = errors.New("short link has expired")
+	ErrShortLinkInactive        = errors.New("short link is inactive")
+	ErrShortLinkUnauthorized    = errors.New("unauthorized to access this link")
+	ErrDuplicateShortCode       = errors.New("short code already exists")
+	ErrInvalidOriginalURL       = errors.New("invalid original URL")
+	ErrShortLinkAlreadyDeleted  = errors.New("short link has already been deleted")
+	ErrEmptyCodesList           = errors.New("codes list cannot be empty")
+	ErrSomeShortLinksNotFound   = errors.New("some short links not found")
+	ErrLinkIsBanned             = errors.New("the original URL is banned")
+	ErrShortIsNotDeleted        = errors.New("short link is not deleted")
 
 	// Service errors
 	ErrFailedToGenerateCode = errors.New("failed to generate unique short code")
@@ -28,6 +31,12 @@ var (
 
 	// Limit errors
 	ErrClickLimitReached = errors.New("click limit reached")
+
+	//bulk create errors
+	ErrBulkCreateLimitExceeded   = errors.New("bulk create limit exceeded, maximum 15 links per batch")
+	ErrBulkCreateFailed          = errors.New("failed to create bulk short links")
+	ErrEmptyBulkLinksList        = errors.New("bulk links list cannot be empty")
+	ErrDuplicateShortCodeInBatch = errors.New("duplicate short code in batch")
 )
 
 var (
@@ -50,7 +59,7 @@ var (
 	ErrAPIKeyLimitReached      = errors.New("API key limit reached for user")
 	ErrAPIKeyRateLimitExceeded = errors.New("API key rate limit exceeded")
 	ErrAPIKeyIPNotAllowed      = errors.New("API key cannot be used from this IP address")
-	ErrGenerateAPIKeyFailed	 = errors.New("failed to generate API key")
+	ErrGenerateAPIKeyFailed    = errors.New("failed to generate API key")
 )
 
 var (
@@ -76,8 +85,8 @@ var (
 	ErrUserDuplicateEntry     = errors.New("duplicate entry for user data")
 	ErrUserDatabaseError      = errors.New("database error while processing user request")
 	ErrUserEmailNotVerified   = errors.New("user email is not verified")
-	ErrUserFindFailed          = errors.New("failed to find user")
-	ErrUserFailed              = errors.New("failed to process user request")
+	ErrUserFindFailed         = errors.New("failed to find user")
+	ErrUserFailed             = errors.New("failed to process user request")
 )
 
 var (

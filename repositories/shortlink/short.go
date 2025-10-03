@@ -1,6 +1,7 @@
 package shortlink
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -27,11 +28,11 @@ func NewShortLinkRepository(db *gorm.DB) *ShortLinkRepository {
 	return &ShortLinkRepository{db: db}
 }
 
-func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) error {
+func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) (*shortlink.ShortLink, *shortlink.ShortLinkDetail, error) {
 	// Check for duplicate short code first
 	if link.CustomCode != "" {
 		if err := r.db.Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
-			return gorm.ErrDuplicatedKey
+			return nil, nil, gorm.ErrDuplicatedKey
 		}
 	}
 
@@ -65,7 +66,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 
 	if err := r.db.Create(&shortLink).Error; err != nil {
 		utils.Logger.Error("Failed to create short link", "error", err.Error())
-		return err
+		return nil, nil, err
 	}
 
 	shortLinkDetail := shortlink.ShortLinkDetail{
@@ -76,7 +77,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 
 	if err := r.db.Create(&shortLinkDetail).Error; err != nil {
 		utils.Logger.Error("Failed to create short link detail", "error", err.Error())
-		return err
+		return nil, nil, err
 	}
 
 	utils.Logger.Info("Short link created successfully",
@@ -85,7 +86,93 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 		"user_id", link.UserID,
 	)
 
-	return nil
+	return &shortLink, &shortLinkDetail, nil
+}
+
+
+// CreateBulkShortLinks creates multiple short links in a single transaction
+func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRequest) ([]shortlink.ShortLink, []shortlink.ShortLinkDetail, error) {
+    if len(links) == 0 {
+        return nil, nil, utils.ErrEmptyBulkLinksList
+	}
+    
+    if len(links) > 15 { // Set reasonable limit
+        return nil, nil, utils.ErrBulkCreateLimitExceeded
+    }
+
+    var createdLinks []shortlink.ShortLink
+    var createdDetails []shortlink.ShortLinkDetail
+
+    // Single transaction for all operations
+    err := r.db.Transaction(func(tx *gorm.DB) error {
+        for i, linkReq := range links {
+            // Generate short code if not provided
+            if linkReq.CustomCode == "" {
+                linkReq.CustomCode = r.generateCustomCode(linkReq.OriginalURL)
+            }
+
+            // Check for duplicate codes within batch
+            for j := range i {
+                if links[j].CustomCode == linkReq.CustomCode {
+                    return utils.ErrDuplicateShortCodeInBatch
+                }
+            }
+
+            // Check existing codes in database
+            var existingLink shortlink.ShortLink
+            if err := tx.Where("short_code = ?", linkReq.CustomCode).First(&existingLink).Error; err == nil {
+                return utils.ErrDuplicateShortCode
+            }
+
+            // Handle nullable UserID
+            var userIDPtr *string
+            if linkReq.UserID != "" {
+                userIDPtr = &linkReq.UserID
+            }
+
+            // Create ShortLink
+            shortLink := shortlink.ShortLink{
+                ID:          uuid.New().String(),
+                UserID:      userIDPtr,
+                ShortCode:   linkReq.CustomCode,
+                OriginalURL: linkReq.OriginalURL,
+                Title:       linkReq.Title,
+                Description: linkReq.Description,
+                ExpiresAt:   linkReq.ExpiresAt,
+            }
+
+            if err := tx.Create(&shortLink).Error; err != nil {
+                return utils.ErrShortCreatedFailed
+            }
+            createdLinks = append(createdLinks, shortLink)
+
+            // Create ShortLinkDetail
+            shortLinkDetail := shortlink.ShortLinkDetail{
+                ID:          uuid.New().String(),
+                ShortLinkID: shortLink.ID,
+                Passcode:    utils.StringToInt(linkReq.Passcode),
+            }
+
+            if err := tx.Create(&shortLinkDetail).Error; err != nil {
+                return utils.ErrShortDetailCreatedFailed
+            }
+            createdDetails = append(createdDetails, shortLinkDetail)
+        }
+
+        return nil
+    })
+
+    if err != nil {
+        utils.Logger.Error("Failed to create bulk short links", "error", err.Error())
+        return nil, nil, err
+    }
+
+    utils.Logger.Info("Bulk short links created successfully",
+        "count", len(createdLinks),
+        "user_id", links[0].UserID,
+    )
+
+    return createdLinks, createdDetails, nil
 }
 
 func (r *ShortLinkRepository) generateCustomCode(url string) string {
@@ -99,13 +186,14 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 		return string(code)
 	}
 
-	// Use the first 4 characters of URL (or whatever is available)
-	endIndex := len(url)
-	if endIndex > 4 {
-		endIndex = 4
+	// Encode the URL to base64 and take 4 random characters from the encoded string
+	encodedString := base64.RawURLEncoding.EncodeToString([]byte(url))
+	code := make([]byte, 4)
+	for i := range code {
+		code[i] = encodedString[localRng.Intn(len(encodedString))]
+		utils.Logger.Info("Generated character", "char", string(code[i]))
 	}
-
-	return url[:endIndex]
+	return string(code)
 }
 
 // GetShortsByUserIDWithPagination gets short links with pagination and sorting

@@ -10,7 +10,7 @@ import (
 func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo repositories.UserRepository, authRepo *repositories.AuthRepository) {
 	shortGroup := rg.Group("/short")
 	{
-		shortGroup.Use(middleware.RateLimitMiddleware(3))
+		shortGroup.Use(middleware.RateLimitMiddleware(25))
 		shortGroup.Use(middleware.OptionalAuth(userRepo))
 		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)

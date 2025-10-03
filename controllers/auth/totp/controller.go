@@ -3,14 +3,14 @@ package totp
 import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/utils/mail"
 )
 
 // Controller handles TOTP/2FA-related authentication operations
 type Controller struct {
 	*controllers.BaseController
 	repo         *repositories.AuthRepository
-	emailService utils.EmailService
+	emailService *mail.EmailService
 }
 
 // NewController creates a new TOTP authentication controller
@@ -20,11 +20,11 @@ func NewController(base *controllers.BaseController) *Controller {
 	}
 
 	authRepo := repositories.NewAuthRepository(base.GormDB)
-	emailService := utils.NewEmailService()
+	emailService := mail.NewEmailService()
 
 	return &Controller{
 		BaseController: base,
 		repo:           authRepo,
-		emailService:   *emailService,
+		emailService:   emailService,
 	}
 }
