@@ -21,7 +21,7 @@ func (c *Controller) Logout(ctx *gin.Context) {
 	}
 
 	// Invalidate session in Redis
-	if err := middleware.DeleteAllUserSessions(ctx, userID); err != nil {
+	if err := middleware.DeleteSession(ctx, sessionID); err != nil {
 		utils.Logger.Error("Error invalidating user session", "user_id", userID, "session_id", sessionID, "error", err)
 		utils.SendErrorResponse(ctx, 500, "Failed to invalidate session", "ERR_SESSION_INVALIDATION_FAILED", utils.ErrSessionInvalidationFailed.Error(), nil)
 		return
