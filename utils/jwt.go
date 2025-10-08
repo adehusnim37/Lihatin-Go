@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 )
 
 var jwtSecret = []byte(GetRequiredEnv(EnvJWTSecret))
@@ -23,8 +25,14 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
-// GenerateJWT creates a new JWT token for a user
+// GenerateJWT creates a new JWT token for a user with unique JTI for blacklist support
 func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role string, isPremium, isVerified bool) (string, error) {
+	// Generate unique JTI (JWT ID) for blacklist tracking
+	jti, err := GenerateSecureToken(32)
+	if err != nil {
+		return "", err
+	}
+
 	claims := JWTClaims{
 		UserID:     userID,
 		SessionID:  session_id,
@@ -36,6 +44,7 @@ func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role s
 		IsPremium:  isPremium,
 		IsVerified: isVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,                                                                                           // JWT ID for blacklist
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(GetEnvAsInt(EnvJWTExpired, 24)) * time.Hour)), // 48 hours
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
@@ -48,18 +57,32 @@ func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role s
 	return token.SignedString(jwtSecret)
 }
 
-// GenerateRefreshToken creates a refresh token with longer expiry
-func GenerateRefreshToken(userID string) (string, error) {
-	claims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), // 7 days
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Issuer:    "lihatin-go",
-		Subject:   userID,
+// GenerateRefreshToken creates a refresh token and stores it in Redis
+func GenerateRefreshToken(ctx context.Context, redisClient *redis.Client, userID, sessionID, deviceID, lastIP string) (string, error) {
+	// Generate unique refresh token (128 char hex string)
+	refreshToken, err := GenerateSecureToken(64)
+	if err != nil {
+		return "", err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	// Store in Redis with metadata
+	refreshTokenManager := NewRefreshTokenManager(redisClient)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+
+	err = refreshTokenManager.StoreRefreshToken(ctx, refreshToken, RefreshTokenData{
+		UserID:    userID,
+		SessionID: sessionID,
+		DeviceID:  deviceID,
+		LastIP:    lastIP,
+		CreatedAt: time.Now(),
+		ExpiresAt: expiresAt,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return refreshToken, nil
 }
 
 // ValidateJWT validates and parses a JWT token

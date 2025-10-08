@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -227,6 +228,11 @@ func SetManager(manager *Manager) {
 // GetManager returns the global session manager instance
 func GetManager() *Manager {
 	return globalManager
+}
+
+// GetRedisClient returns the Redis client from the store
+func (m *Manager) GetRedisClient() *redis.Client {
+	return m.store.GetClient()
 }
 
 // getSessionPreview returns first 16 chars of session ID for logging (security)

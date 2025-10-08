@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -614,7 +615,7 @@ func (c *Controller) ResetPassword(ctx *gin.Context) {
 	})
 }
 
-// RefreshToken generates new access token from refresh token
+// RefreshToken generates new access token from refresh token (Redis-based)
 func (c *Controller) RefreshToken(ctx *gin.Context) {
 	var req struct {
 		RefreshToken string `json:"refresh_token" validate:"required"`
@@ -630,21 +631,33 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	// Validate refresh token
-	userID, err := utils.ValidateRefreshToken(req.RefreshToken)
+	// Get Redis client
+	sessionManager := middleware.GetSessionManager()
+	redisClient := sessionManager.GetRedisClient()
+
+	// Validate refresh token from Redis
+	refreshTokenManager := utils.NewRefreshTokenManager(redisClient)
+	tokenData, err := refreshTokenManager.GetRefreshToken(context.Background(), req.RefreshToken)
 	if err != nil {
+		utils.Logger.Warn("Invalid refresh token",
+			"error", err.Error(),
+		)
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Invalid refresh token",
-			Error:   map[string]string{"token": "Invalid or expired refresh token"},
+			Message: "Invalid or expired refresh token",
+			Error:   map[string]string{"refresh_token": "Please login again"},
 		})
 		return
 	}
 
-	// Get user data
-	user, err := c.repo.GetUserRepository().GetUserByID(userID)
+	// Get user details
+	user, err := c.repo.GetUserRepository().GetUserByID(tokenData.UserID)
 	if err != nil {
+		utils.Logger.Error("Failed to get user for refresh token",
+			"user_id", tokenData.UserID,
+			"error", err.Error(),
+		)
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -654,56 +667,84 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	// Get user auth data
-	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
+	// Get user auth info
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "User auth not found",
-			Error:   map[string]string{"auth": "Invalid user authentication"},
+			Message: "Failed to get user authentication info",
+			Error:   map[string]string{"error": "Internal server error"},
 		})
 		return
 	}
 
-	sessionID, err := middleware.CreateSession(
-		ctx,
+	// Generate new JWT token with same session
+	role := user.Role
+	newToken, err := utils.GenerateJWT(
 		user.ID,
-		"login",
-		ctx.ClientIP(),
-		ctx.GetHeader("User-Agent"),
-		"124121",
+		tokenData.SessionID,
+		tokenData.DeviceID,
+		tokenData.LastIP,
+		user.Username,
+		user.Email,
+		role,
+		user.IsPremium,
+		userAuth.IsEmailVerified,
 	)
 	if err != nil {
-		utils.Logger.Error("Failed to create session in Redis",
-			"user_id", user.ID,
-			"error", err.Error(),
-		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Message: "Failed to create session",
-			Error:   map[string]string{"server": "Session creation failed"},
-		})
-		return
-	}
-
-	// Generate new access token
-	role := map[bool]string{true: "premium", false: "regular"}[user.IsPremium]
-	newToken, err := utils.GenerateJWT(user.ID, sessionID, *userAuth.DeviceID, *userAuth.LastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
-	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Failed to generate token",
+			Message: "Failed to generate new token",
 			Error:   map[string]string{"error": "Token generation failed"},
 		})
 		return
 	}
 
+	// Rotate refresh token (delete old, create new) - security best practice
+	err = refreshTokenManager.DeleteRefreshToken(context.Background(), req.RefreshToken)
+	if err != nil {
+		utils.Logger.Warn("Failed to delete old refresh token",
+			"user_id", tokenData.UserID,
+			"error", err.Error(),
+		)
+	}
+
+	// Generate new refresh token
+	newRefreshToken, err := utils.GenerateRefreshToken(
+		context.Background(),
+		redisClient,
+		user.ID,
+		tokenData.SessionID,
+		tokenData.DeviceID,
+		tokenData.LastIP,
+	)
+	if err != nil {
+		utils.Logger.Error("Failed to generate new refresh token",
+			"user_id", user.ID,
+			"error", err.Error(),
+		)
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Failed to generate refresh token",
+			Error:   map[string]string{"error": "Refresh token generation failed"},
+		})
+		return
+	}
+
+	utils.Logger.Info("Token refreshed successfully",
+		"user_id", user.ID,
+		"session_id", utils.GetKeyPreview(tokenData.SessionID),
+	)
+
+	// Return new tokens
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
-			"token": newToken,
+			"token":         newToken,
+			"refresh_token": newRefreshToken,
 		},
 		Message: "Token refreshed successfully",
 		Error:   nil,

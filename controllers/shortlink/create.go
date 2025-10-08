@@ -30,25 +30,30 @@ func (c *Controller) Create(ctx *gin.Context) {
 		"user_id", userID,
 	)
 
-	// Primary detection: if links array has items, it's bulk regardless of is_bulky flag
-	if len(req.Links) > 0 {
-		utils.Logger.Info("Detected bulk request by links array", "count", len(req.Links), "user_id", userID)
+	// Bulk mode: is_bulky true & links >= 1
+	if req.IsBulky {
+		if len(req.Links) == 0 {
+			utils.SendValidationError(ctx, fmt.Errorf("links wajib diisi untuk mode bulk"), &req)
+			return
+		}
 		c.handleBulkCreation(ctx, req.Links, userID, userEmail, userName)
 		return
 	}
 
-	// Secondary detection: if link object is provided, it's single
-	if req.Link != nil {
-		utils.Logger.Info("Detected single request by link object", "user_id", userID)
-		c.handleSingleCreation(ctx, *req.Link, userID, userEmail, userName)
-		return
-	}
-
-	// Fallback: if is_bulky is true but no links provided, it's an error
-	if req.IsBulky {
-		utils.Logger.Error("Bulk mode indicated but no links provided", "user_id", userID)
-		utils.SendValidationError(ctx, fmt.Errorf("links wajib diisi untuk mode bulk"), &req)
-		return
+	// Single mode: is_bulky false
+	if !req.IsBulky {
+		if len(req.Links) == 1 {
+			c.handleSingleCreation(ctx, req.Links[0], userID, userEmail, userName)
+			return
+		}
+		if len(req.Links) > 1 {
+			utils.SendValidationError(ctx, fmt.Errorf("gunakan 1 link saja untuk mode single"), &req)
+			return
+		}
+		if req.Link != nil {
+			c.handleSingleCreation(ctx, *req.Link, userID, userEmail, userName)
+			return
+		}
 	}
 
 	// Final fallback: neither bulk nor single data provided

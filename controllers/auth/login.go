@@ -153,9 +153,21 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
-	// Generate refresh token
-	refreshToken, err := utils.GenerateRefreshToken(user.ID)
+	// Generate refresh token and store in Redis
+	sessionManager := middleware.GetSessionManager()
+	refreshToken, err := utils.GenerateRefreshToken(
+		context.Background(),
+		sessionManager.GetRedisClient(),
+		user.ID,
+		sessionID,
+		*deviceID,
+		*lastIP,
+	)
 	if err != nil {
+		utils.Logger.Error("Failed to generate refresh token",
+			"user_id", user.ID,
+			"error", err.Error(),
+		)
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,

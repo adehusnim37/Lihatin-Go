@@ -15,6 +15,11 @@ type RedisStore struct {
 	prefix string // Key prefix for namespacing
 }
 
+// GetClient returns the Redis client for external use
+func (s *RedisStore) GetClient() *redis.Client {
+	return s.client
+}
+
 // NewRedisStore creates a new Redis session store
 func NewRedisStore(addr, password string, db int) (*RedisStore, error) {
 	client := redis.NewClient(&redis.Options{

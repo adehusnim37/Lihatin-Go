@@ -15,9 +15,9 @@ type CreateShortLinkRequest struct {
 
 // ShortLinkRequest represents request to create single or multiple short links
 type ShortLinkRequest struct {
-	IsBulky bool                      `json:"is_bulky,omitempty"`
-	Link    *CreateShortLinkRequest   `json:"link,omitempty" binding:"omitempty,required_if=IsBulky false" label:"Data Short Link Tunggal"`
-	Links   []CreateShortLinkRequest  `json:"links,omitempty" binding:"omitempty,dive,required_if=IsBulky true" label:"Data Short Links Jamak"`
+	IsBulky bool                     `json:"is_bulky,omitempty"`
+	Link    *CreateShortLinkRequest  `json:"link,omitempty" binding:"omitempty,required_if=IsBulky false" label:"Data Short Link Tunggal"`
+	Links   []CreateShortLinkRequest `json:"links,omitempty" binding:"omitempty,dive,required_if=IsBulky true" label:"Data Short Links Jamak"`
 }
 
 // BulkShortLinkResponse represents response for bulk short link creation

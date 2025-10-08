@@ -1,16 +1,26 @@
-# .air.toml
+# .air.toml (Windows-friendly)
 root = "."
 tmp_dir = "tmp"
 
+# Air akan menjalankan file ini (pastikan .exe)
+bin = "tmp\\main.exe"
+
 [build]
-  cmd = "go build -o ./tmp/main ."
-  bin = "tmp/main"
-  full_bin = "./tmp/main"
+# Build ke .exe (pakai backslash biar aman di Windows)
+cmd = "go build -o tmp\\main.exe ."
+delay = "200ms"
+kill_delay = "800ms"
 
 [log]
-  time = true
+time = true
 
+# Pilih salah satu gaya watcher (jangan dobel):
+# --- Opsi A: gaya baru ---
 [watch]
-  include = ["."]
-  exclude = ["tmp", "vendor", "node_modules"]
-  extensions = ["go", "tpl", "tmpl", "html"]
+include = ["."]
+exclude = ["tmp", "vendor", "node_modules"]
+extensions = ["go", "tpl", "tmpl", "html", "env"]
+
+# --- Opsi B: gaya lama (komentari [watch] di atas kalau pakai ini) ---
+# include_ext = ["go", "tpl", "tmpl", "html", "env"]
+# exclude_dir = ["tmp", "vendor", "node_modules"]

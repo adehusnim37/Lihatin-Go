@@ -8,6 +8,15 @@ import (
 	"fmt"
 )
 
+// GenerateSecureToken generates a secure random token of specified byte length
+func GenerateSecureToken(byteLength int) (string, error) {
+	bytes := make([]byte, byteLength)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
 // GenerateVerificationToken generates a secure random token for email verification
 func GenerateVerificationToken() (string, error) {
 	// Generate 32 bytes of random data (256 bits)

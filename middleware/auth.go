@@ -53,6 +53,33 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			return
 		}
 
+		// Check if JWT is blacklisted (revoked during logout)
+		sessionManager := GetSessionManager()
+		blacklistManager := utils.NewJWTBlacklistManager(sessionManager.GetRedisClient())
+		isBlacklisted, err := blacklistManager.IsJWTBlacklisted(c.Request.Context(), claims.ID)
+		if err != nil {
+			utils.Logger.Error("Failed to check JWT blacklist", "error", err.Error())
+			c.JSON(http.StatusInternalServerError, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Authentication check failed",
+				Error:   map[string]string{"auth": "Internal error"},
+			})
+			c.Abort()
+			return
+		}
+
+		if isBlacklisted {
+			c.JSON(http.StatusUnauthorized, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Token has been revoked",
+				Error:   map[string]string{"auth": "Please login again"},
+			})
+			c.Abort()
+			return
+		}
+
 		// Optionally verify user still exists and is active
 		user, err := userRepo.GetUserByID(claims.UserID)
 		if err != nil {
@@ -195,6 +222,19 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 			if token != "" {
 				claims, err := utils.ValidateJWT(token)
 				if err == nil {
+					// Check if JWT is blacklisted (revoked during logout)
+					sessionManager := GetSessionManager()
+					blacklistManager := utils.NewJWTBlacklistManager(sessionManager.GetRedisClient())
+					isBlacklisted, err := blacklistManager.IsJWTBlacklisted(c.Request.Context(), claims.ID)
+					if err != nil {
+						utils.Logger.Error("Failed to check JWT blacklist", "error", err.Error())
+					}
+
+					if isBlacklisted {
+						c.Set("is_authenticated", false)
+						c.Next()
+						return
+					}
 					// Set user information in context if token is valid
 					c.Set("user_id", claims.UserID)
 					c.Set("username", claims.Username)
