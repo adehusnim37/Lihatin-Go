@@ -57,6 +57,13 @@ var indonesianMessages = map[string]string{
 	"datetime":     "%s harus berupa tanggal dan waktu yang valid dengan format %s",
 	"required_if":  "%s wajib diisi ketika %s adalah %s",
 	"excluded_if":  "%s tidak boleh diisi ketika %s adalah %s",
+	"excluded":     "%s tidak boleh diisi",
+	"omitempty":    "%s tidak valid",
+	"bool":         "%s harus berupa boolean",
+	"array":        "%s harus berupa array",
+	"slice":        "%s harus berupa array",
+	"map":          "%s harus berupa peta",
+	"set":          "%s harus berupa set",
 }
 
 // Type mapping for Indonesian error messages
@@ -72,6 +79,8 @@ var typeMapping = map[string]string{
 	"[]int":    "array angka",
 	"array":    "array",
 	"slice":    "array",
+	"link":     "%s harus berupa payload link tunggal yang valid",
+	"links":    "%s harus berupa payload link jamak yang valid",
 }
 
 // GetFieldLabel extracts the label from struct tag or defaults to field name
@@ -223,12 +232,13 @@ func SendValidationError(c *gin.Context, err error, structPtr interface{}) {
 	} else if _, ok := err.(validator.ValidationErrors); ok {
 		result = HandleValidationError(err, structPtr)
 	} else {
-		// Handle other binding errors
+		// Handle custom error messages (from business logic)
+		errorMessage := err.Error()
 		result = ValidationResponse{
 			Status:  400,
-			Details: []DetailError{{Field: "request", Message: "Format request tidak valid"}},
+			Details: []DetailError{{Field: "request", Message: errorMessage}},
 			ErrorMap: map[string]string{
-				"request": "Format request tidak valid",
+				"request": errorMessage,
 			},
 			Message: "Validasi gagal",
 			Success: false,

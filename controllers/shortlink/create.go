@@ -10,7 +10,7 @@ import (
 )
 
 func (c *Controller) Create(ctx *gin.Context) {
-	var req dto.CreateShortLinkRequest
+	var req dto.ShortLinkRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// Use new validation error handler
@@ -18,34 +18,42 @@ func (c *Controller) Create(ctx *gin.Context) {
 		return
 	}
 
-	var userID string
-	if userIDVal, exists := ctx.Get("user_id"); exists {
-		userID = userIDVal.(string)
-		utils.Logger.Info("User authenticated", "user_id", userID)
-	}
-
+	userID := ctx.GetString("user_id")
 	userEmail := ctx.GetString("email")
 	userName := ctx.GetString("username")
 
-	// 3. THIRD: Use authenticated user ID or fall back to request UserID (for anonymous)
-	if userID == "" {
-		userID = req.UserID // This could be empty for anonymous users
-		utils.Logger.Info("No authenticated user, using request UserID", "user_id", userID)
+	// Debug logging
+	utils.Logger.Info("Request received",
+		"is_bulky", req.IsBulky,
+		"has_link", req.Link != nil,
+		"links_count", len(req.Links),
+		"user_id", userID,
+	)
+
+	// Primary detection: if links array has items, it's bulk regardless of is_bulky flag
+	if len(req.Links) > 0 {
+		utils.Logger.Info("Detected bulk request by links array", "count", len(req.Links), "user_id", userID)
+		c.handleBulkCreation(ctx, req.Links, userID, userEmail, userName)
+		return
 	}
 
-	// 4. Override request UserID with the final userID (authenticated takes priority)
-	req.UserID = userID
+	// Secondary detection: if link object is provided, it's single
+	if req.Link != nil {
+		utils.Logger.Info("Detected single request by link object", "user_id", userID)
+		c.handleSingleCreation(ctx, *req.Link, userID, userEmail, userName)
+		return
+	}
 
-	// Decide to handle single or bulk creation based on IsBulky flag
-	// 5. FOURTH: Handle single or bulk creation
-	utils.Logger.Info("Creating short link(s)", "is_bulky", req.IsBulky, "user_id", userID)
+	// Fallback: if is_bulky is true but no links provided, it's an error
 	if req.IsBulky {
-		utils.Logger.Info("Handling bulk creation", "user_id", userID)
-		c.handleBulkCreation(ctx, userID, userEmail, userName)
-	} else {
-		c.handleSingleCreation(ctx, req, userID, userEmail, userName)
+		utils.Logger.Error("Bulk mode indicated but no links provided", "user_id", userID)
+		utils.SendValidationError(ctx, fmt.Errorf("links wajib diisi untuk mode bulk"), &req)
+		return
 	}
 
+	// Final fallback: neither bulk nor single data provided
+	utils.Logger.Error("No valid request data provided", "user_id", userID)
+	utils.SendValidationError(ctx, fmt.Errorf("request harus berisi 'link' untuk single atau 'links' untuk bulk"), &req)
 }
 
 // Handle single short link creation
@@ -148,21 +156,16 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 }
 
 // Handle bulk short links creation
-func (c *Controller) handleBulkCreation(ctx *gin.Context, userID, userEmail, userName string) {
+func (c *Controller) handleBulkCreation(ctx *gin.Context, links []dto.CreateShortLinkRequest, userID, userEmail, userName string) {
 	// For bulk, we need multiple link data
-	var bulkReq dto.BulkCreateShortLinkRequest
-	if err := ctx.ShouldBindJSON(&bulkReq); err != nil {
-		utils.SendValidationError(ctx, err, &bulkReq)
-		return
-	}
 
 	// Set user ID for all links
-	for i := range bulkReq.Links {
-		bulkReq.Links[i].UserID = userID
+	for i := range links {
+		links[i].UserID = userID
 	}
 
 	// Create bulk short links
-	createdLinks, createdDetails, err := c.repo.CreateBulkShortLinks(bulkReq.Links)
+	createdLinks, createdDetails, err := c.repo.CreateBulkShortLinks(links)
 	if err != nil {
 		utils.Logger.Error("Failed to create bulk short links", "error", err.Error())
 		utils.HandleError(ctx, err, userID)

@@ -4,7 +4,6 @@ import "time"
 
 // CreateShortLinkRequest represents request to create short link
 type CreateShortLinkRequest struct {
-	IsBulky     bool       `json:"is_bulky,omitempty" binding:"omitempty" label:"Buat Banyak"` // New field to indicate bulk creation
 	UserID      string     `json:"user_id,omitempty"`
 	Passcode    string     `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
 	OriginalURL string     `json:"original_url" label:"URL Asli" binding:"required,url"`
@@ -14,11 +13,14 @@ type CreateShortLinkRequest struct {
 	ExpiresAt   *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa"`
 }
 
-// BulkCreateShortLinkRequest represents request to create multiple short links
-type BulkCreateShortLinkRequest struct {
-	Links []CreateShortLinkRequest `json:"links" binding:"required,min=1,max=15,dive"` // Limit to max 15 links per request
+// ShortLinkRequest represents request to create single or multiple short links
+type ShortLinkRequest struct {
+	IsBulky bool                      `json:"is_bulky,omitempty"`
+	Link    *CreateShortLinkRequest   `json:"link,omitempty" binding:"omitempty,required_if=IsBulky false" label:"Data Short Link Tunggal"`
+	Links   []CreateShortLinkRequest  `json:"links,omitempty" binding:"omitempty,dive,required_if=IsBulky true" label:"Data Short Links Jamak"`
 }
 
+// BulkShortLinkResponse represents response for bulk short link creation
 type BulkShortLinkResponse struct {
 	Links        []ShortLinkResponse `json:"links"`
 	TotalCount   int                 `json:"total_count"`
