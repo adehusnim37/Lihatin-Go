@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/utils/mail"
 )
 
 func main() {
 	fmt.Println("Testing email service configuration...")
-	
-	emailService := utils.NewEmailService()
-	
+
+	emailService := mail.NewEmailService()
+
 	// Test sending a simple email
 	err := emailService.SendVerificationEmail("test@example.com", "Test User", "test-token-123")
 	if err != nil {

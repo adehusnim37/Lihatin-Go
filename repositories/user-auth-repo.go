@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -352,4 +353,26 @@ func (r *UserAuthRepository) GetUserAuthStats() (map[string]interface{}, error) 
 	stats["locked_users"] = lockedUsers
 
 	return stats, nil
+}
+
+// Logout and remove sessionID for user
+func (ur *UserAuthRepository) Logout(userID string) error {
+	var userAuth user.UserAuth
+
+	result := ur.db.Where("user_id = ?", userID).First(&userAuth)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return utils.ErrSessionNotFound
+		}
+		utils.Logger.Error("Error finding user session", "user_id", userID, "error", result.Error)
+		return utils.ErrUserDatabaseError
+	}
+
+	result = ur.db.Model(&userAuth).Updates(map[string]interface{}{
+		"session_id": nil,
+		"device_id":  nil,
+		"last_ip":    nil,
+	})
+
+	return nil
 }

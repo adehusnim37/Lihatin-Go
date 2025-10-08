@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	"github.com/adehusnim37/lihatin-go/models/user"
@@ -88,6 +89,15 @@ func main() {
 		panic(err)
 	}
 	log.Println("Database migrations completed successfully!")
+
+	// Initialize Redis session manager
+	log.Println("Initializing session manager...")
+	if err := middleware.InitSessionManager(); err != nil {
+		log.Printf("Failed to initialize session manager: %v", err)
+		log.Println("Warning: Application will run without session management")
+	} else {
+		log.Println("✅ Session manager initialized successfully!")
+	}
 
 	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()

@@ -1,15 +1,15 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
-	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
 	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
-	"github.com/adehusnim37/lihatin-go/utils/session"
 	"github.com/gin-gonic/gin"
 )
 
@@ -109,15 +109,23 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
-	sessionID, err := session.GenerateSessionID(
-		user.ID,                  // User ID
-		"login",                  // Purpose
-		ctx.ClientIP(),          // IP Address
-		ctx.GetHeader("User-Agent"), // User Agent
-		24*time.Hour,                // Expires in 24 hours
-	)
+	// Get device and IP info
+	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
 
+	// Create session in Redis using middleware helper
+	sessionID, err := middleware.CreateSession(
+		context.Background(),
+		user.ID,
+		"login",
+		ctx.ClientIP(),
+		ctx.GetHeader("User-Agent"),
+		*deviceID,
+	)
 	if err != nil {
+		utils.Logger.Error("Failed to create session in Redis",
+			"user_id", user.ID,
+			"error", err.Error(),
+		)
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Message: "Failed to create session",
@@ -125,9 +133,12 @@ func (c *Controller) Login(ctx *gin.Context) {
 		})
 		return
 	}
-	// Create user auth record for email verification
-	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
 
+	utils.Logger.Info("Session created successfully",
+		"user_id", user.ID,
+		"session_preview", utils.GetKeyPreview(sessionID),
+		"device_id", *deviceID,
+	)
 
 	// Generate JWT token
 	role := user.Role
@@ -174,7 +185,16 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Prepare response data
 	responseData := map[string]interface{}{
-		"user":          user,
+		"user": dto.UserProfile{
+			ID:        user.ID,
+			Username:  user.Username,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Email:     user.Email,
+			Avatar:    user.Avatar,
+			IsPremium: user.IsPremium,
+			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		},
 		"token":         token,
 		"refresh_token": refreshToken,
 		"requires_2fa":  hasTOTP,

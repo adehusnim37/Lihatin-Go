@@ -1,10 +1,8 @@
 package session
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"context"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -50,48 +48,46 @@ func (s *SessionMetadata) String() string {
 		s.UserID, s.Purpose, s.Age(), s.TimeLeft())
 }
 
-// ExtractSessionInfo extracts session information without full validation (for debugging/logging)
-func ExtractSessionInfo(sessionID string) (*SessionMetadata, error) {
-	if !strings.HasPrefix(sessionID, "sess_") {
-		return nil, fmt.Errorf("invalid session format")
+// Note: Since session ID is now a simple random key,
+// all metadata must be fetched from Redis using the Manager.
+// The functions below require the Manager to be initialized.
+
+// GetSessionInfo fetches session information from Redis
+func GetSessionInfo(sessionID string) (*SessionMetadata, error) {
+	manager := GetManager()
+	if manager == nil {
+		return nil, fmt.Errorf("session manager not initialized")
 	}
 
-	sessionID = strings.TrimPrefix(sessionID, "sess_")
-	parts := strings.Split(sessionID, ".")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid session structure")
-	}
-
-	payload, err := base64.URLEncoding.DecodeString(parts[0])
+	session, err := manager.Get(context.Background(), sessionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode payload")
+		return nil, err
 	}
 
-	if len(payload) < 24 {
-		return nil, fmt.Errorf("payload too short")
-	}
-
-	metadataBytes := payload[24:]
-	var metadata SessionMetadata
-	if err := json.Unmarshal(metadataBytes, &metadata); err != nil {
-		return nil, fmt.Errorf("failed to parse metadata")
-	}
-
-	return &metadata, nil
+	// Convert Session to SessionMetadata
+	return &SessionMetadata{
+		UserID:    session.UserID,
+		Purpose:   session.Purpose,
+		IssuedAt:  session.CreatedAt.Unix(),
+		ExpiresAt: session.ExpiresAt.Unix(),
+		IPAddress: session.IPAddress,
+		UserAgent: session.UserAgent,
+	}, nil
 }
 
-// IsSessionExpired checks if session is expired without full validation
+// IsSessionExpired checks if session is expired by checking Redis
 func IsSessionExpired(sessionID string) bool {
-	metadata, err := ExtractSessionInfo(sessionID)
+	metadata, err := GetSessionInfo(sessionID)
 	if err != nil {
 		return true
 	}
+
 	return metadata.IsExpired()
 }
 
-// GetSessionTimeLeft returns remaining time for session
+// GetSessionTimeLeft returns remaining time for session from Redis
 func GetSessionTimeLeft(sessionID string) (time.Duration, error) {
-	metadata, err := ExtractSessionInfo(sessionID)
+	metadata, err := GetSessionInfo(sessionID)
 	if err != nil {
 		return 0, err
 	}
@@ -104,18 +100,18 @@ func GetSessionTimeLeft(sessionID string) (time.Duration, error) {
 	return remaining, nil
 }
 
-// GetSessionUserID extracts user ID from session without full validation
+// GetSessionUserID extracts user ID from session via Redis
 func GetSessionUserID(sessionID string) (string, error) {
-	metadata, err := ExtractSessionInfo(sessionID)
+	metadata, err := GetSessionInfo(sessionID)
 	if err != nil {
 		return "", err
 	}
 	return metadata.UserID, nil
 }
 
-// GetSessionPurpose extracts purpose from session without full validation
+// GetSessionPurpose extracts purpose from session via Redis
 func GetSessionPurpose(sessionID string) (string, error) {
-	metadata, err := ExtractSessionInfo(sessionID)
+	metadata, err := GetSessionInfo(sessionID)
 	if err != nil {
 		return "", err
 	}
@@ -124,17 +120,9 @@ func GetSessionPurpose(sessionID string) (string, error) {
 
 // GetSessionAge returns how long ago the session was created
 func GetSessionAge(sessionID string) (time.Duration, error) {
-	metadata, err := ExtractSessionInfo(sessionID)
+	metadata, err := GetSessionInfo(sessionID)
 	if err != nil {
 		return 0, err
 	}
 	return metadata.Age(), nil
-}
-
-// getSessionPreview returns a preview of session ID for safe logging
-func getSessionPreview(sessionID string) string {
-	if len(sessionID) <= 12 {
-		return sessionID
-	}
-	return sessionID[:8] + "..." + sessionID[len(sessionID)-4:]
 }

@@ -121,7 +121,6 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		apiKeyID := extractIDApiKey(apiKeyValue)
 
 		// Convert API key to pointer if not empty
-	
 
 		// Create log entry
 		log := &logging.ActivityLog{

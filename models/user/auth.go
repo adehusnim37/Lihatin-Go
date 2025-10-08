@@ -20,14 +20,14 @@ type UserAuth struct {
 	PasswordResetTokenExpiresAt *time.Time `json:"-"`                 // Expiry for the reset token
 
 	// Account status & security
-	SessionID           *string    `json:"session_id,omitempty" gorm:"type:text;index"` // Current active session ID, if any
-	DeviceID            *string    `json:"device_id,omitempty" gorm:"size:255;index"`   // Current active device ID, if any
-	LastIP              *string    `json:"last_ip,omitempty" gorm:"size:45"`            // Last IP address used, if any
+	DeviceID            *string    `json:"device_id,omitempty" gorm:"size:255;index"` // Current active device ID, if any
+	LastIP              *string    `json:"last_ip,omitempty" gorm:"size:45"`          // Last IP address used, if any
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
-	FailedLoginAttempts int        `json:"-" gorm:"default:0"`                   // Counter for failed login attempts
-	LockoutUntil        *time.Time `json:"-"`                                    // Timestamp until which the account is locked
-	IsActive            bool       `json:"is_active" gorm:"default:true"`        // General account active status
-	IsTOTPEnabled       bool       `json:"is_totp_enabled" gorm:"default:false"` // Whether TOTP is enabled for this user
+	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
+	FailedLoginAttempts int        `json:"failed_login_attempts,omitempty" gorm:"default:0"` // Counter for failed login attempts
+	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`                          // Timestamp until which the account is locked
+	IsActive            bool       `json:"is_active" gorm:"default:true"`                    // General account active status
+	IsTOTPEnabled       bool       `json:"is_totp_enabled" gorm:"default:false"`             // Whether TOTP is enabled for this user
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`

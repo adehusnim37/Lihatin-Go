@@ -1,19 +1,39 @@
 package session
 
 import (
-	"encoding/base64"
+	"context"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/adehusnim37/lihatin-go/utils"
 )
 
-// ValidateSessionForUser checks if session belongs to specific user with additional validations
+// ValidateSessionForUser validates session from Redis and checks user/IP/UA
+// This function requires the Manager to be initialized
 func ValidateSessionForUser(sessionID, expectedUserID, currentIP, currentUserAgent string) (*SessionMetadata, error) {
-	metadata, isValid := ValidateSessionID(sessionID)
-	if !isValid {
-		return nil, fmt.Errorf("invalid session ID")
+	// First check format
+	if !IsValidSessionFormat(sessionID) {
+		return nil, fmt.Errorf("invalid session ID format")
+	}
+
+	// Get session from Redis (this validates expiration too)
+	manager := GetManager()
+	if manager == nil {
+		return nil, fmt.Errorf("session manager not initialized")
+	}
+
+	sess, err := manager.Get(context.Background(), sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found or expired: %w", err)
+	}
+
+	// Convert Session to SessionMetadata
+	metadata := &SessionMetadata{
+		UserID:    sess.UserID,
+		Purpose:   sess.Purpose,
+		IssuedAt:  sess.CreatedAt.Unix(),
+		ExpiresAt: sess.ExpiresAt.Unix(),
+		IPAddress: sess.IPAddress,
+		UserAgent: sess.UserAgent,
 	}
 
 	// Check user ID
@@ -43,37 +63,29 @@ func ValidateSessionForUser(sessionID, expectedUserID, currentIP, currentUserAge
 	return metadata, nil
 }
 
-// ValidateSessionFormat checks if sessionID has correct format without full validation
-func ValidateSessionFormat(sessionID string) bool {
-	if !strings.HasPrefix(sessionID, "sess_") {
-		return false
-	}
-
-	sessionID = strings.TrimPrefix(sessionID, "sess_")
-	parts := strings.Split(sessionID, ".")
-
-	// Should have exactly 2 parts (payload.signature)
-	if len(parts) != 2 {
-		return false
-	}
-
-	// Both parts should be valid base64
-	if _, err := base64.URLEncoding.DecodeString(parts[0]); err != nil {
-		return false
-	}
-
-	if _, err := base64.URLEncoding.DecodeString(parts[1]); err != nil {
-		return false
-	}
-
-	return true
-}
-
 // ValidateSessionStrict performs strict validation with IP and User-Agent enforcement
 func ValidateSessionStrict(sessionID, expectedUserID, currentIP, currentUserAgent string) (*SessionMetadata, error) {
-	metadata, isValid := ValidateSessionID(sessionID)
-	if !isValid {
-		return nil, fmt.Errorf("invalid session ID")
+	if !IsValidSessionFormat(sessionID) {
+		return nil, fmt.Errorf("invalid session ID format")
+	}
+
+	manager := GetManager()
+	if manager == nil {
+		return nil, fmt.Errorf("session manager not initialized")
+	}
+
+	sess, err := manager.Get(context.Background(), sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found or expired: %w", err)
+	}
+
+	metadata := &SessionMetadata{
+		UserID:    sess.UserID,
+		Purpose:   sess.Purpose,
+		IssuedAt:  sess.CreatedAt.Unix(),
+		ExpiresAt: sess.ExpiresAt.Unix(),
+		IPAddress: sess.IPAddress,
+		UserAgent: sess.UserAgent,
 	}
 
 	// Check user ID
@@ -96,9 +108,27 @@ func ValidateSessionStrict(sessionID, expectedUserID, currentIP, currentUserAgen
 
 // ValidateSessionPurpose checks if session has specific purpose
 func ValidateSessionPurpose(sessionID string, expectedPurposes ...string) (*SessionMetadata, error) {
-	metadata, isValid := ValidateSessionID(sessionID)
-	if !isValid {
-		return nil, fmt.Errorf("invalid session ID")
+	if !IsValidSessionFormat(sessionID) {
+		return nil, fmt.Errorf("invalid session ID format")
+	}
+
+	manager := GetManager()
+	if manager == nil {
+		return nil, fmt.Errorf("session manager not initialized")
+	}
+
+	sess, err := manager.Get(context.Background(), sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found or expired: %w", err)
+	}
+
+	metadata := &SessionMetadata{
+		UserID:    sess.UserID,
+		Purpose:   sess.Purpose,
+		IssuedAt:  sess.CreatedAt.Unix(),
+		ExpiresAt: sess.ExpiresAt.Unix(),
+		IPAddress: sess.IPAddress,
+		UserAgent: sess.UserAgent,
 	}
 
 	// Check if session purpose matches any of expected purposes
@@ -110,40 +140,4 @@ func ValidateSessionPurpose(sessionID string, expectedPurposes ...string) (*Sess
 
 	return nil, fmt.Errorf("session purpose '%s' not in allowed purposes: %v",
 		metadata.Purpose, expectedPurposes)
-}
-
-// ValidateSessionNotExpired checks if session is not expired (lightweight validation)
-func ValidateSessionNotExpired(sessionID string) error {
-	if IsSessionExpired(sessionID) {
-		return fmt.Errorf("session expired")
-	}
-	return nil
-}
-
-// ValidateMultipleSessions validates multiple session IDs and returns valid ones
-func ValidateMultipleSessions(sessionIDs []string) map[string]*SessionMetadata {
-	validSessions := make(map[string]*SessionMetadata)
-
-	for _, sessionID := range sessionIDs {
-		if metadata, isValid := ValidateSessionID(sessionID); isValid {
-			validSessions[sessionID] = metadata
-		}
-	}
-
-	return validSessions
-}
-
-// ValidateSessionMinimumTimeLeft ensures session has minimum time remaining
-func ValidateSessionMinimumTimeLeft(sessionID string, minimumDuration time.Duration) error {
-	timeLeft, err := GetSessionTimeLeft(sessionID)
-	if err != nil {
-		return err
-	}
-
-	if timeLeft < minimumDuration {
-		return fmt.Errorf("session expires too soon: %v remaining, need at least %v",
-			timeLeft, minimumDuration)
-	}
-
-	return nil
 }

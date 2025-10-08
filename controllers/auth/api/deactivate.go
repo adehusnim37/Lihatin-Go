@@ -1,8 +1,6 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
@@ -16,7 +14,7 @@ func (c *Controller) DeactivateAPIKey(ctx *gin.Context) {
 	userRole := ctx.GetString("role")
 
 	if err := ctx.ShouldBindUri(&reqId); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.SendValidationError(ctx, err, &reqId)
 		return
 	}
 

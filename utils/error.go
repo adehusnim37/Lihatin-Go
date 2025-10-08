@@ -109,4 +109,12 @@ var (
 	ErrTokenGenerationFailed = errors.New("failed to generate token")
 	ErrTokenInvalid          = errors.New("invalid token")
 	ErrTokenExpired          = errors.New("token has expired")
+	ErrTokenMissing          = errors.New("token is missing")
+
+	// Session errors
+	ErrSessionNotFound           = errors.New("session not found")
+	ErrSessionExpired            = errors.New("session expired")
+	ErrInvalidSession            = errors.New("invalid session")
+	ErrSessionCreationFailed     = errors.New("failed to create session")
+	ErrSessionInvalidationFailed = errors.New("failed to invalidate session")
 )

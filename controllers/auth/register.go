@@ -1,16 +1,17 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
-	"github.com/adehusnim37/lihatin-go/utils/session"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -101,15 +102,25 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 	expirationTime := time.Now().Add(time.Duration(jwtExpiredHours) * time.Hour)
-	sessionID, err := session.GenerateSessionID(
-		newUser.ID,                  // User ID
-		"registration",              // Purpose
-		ctx.ClientIP(),              // IP Address
-		ctx.GetHeader("User-Agent"), // User Agent
-		time.Duration(jwtExpiredHours)*time.Hour, // Expires in jwtExpiredHours
+
+	// Get device and IP info
+	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+
+	// Create session in Redis
+	sessionID, err := middleware.CreateSession(
+		context.Background(),
+		newUser.ID,
+		"registration",
+		ctx.ClientIP(),
+		ctx.GetHeader("User-Agent"),
+		*deviceID,
 	)
 
 	if err != nil {
+		utils.Logger.Error("Failed to create registration session in Redis",
+			"user_id", newUser.ID,
+			"error", err.Error(),
+		)
 		utils.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
@@ -120,8 +131,11 @@ func (c *Controller) Register(ctx *gin.Context) {
 		)
 		return
 	}
-	// Create user auth record for email verification
-	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+
+	utils.Logger.Info("Registration session created",
+		"user_id", newUser.ID,
+		"session_preview", utils.GetKeyPreview(sessionID),
+	)
 
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
@@ -134,7 +148,6 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 	userAuth := &user.UserAuth{
 		ID:                              uuidV7.String(),
-		SessionID:                       &sessionID,
 		DeviceID:                        deviceID,
 		LastIP:                          lastIP,
 		UserID:                          newUser.ID,

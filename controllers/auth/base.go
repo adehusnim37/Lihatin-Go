@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/repositories"
@@ -665,9 +666,30 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
+	sessionID, err := middleware.CreateSession(
+		ctx,
+		user.ID,
+		"login",
+		ctx.ClientIP(),
+		ctx.GetHeader("User-Agent"),
+		"124121",
+	)
+	if err != nil {
+		utils.Logger.Error("Failed to create session in Redis",
+			"user_id", user.ID,
+			"error", err.Error(),
+		)
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Message: "Failed to create session",
+			Error:   map[string]string{"server": "Session creation failed"},
+		})
+		return
+	}
+
 	// Generate new access token
 	role := map[bool]string{true: "premium", false: "regular"}[user.IsPremium]
-	newToken, err := utils.GenerateJWT(user.ID, *userAuth.SessionID, *userAuth.DeviceID, *userAuth.LastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
+	newToken, err := utils.GenerateJWT(user.ID, sessionID, *userAuth.DeviceID, *userAuth.LastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -684,21 +706,6 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 			"token": newToken,
 		},
 		Message: "Token refreshed successfully",
-		Error:   nil,
-	})
-}
-
-// Logout invalidates user session (placeholder for token blacklisting)
-func (c *Controller) Logout(ctx *gin.Context) {
-	// In a real implementation, you would:
-	// 1. Add the token to a blacklist (Redis/database)
-	// 2. Clear any session data
-	// 3. Optionally revoke refresh tokens
-
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    nil,
-		Message: "Logged out successfully",
 		Error:   nil,
 	})
 }

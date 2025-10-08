@@ -124,6 +124,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 		c.Set("is_premium", claims.IsPremium)
 		c.Set("is_verified", claims.IsVerified)
 		c.Set("user", user)
+		c.Set("session_id", claims.SessionID)
 
 		c.Next()
 	}
