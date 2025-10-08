@@ -3,7 +3,7 @@ package user
 import "time"
 
 type UserAuth struct {
-	ID     string `json:"id" gorm:"primaryKey;type:char(36);default:(uuid_generate_v7())"`                   // Primary Key with UUID v7 auto-generation
+	ID     string `json:"id" gorm:"primaryKey;type:char(36);"`                                               // Primary Key with UUID v7 auto-generation
 	UserID string `json:"user_id" gorm:"size:191;not null;uniqueIndex"`                                      // Foreign Key to User.ID, same size as User.ID
 	User   *User  `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
 
@@ -20,9 +20,9 @@ type UserAuth struct {
 	PasswordResetTokenExpiresAt *time.Time `json:"-"`                 // Expiry for the reset token
 
 	// Account status & security
-	SessionID           *string    `json:"session_id,omitempty" gorm:"size:255;index"` // Current active session ID, if any
-	DeviceID            *string    `json:"device_id,omitempty" gorm:"size:255;index"`  // Current active device ID, if any
-	LastIP              *string    `json:"last_ip,omitempty" gorm:"size:45"`           // Last IP address used, if any
+	SessionID           *string    `json:"session_id,omitempty" gorm:"type:text;index"` // Current active session ID, if any
+	DeviceID            *string    `json:"device_id,omitempty" gorm:"size:255;index"`   // Current active device ID, if any
+	LastIP              *string    `json:"last_ip,omitempty" gorm:"size:45"`            // Last IP address used, if any
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
 	FailedLoginAttempts int        `json:"-" gorm:"default:0"`                   // Counter for failed login attempts
 	LockoutUntil        *time.Time `json:"-"`                                    // Timestamp until which the account is locked

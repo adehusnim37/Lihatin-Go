@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
@@ -20,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
+func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Inisialisasi router Gin default (sudah include logger & recovery middleware)
 	r := gin.Default()
 
@@ -32,7 +31,7 @@ func SetupRouter(db *sql.DB, validate *validator.Validate) *gin.Engine {
 	}
 
 	// Create base controller with GORM for auth
-	baseController := controllers.NewBaseControllerWithGorm(db, gormDB, validate)
+	baseController := controllers.NewBaseControllerWithGorm(gormDB, validate)
 
 	// Inisialisasi controller spesifik
 	userController := user.NewController(baseController)

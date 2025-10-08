@@ -87,7 +87,7 @@ func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (*user.Us
 
 func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {
 	var user user.User
-	result := ur.db.Select("id, email, username").Where("(email = ? OR username = ?) AND deleted_at IS NULL", input, input).First(&user)
+	result := ur.db.Select("id, email, username, is_locked").Where("(email = ? OR username = ?) AND deleted_at IS NULL AND is_locked = false", input, input).First(&user)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -110,7 +110,12 @@ func (ur *userRepository) CreateUser(user *user.User) error {
 
 	// Generate UUID if not provided
 	if user.ID == "" {
-		user.ID = uuid.New().String()
+		newUUID, err := uuid.NewV7()
+		if err != nil {
+			utils.Logger.Error("Error generating UUID", "error", err)
+			return utils.ErrUserCreationFailed
+		}
+		user.ID = newUUID.String()
 	}
 
 	// Set hashed password and timestamps

@@ -22,6 +22,12 @@ func NewUserAuthRepository(db *gorm.DB) *UserAuthRepository {
 
 // CreateUserAuth creates a new UserAuth record
 func (r *UserAuthRepository) CreateUserAuth(userAuth *user.UserAuth) error {
+	//check if user with the userID already exists
+	var existingUserAuth user.UserAuth
+	if err := r.db.Where("user_id = ?", userAuth.UserID).First(&existingUserAuth).Error; err == nil {
+		return utils.ErrUserAlreadyExists
+	}
+
 	if err := r.db.Create(userAuth).Error; err != nil {
 		return utils.ErrUserCreationFailed
 	}

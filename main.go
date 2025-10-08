@@ -89,19 +89,16 @@ func main() {
 	}
 	log.Println("Database migrations completed successfully!")
 
-	// Setup custom validators untuk Gin's binding validator (untuk controller baru)
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		utils.SetupCustomValidators(v)
-		log.Println("✅ Custom validators registered to Gin's engine!")
-	} else {
-		log.Println("⚠️  Failed to register custom validators to Gin's engine")
-	}
-
 	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()
 	utils.SetupCustomValidators(validate)
 
-	r := routes.SetupRouter(db, validate)
+	// ✅ TAMBAHKAN INI: Override Gin's default validator dengan custom validator
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		utils.SetupCustomValidators(v)
+	}
+
+	r := routes.SetupRouter(validate)
 	fmt.Println("Server running on port:", utils.GetRequiredEnv(utils.EnvAppPort))
 	r.Run(utils.GetRequiredEnv(utils.EnvAppPort))
 }
