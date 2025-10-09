@@ -41,6 +41,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.POST("/logout", authController.Logout)
 		protectedAuth.POST("/change-password", authController.ChangePassword)
 		protectedAuth.GET("/profile", authController.GetProfile)
+		protectedAuth.PUT("/profile", authController.UpdateProfile)
+		protectedAuth.DELETE("/delete-account", authController.DeleteAccount)
 
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")

@@ -124,7 +124,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 					Success: false,
 					Data:    nil,
 					Message: "Session validation failed",
-					Error:   map[string]string{"session": "Session validation failed"},
+					Error:   map[string]string{"session": "Session validation failed. Please login again."},
 				})
 				c.Abort()
 				return

@@ -5,21 +5,22 @@ import (
 )
 
 type User struct {
-	ID           string     `json:"id" gorm:"primaryKey"`
-	Username     string     `json:"username" gorm:"uniqueIndex;size:50;not null" validate:"required,min=3,max=50"`
-	FirstName    string     `json:"first_name" gorm:"size:50" validate:"required,min=3,max=50"`
-	LastName     string     `json:"last_name" gorm:"size:50" validate:"required,min=3,max=50"`
-	Email        string     `json:"email" gorm:"uniqueIndex;size:100;not null" validate:"required,email"`
-	Password     string     `json:"password" gorm:"size:255" validate:"required,min=8,max=50,pwdcomplex"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	DeletedAt    *time.Time `json:"deleted_at,omitempty" gorm:"index"`
-	IsPremium    bool       `json:"is_premium" gorm:"default:false"`
-	Avatar       string     `json:"avatar" gorm:"size:255"`
-	IsLocked     bool       `json:"is_locked" gorm:"default:false"`
-	LockedAt     *time.Time `json:"locked_at,omitempty"`
-	LockedReason string     `json:"locked_reason,omitempty" gorm:"size:500"`
-	Role         string     `json:"role" gorm:"size:20;default:user"` // user, admin, super_admin
+	ID              string     `json:"id" gorm:"primaryKey"`
+	Username        string     `json:"username" gorm:"uniqueIndex;size:50;not null" validate:"required,min=3,max=50"`
+	FirstName       string     `json:"first_name" gorm:"size:50" validate:"required,min=3,max=50"`
+	LastName        string     `json:"last_name" gorm:"size:50" validate:"required,min=3,max=50"`
+	Email           string     `json:"email" gorm:"uniqueIndex;size:100;not null" validate:"required,email"`
+	Password        string     `json:"password" gorm:"size:255" validate:"required,min=8,max=50,pwdcomplex"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty" gorm:"index"`
+	UsernameChanged bool       `json:"username_changed,omitempty" gorm:"default:false"`
+	IsPremium       bool       `json:"is_premium" gorm:"default:false"`
+	Avatar          string     `json:"avatar" gorm:"size:255"`
+	IsLocked        bool       `json:"is_locked" gorm:"default:false"`
+	LockedAt        *time.Time `json:"locked_at,omitempty"`
+	LockedReason    string     `json:"locked_reason,omitempty" gorm:"size:500"`
+	Role            string     `json:"role" gorm:"size:20;default:user"` // user, admin, super_admin
 
 	// Relationships
 	UserAuth []UserAuth `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
@@ -64,24 +65,4 @@ type PaginatedUsersResponse struct {
 	Page       int                 `json:"page"`
 	Limit      int                 `json:"limit"`
 	TotalPages int                 `json:"total_pages"`
-}
-
-// UserProfileResponse represents user profile for regular users
-type UserProfileResponse struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	FirstName string    `json:"first_name"`
-	LastName  string    `json:"last_name"`
-	Email     string    `json:"email"`
-	Avatar    string    `json:"avatar"`
-	IsPremium bool      `json:"is_premium"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type UpdateUser struct {
-	FirstName string `json:"first_name" validate:"required,min=3,max=50"`
-	LastName  string `json:"last_name" validate:"required,min=3,max=50"`
-	Email     string `json:"email" validate:"required,email"`
-	Password  string `json:"password" validate:"required,min=8,max=50,pwdcomplex"`
-	Avatar    string `json:"avatar" validate:"omitempty,url"`
 }

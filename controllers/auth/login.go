@@ -196,8 +196,12 @@ func (c *Controller) Login(ctx *gin.Context) {
 	}()
 
 	// Prepare response data
-	responseData := map[string]interface{}{
-		"user": dto.UserProfile{
+	responseData := dto.LoginResponse{
+		Token: dto.TokenResponse{
+			AccessToken:  token,
+			RefreshToken: refreshToken,
+		},
+		User: dto.UserProfile{
 			ID:        user.ID,
 			Username:  user.Username,
 			FirstName: user.FirstName,
@@ -207,22 +211,19 @@ func (c *Controller) Login(ctx *gin.Context) {
 			IsPremium: user.IsPremium,
 			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		},
-		"token":         token,
-		"refresh_token": refreshToken,
-		"requires_2fa":  hasTOTP,
-		"is_verified":   userAuth.IsEmailVerified,
+		Auth: dto.UserAuthResponse{
+			ID:              userAuth.ID,
+			UserID:          userAuth.UserID,
+			IsEmailVerified: userAuth.IsEmailVerified,
+			IsTOTPEnabled:   userAuth.IsTOTPEnabled,
+			LastLoginAt:     userAuth.LastLoginAt.Format("2006-01-02T15:04:05Z07:00"),
+		},
 	}
 
+	message := "Login successful"
 	if hasTOTP {
-		responseData["message"] = "Login successful. Please complete two-factor authentication."
-	} else {
-		responseData["message"] = "Login successful"
+		message = "Login successful. Please complete two-factor authentication."
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    responseData,
-		Message: "Login successful",
-		Error:   nil,
-	})
+	utils.SendOKResponse(ctx, responseData, message)
 }

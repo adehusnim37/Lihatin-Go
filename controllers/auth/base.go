@@ -39,67 +39,6 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 	}
 }
 
-// ResendVerification is implemented in email-auth.go
-
-// GetProfile returns user profile information
-func (c *Controller) GetProfile(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication required",
-			Error:   map[string]string{"auth": "Please login to access this feature"},
-		})
-		return
-	}
-
-	// Get user information
-	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
-	if err != nil {
-		ctx.JSON(http.StatusNotFound, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "User not found",
-			Error:   map[string]string{"user": "User not found"},
-		})
-		return
-	}
-
-	// Get user auth information
-	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to get user authentication data",
-			Error:   map[string]string{"error": "Internal server error"},
-		})
-		return
-	}
-
-	// Create profile response
-	profile := map[string]interface{}{
-		"id":                user.ID,
-		"username":          user.Username,
-		"first_name":        user.FirstName,
-		"last_name":         user.LastName,
-		"email":             user.Email,
-		"avatar":            user.Avatar,
-		"is_premium":        user.IsPremium,
-		"created_at":        user.CreatedAt,
-		"is_email_verified": userAuth.IsEmailVerified,
-		"has_totp_enabled":  userAuth.IsTOTPEnabled,
-		"last_login_at":     userAuth.LastLoginAt,
-	}
-
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    profile,
-		Message: "Profile retrieved successfully",
-		Error:   nil,
-	})
-}
 
 // GetRecoveryCodes returns TOTP recovery codes
 func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {

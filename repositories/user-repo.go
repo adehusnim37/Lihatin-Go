@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
@@ -16,11 +17,11 @@ type UserRepository interface {
 	GetAllUsers() ([]user.User, error)
 	GetUserByID(id string) (*user.User, error)
 	GetUserByEmailOrUsername(input string) (*user.User, error)
-	GetUserForLogin(emailOrUsername string) (*user.User, error)
 	CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error)
 	CreateUser(user *user.User) error
-	UpdateUser(id string, user *user.UpdateUser) error
+	UpdateUser(id string, user dto.UpdateProfileRequest) error
 	DeleteUserPermanent(id string) error
+
 	// Admin methods
 	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
 	LockUser(userID, reason string) error
@@ -141,92 +142,72 @@ func (ur *userRepository) CreateUser(user *user.User) error {
 	return nil
 }
 
-func (ur *userRepository) UpdateUser(id string, updateUser *user.UpdateUser) error {
+func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequest) error {
 	// First, get the current user data to compare
 	currentUser, err := ur.GetUserByID(id)
 	if err != nil {
 		utils.Logger.Error("Error getting current user for update", "user_id", id, "error", err)
-		return err
+		return utils.ErrUserNotFound
 	}
 
-	// Prepare updates map
-	updates := make(map[string]interface{})
-
-	// Check each field and only update if different
-	if updateUser.FirstName != "" && updateUser.FirstName != currentUser.FirstName {
-		updates["first_name"] = updateUser.FirstName
+	if updateUser.FirstName != nil {
+		currentUser.FirstName = *updateUser.FirstName
 	}
-
-	if updateUser.LastName != "" && updateUser.LastName != currentUser.LastName {
-		updates["last_name"] = updateUser.LastName
+	if updateUser.LastName != nil {
+		currentUser.LastName = *updateUser.LastName
 	}
-
-	// Only update email if it's different from current email
-	if updateUser.Email != "" && updateUser.Email != currentUser.Email {
-		// Check if the new email already exists for another user
-		existingUser, err := ur.GetUserByEmailOrUsername(updateUser.Email)
-		if err == nil && existingUser != nil && existingUser.ID != id {
-			// Email already exists for another user
-			return utils.ErrUserEmailExists
+	if currentUser.UsernameChanged {
+		utils.Logger.Warn("Username change attempt denied", "user_id", id, "current_username", currentUser.Username)
+		return utils.ErrUsernameChangeNotAllowed
+	}
+	if updateUser.Username != nil {
+		checkUsername := ur.db.Where("username = ? AND id != ? AND deleted_at IS NULL", currentUser.Username, id).First(&user.User{})
+		if checkUsername.Error == nil {
+			utils.Logger.Warn("Username already taken", "username", currentUser.Username)
+			return utils.ErrUserDuplicateEntry
 		}
-		updates["email"] = updateUser.Email
+		currentUser.Username = *updateUser.Username
+	}
+	if updateUser.Email != nil {
+		currentUser.Email = *updateUser.Email
 	}
 
-	if updateUser.Avatar != "" && updateUser.Avatar != currentUser.Avatar {
-		updates["avatar"] = updateUser.Avatar
-	}
-
-	// Handle password separately since it needs hashing
-	if updateUser.Password != "" {
-		hashedPassword, err := utils.HashPassword(updateUser.Password)
-		if err != nil {
-			utils.Logger.Error("Error hashing password during update", "user_id", id, "error", err)
-			return utils.ErrUserPasswordHashFailed
-		}
-		updates["password"] = hashedPassword
-	}
-
-	// If no fields to update, return early
-	if len(updates) == 0 {
-		utils.Logger.Info("No fields to update for user", "user_id", id)
-		return nil
-	}
-
-	// Always update the updated_at timestamp when there are changes
-	updates["updated_at"] = time.Now()
+	currentUser.UsernameChanged = currentUser.UsernameChanged || (updateUser.Username != nil)
 
 	// Perform the update using GORM
-	result := ur.db.Model(&user.User{}).Where("id = ?", id).Updates(updates)
+	result := ur.db.Model(&user.User{}).Where("id = ?", id).Updates(currentUser)
 	if result.Error != nil {
 		utils.Logger.Error("Failed to update user", "user_id", id, "error", result.Error)
 		return utils.ErrUserUpdateFailed
 	}
 
-	utils.Logger.Info("User updated successfully", "user_id", id, "fields_updated", len(updates))
+	updatedFields := 0
+	if updateUser.FirstName != nil {
+		updatedFields++
+	}
+	if updateUser.LastName != nil {
+		updatedFields++
+	}
+	if updateUser.Username != nil {
+		updatedFields++
+	}
+	if updateUser.Email != nil {
+		updatedFields++
+	}
+	utils.Logger.Info("User updated successfully", "user_id", id, "fields_updated", updatedFields)
 	return nil
 }
 
-func (ur *userRepository) GetUserForLogin(emailOrUsername string) (*user.User, error) {
-	utils.Logger.Info("Attempting user login", "email_or_username", emailOrUsername)
-
+func (ur *userRepository) DeleteUserPermanent(id string) error {
 	var user user.User
-	result := ur.db.Where("(email = ? OR username = ?) AND deleted_at IS NULL", emailOrUsername, emailOrUsername).First(&user)
 
+	result := ur.db.Where("id = ? AND deleted_at IS NULL", id).First(&user)
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			utils.Logger.Warn("No user found for login", "email_or_username", emailOrUsername)
-			return nil, utils.ErrUserNotFound
-		}
-		utils.Logger.Error("Database error during login attempt", "email_or_username", emailOrUsername, "error", result.Error)
-		return nil, utils.ErrUserDatabaseError
+		utils.Logger.Error("Failed to find user for permanent deletion", "user_id", id, "error", result.Error)
+		return utils.ErrUserNotFound
 	}
 
-	utils.Logger.Info("User found for login", "user_id", user.ID, "username", user.Username)
-	return &user, nil
-}
-
-func (ur *userRepository) DeleteUserPermanent(id string) error {
-	result := ur.db.Unscoped().Delete(&user.User{}, "id = ?", id)
+	result = ur.db.Unscoped().Delete(&user, "id = ?", id)
 	if result.Error != nil {
 		utils.Logger.Error("Failed to permanently delete user", "user_id", id, "error", result.Error)
 		return utils.ErrUserDeleteFailed

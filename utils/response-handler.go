@@ -47,7 +47,10 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 		SendErrorResponse(ctx, http.StatusBadRequest, "USER_FIND_FAILED", "Failed to find user", "user", userID)
 	case ErrUserFailed:
 		SendErrorResponse(ctx, http.StatusBadRequest, "USER_FAILED", "Failed to process user request", "user", userID)
-
+	case ErrUsernameChangeNotAllowed:
+		SendErrorResponse(ctx, http.StatusBadRequest, "USERNAME_CHANGE_NOT_ALLOWED", "Username can only be changed once and cannot be changed again", "username", userID)
+	case ErrDuplicateUsername:
+		SendErrorResponse(ctx, http.StatusConflict, "USERNAME_EXISTS", "Username already exists", "username", userID)
 	// Email verification-related errors
 	case ErrEmailVerificationTokenInvalid:
 		SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_VERIFICATION_TOKEN", "Invalid email verification token", "token", userID)
@@ -59,6 +62,16 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 		SendErrorResponse(ctx, http.StatusBadRequest, "EMAIL_VERIFICATION_FAILED", "Failed to verify email", "email", userID)
 	case ErrCreateVerificationTokenFailed:
 		SendErrorResponse(ctx, http.StatusBadRequest, "CREATE_VERIFICATION_TOKEN_FAILED", "Failed to create email verification token", "token", userID)
+
+	// Token-related errors
+	case ErrTokenInvalid:
+		SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_TOKEN", "Invalid token", "token", userID)
+	case ErrTokenExpired:
+		SendErrorResponse(ctx, http.StatusUnauthorized, "TOKEN_EXPIRED", "Token has expired", "token", userID)
+	case ErrTokenMissing:
+		SendErrorResponse(ctx, http.StatusBadRequest, "TOKEN_MISSING", "Token is missing", "token", userID)
+	case ErrTokenGenerationFailed:
+		SendErrorResponse(ctx, http.StatusInternalServerError, "TOKEN_GENERATION_FAILED", "Failed to generate token", "token", userID)
 
 	// API Key-related errors
 	case ErrAPIKeyNotFound:
@@ -91,7 +104,7 @@ func HandleError(ctx *gin.Context, err error, userID any) {
 		SendErrorResponse(ctx, http.StatusForbidden, "API_KEY_INVALID_REFERRER", "API key cannot be used from this referrer", "api_key", userID)
 	case ErrAPIKeyRateLimitExceeded:
 		SendErrorResponse(ctx, http.StatusTooManyRequests, "API_KEY_RATE_LIMIT_EXCEEDED", "API key rate limit exceeded", "api_key", userID)
-		
+
 	// Short Link-related errors
 	case ErrShortLinkNotFound:
 		SendErrorResponse(ctx, http.StatusNotFound, "SHORT_LINK_NOT_FOUND", "Short link not found", "short_link", userID)
