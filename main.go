@@ -94,7 +94,8 @@ func main() {
 	log.Println("Initializing session manager...")
 	if err := middleware.InitSessionManager(); err != nil {
 		log.Printf("Failed to initialize session manager: %v", err)
-		log.Println("Warning: Application will run without session management")
+		log.Println("❌ Redis belum aktif! Pastikan Docker Redis sudah running sebelum start server. Bila tidak, fitur session seperti login tidak akan berfungsi.")
+		panic("Application stopped: Redis session manager is required for authentication/session features.")
 	} else {
 		log.Println("✅ Session manager initialized successfully!")
 	}

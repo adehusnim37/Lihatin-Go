@@ -14,7 +14,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 
 	if userID == "" {
-		utils.SendErrorResponse(ctx, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", "auth", userID)
+		utils.SendErrorResponse(ctx, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", "auth")
 		return
 	}
 
@@ -61,7 +61,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 		utils.Logger.Warn("Invalid TOTP code provided for verification",
 			"user_id", userID,
 		)
-		utils.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_TOTP", "Invalid TOTP code", "totp", userID)
+		utils.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_TOTP", "Invalid TOTP code", "totp")
 		return
 	}
 
@@ -72,7 +72,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.SendErrorResponse(ctx, http.StatusInternalServerError, "TOTP_METHOD_NOT_FOUND", "Failed to get TOTP method", "totp", userID)
+		utils.SendErrorResponse(ctx, http.StatusInternalServerError, "TOTP_METHOD_NOT_FOUND", "Failed to get TOTP method", "totp")
 		return
 	}
 
@@ -82,7 +82,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.SendErrorResponse(ctx, http.StatusInternalServerError, "TOTP_VERIFY_FAILED", "Failed to verify TOTP method", "totp", userID)
+		utils.SendErrorResponse(ctx, http.StatusInternalServerError, "TOTP_VERIFY_FAILED", "Failed to verify TOTP method", "totp")
 		return
 	}
 

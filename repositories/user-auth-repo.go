@@ -68,9 +68,14 @@ func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 }
 
 // SetEmailVerificationToken sets email verification token and expiry
-func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string) error {
+func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, expiry ...time.Time) error {
 	// Set token expiry (2 hours from now)
-	var expiresAt = time.Now().Add(time.Duration(utils.GetEnvAsInt("EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS", 2)) * time.Hour)
+	var expiresAt time.Time
+	if len(expiry) > 0 {
+		expiresAt = expiry[0]
+	} else {
+		expiresAt = time.Now().Add(time.Duration(utils.GetEnvAsInt("EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS", 2)) * time.Hour)
+	}
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]any{
@@ -100,6 +105,63 @@ func (r *UserAuthRepository) VerifyEmail(token string) error {
 
 	if result.RowsAffected == 0 {
 		return utils.ErrEmailVerificationTokenExpired
+	}
+
+	return nil
+}
+
+func (r *UserAuthRepository) ChangeEmail(userID, newEmail string) error {
+	var usr user.User
+	var userAuth user.UserAuth
+
+	// Get user data
+	if err := r.db.Where("id = ?", userID).First(&usr).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ErrUserNotFound
+		}
+		return utils.ErrUserFindFailed
+	}
+
+	// Get user auth data
+	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ErrUserNotFound
+		}
+		return utils.ErrUserFindFailed
+	}
+
+	if !userAuth.IsEmailVerified {
+		return utils.ErrUserEmailNotVerified
+	}
+
+	// Check if account is active
+	if !userAuth.IsActive {
+		return utils.ErrUserAccountDeactivated
+	}
+
+	// Check if new email is same as current
+	if usr.Email == newEmail {
+		return utils.ErrUserEmailSameAsCurrent
+	}
+
+	// Check if new email already exists
+	var existingUser user.User
+	if err := r.db.Where("email = ?", newEmail).First(&existingUser).Error; err == nil {
+		return utils.ErrUserEmailExists
+	}
+
+	// Update email in user table
+	if err := r.db.Model(&usr).Where("id = ?", userID).Update("email", newEmail).Error; err != nil {
+		return utils.ErrUserUpdateFailed
+	}
+
+	// Mark email as unverified after change
+	if err := r.db.Model(&userAuth).Where("user_id = ?", userID).Updates(map[string]interface{}{
+		"is_email_verified":                   false,
+		"email_verification_token":            "",
+		"email_verification_token_expires_at": nil,
+	}).Error; err != nil {
+		return utils.ErrUserAuthUpdateFailed
 	}
 
 	return nil

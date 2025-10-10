@@ -168,9 +168,7 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 		}
 		currentUser.Username = *updateUser.Username
 	}
-	if updateUser.Email != nil {
-		currentUser.Email = *updateUser.Email
-	}
+
 
 	currentUser.UsernameChanged = currentUser.UsernameChanged || (updateUser.Username != nil)
 
@@ -191,9 +189,7 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	if updateUser.Username != nil {
 		updatedFields++
 	}
-	if updateUser.Email != nil {
-		updatedFields++
-	}
+	
 	utils.Logger.Info("User updated successfully", "user_id", id, "fields_updated", updatedFields)
 	return nil
 }

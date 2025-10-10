@@ -319,7 +319,7 @@ func extractAPIKey(c *gin.Context) string {
 func extractIDApiKey(apikey string) *string {
 	keyParts := utils.SplitAPIKey(apikey)
 	if len(keyParts) != 2 {
-		utils.Logger.Warn("Invalid API key format - missing separator", "key_preview", utils.GetKeyPreview(apikey))
+		utils.Logger.Warn("Invalid API key format - missing separator or the APIKey is not defined", "key_preview", utils.GetKeyPreview(apikey))
 		return nil
 	}
 

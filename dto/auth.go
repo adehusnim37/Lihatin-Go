@@ -21,6 +21,11 @@ type TokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// Change Email Request represents the request payload to change email
+type ChangeEmailRequest struct {
+	NewEmail string `json:"new_email" label:"Email Baru" binding:"required,email"`
+}
+
 // UserProfile represents user information returned after login (without sensitive data)
 type UserProfile struct {
 	ID        string `json:"id"`
@@ -47,7 +52,6 @@ type UpdateProfileRequest struct {
 	FirstName *string `json:"first_name" binding:"omitempty,min=2,max=50"`
 	LastName  *string `json:"last_name" binding:"omitempty,min=2,max=50"`
 	Username  *string `json:"username" binding:"omitempty,min=3,max=30,alphanum"`
-	Email     *string `json:"email" binding:"omitempty,email"`
 	Avatar    *string `json:"avatar" binding:"omitempty,url"`
 }
 
@@ -63,4 +67,15 @@ type UserAuthResponse struct {
 	IsEmailVerified bool   `json:"is_email_verified"`
 	IsTOTPEnabled   bool   `json:"is_totp_enabled"`
 	LastLoginAt     string `json:"last_login_at"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" label:"Kata Sandi Saat Ini" binding:"required,min=8,max=50,pwdcomplex"`
+	NewPassword     string `json:"new_password" label:"Kata Sandi Baru" binding:"required,min=8,max=50,pwdcomplex,nefield=CurrentPassword"`
+	ConfirmPassword string `json:"confirm_password" label:"Konfirmasi Kata Sandi Baru" binding:"required,eqfield=NewPassword"`
+}
+
+type ForgotPasswordRequest struct {
+	Email    string `json:"email" label:"Email" binding:"omitempty,email"`
+	Username string `json:"username" label:"Username" binding:"omitempty,min=3,max=30,alphanum"`
 }

@@ -22,6 +22,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/register", authController.Register)
 
 		// Password reset flow
+		authGroup.Use(middleware.RateLimitMiddleware(5)) // Limit to 5 requests per minute per IP
 		authGroup.POST("/forgot-password", authController.ForgotPassword)
 		authGroup.POST("/reset-password", authController.ResetPassword)
 
@@ -42,6 +43,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.POST("/change-password", authController.ChangePassword)
 		protectedAuth.GET("/profile", authController.GetProfile)
 		protectedAuth.PUT("/profile", authController.UpdateProfile)
+		protectedAuth.POST("/change-email", emailController.ChangeEmail)
 		protectedAuth.DELETE("/delete-account", authController.DeleteAccount)
 
 		// TOTP (Two-Factor Authentication) management
