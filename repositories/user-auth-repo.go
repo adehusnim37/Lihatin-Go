@@ -2,12 +2,14 @@ package repositories
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -110,8 +112,9 @@ func (r *UserAuthRepository) VerifyEmail(token string) error {
 	return nil
 }
 
-func (r *UserAuthRepository) ChangeEmail(userID, newEmail string) error {
+func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent string) error {
 	var usr user.User
+	var usrHistory user.HistoryUser
 	var userAuth user.UserAuth
 
 	// Get user data
@@ -150,6 +153,35 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail string) error {
 		return utils.ErrUserEmailExists
 	}
 
+	token, err := utils.GenerateSecureToken(25)
+	if err != nil {
+		// handle error, e.g. log and use empty string or return error from function
+		utils.Logger.Error("Failed to generate revoke token", "error", err)
+		return utils.ErrTokenGenerationFailed
+	}
+
+	// Archive current user data to history table
+	oldEmailJSON, _ := json.Marshal(map[string]string{"email": usr.Email})
+	newEmailJSON, _ := json.Marshal(map[string]string{"email": newEmail})
+
+	usrHistory = user.HistoryUser{
+		UserID:        usr.ID,
+		ActionType:    user.ActionEmailChange,
+		OldValue:      datatypes.JSON(oldEmailJSON),
+		NewValue:      datatypes.JSON(newEmailJSON),
+		ChangedAt:     time.Now(),
+		ChangedBy:     &usr.ID, // Self-change
+		Reason:        "User initiated email change",
+		IPAddress:     &ipAddress,
+		UserAgent:     &userAgent,
+		RevokeToken:   token,
+		RevokeExpires: func(t time.Time) *time.Time { return &t }(time.Now().Add(24 * time.Hour)),
+	}
+
+	if err := r.db.Create(&usrHistory).Error; err != nil {
+		return utils.ErrUserHistoryCreationFailed
+	}
+
 	// Update email in user table
 	if err := r.db.Model(&usr).Where("id = ?", userID).Update("email", newEmail).Error; err != nil {
 		return utils.ErrUserUpdateFailed
@@ -166,6 +198,54 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail string) error {
 
 	return nil
 }
+
+// // UndoChangeEmail reverts email change if the user has not verified the new email
+// func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) error {
+// 	var usrHistory user.HistoryUser
+// 	var usr user.User
+// 	var userAuth user.UserAuth
+
+// 	// Cari history berdasarkan token
+// 	if err := r.db.Where("revoke_token = ?", revokeToken).First(&usrHistory).Error; err != nil {
+// 		if errors.Is(err, gorm.ErrRecordNotFound) {
+// 			return utils.ErrRevokeTokenNotFound
+// 		}
+// 		return utils.ErrUserHistoryFindFailed
+// 	}
+
+// 	// Pastikan token belum expired
+// 	if usrHistory.RevokeExpiresAt == nil || time.Now().After(*usrHistory.RevokeExpiresAt) {
+// 		return utils.ErrRevokeTokenExpired
+// 	}
+
+// 	// Ambil user dan auth
+// 	if err := r.db.Where("id = ?", usrHistory.UserID).First(&usr).Error; err != nil {
+// 		return utils.ErrUserNotFound
+// 	}
+
+// 	if err := r.db.Where("user_id = ?", usrHistory.UserID).First(&userAuth).Error; err != nil {
+// 		return utils.ErrUserNotFound
+// 	}
+
+// 	// Kembalikan email lama
+// 	if err := r.db.Model(&usr).Update("email", usrHistory.EmailChanged).Error; err != nil {
+// 		return utils.ErrUserUpdateFailed
+// 	}
+
+// 	// Reset flag
+// 	if err := r.db.Model(&userAuth).Updates(map[string]any{
+// 		"is_email_verified":                   true,
+// 		"email_verification_token":            "",
+// 		"email_verification_token_expires_at": nil,
+// 	}).Error; err != nil {
+// 		return utils.ErrUserAuthUpdateFailed
+// 	}
+
+// 	// Optional: tandai token sudah digunakan
+// 	r.db.Model(&usrHistory).Update("revoke_expires_at", time.Now())
+
+// 	return nil
+// }
 
 // SetPasswordResetToken sets password reset token and expiry
 func (r *UserAuthRepository) SetPasswordResetToken(userID, token string, expiresAt time.Time) error {

@@ -2,6 +2,9 @@ package user
 
 import (
 	"time"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -23,8 +26,9 @@ type User struct {
 	Role            string     `json:"role" gorm:"size:20;default:user"` // user, admin, super_admin
 
 	// Relationships
-	UserAuth []UserAuth `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
-	APIKeys  []APIKey   `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
+	UserAuth     []UserAuth    `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
+	APIKeys      []APIKey      `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
+	HistoryUsers []HistoryUser `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
 }
 
 // TableName specifies the table name for GORM
@@ -32,37 +36,29 @@ func (User) TableName() string {
 	return "users"
 }
 
-// AdminLockUserRequest represents the request to lock a user account
-type AdminLockUserRequest struct {
-	Reason string `json:"reason" validate:"required,min=10,max=500"`
+type HistoryUser struct {
+	ID            uint           `gorm:"primaryKey"`
+	UserID        string         `gorm:"index:idx_user_action,priority:1;not null"`
+	ActionType    string         `gorm:"index:idx_user_action,priority:2;type:varchar(50);not null"` // e.g. email_change, password_change
+	OldValue      datatypes.JSON `gorm:"type:jsonb"`                                                 // JSON snapshot before change
+	NewValue      datatypes.JSON `gorm:"type:jsonb"`                                                 // JSON snapshot after change
+	Reason        string         `gorm:"type:varchar(255)"`                                          // Reason for change (user/admin/system)
+	ChangedBy     *string        `gorm:"type:varchar(50)"`                                           // Who made the change (userID/adminID/system)
+	RevokeToken   string         `gorm:"type:varchar(100);index"`                                    // Token to revoke sessions if needed
+	RevokeExpires *time.Time     `gorm:""`                                                           // Expiry for the revoke token
+	IPAddress     *string        `gorm:"type:varchar(45)"`                                           // IPv4/IPv6
+	UserAgent     *string        `gorm:"type:text"`                                                  // User agent string
+	ChangedAt     time.Time      `gorm:"autoCreateTime;index"`                                       // Timestamp of change
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
 
-// AdminUnlockUserRequest represents the request to unlock a user account
-type AdminUnlockUserRequest struct {
-	Reason string `json:"reason,omitempty" validate:"max=500"`
-}
-
-// AdminUserResponse represents the response format for admin user data
-type AdminUserResponse struct {
-	ID           string     `json:"id"`
-	Username     string     `json:"username"`
-	FirstName    string     `json:"first_name"`
-	LastName     string     `json:"last_name"`
-	Email        string     `json:"email"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	IsPremium    bool       `json:"is_premium"`
-	IsLocked     bool       `json:"is_locked"`
-	LockedAt     *time.Time `json:"locked_at,omitempty"`
-	LockedReason string     `json:"locked_reason,omitempty"`
-	Role         string     `json:"role"`
-}
-
-// PaginatedUsersResponse represents paginated user results
-type PaginatedUsersResponse struct {
-	Users      []AdminUserResponse `json:"users"`
-	TotalCount int64               `json:"total_count"`
-	Page       int                 `json:"page"`
-	Limit      int                 `json:"limit"`
-	TotalPages int                 `json:"total_pages"`
-}
+// ActionType constants for audit trail
+const (
+	ActionEmailChange    = "email_change"
+	ActionPasswordChange = "password_change"
+	ActionPhoneChange    = "phone_change"
+	ActionUsernameChange = "username_change"
+	ActionProfileUpdate  = "profile_update"
+	ActionAccountLock    = "account_lock"
+	ActionAccountUnlock  = "account_unlock"
+)

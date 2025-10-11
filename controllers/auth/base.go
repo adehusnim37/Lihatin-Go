@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
@@ -176,9 +177,9 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	}
 
 	// Convert to admin response format (remove passwords)
-	adminUsers := make([]user.AdminUserResponse, len(users))
+	adminUsers := make([]dto.AdminUserResponse, len(users))
 	for i, u := range users {
-		adminUsers[i] = user.AdminUserResponse{
+		adminUsers[i] = dto.AdminUserResponse{
 			ID:           u.ID,
 			Username:     u.Username,
 			FirstName:    u.FirstName,
@@ -196,7 +197,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	response := user.PaginatedUsersResponse{
+	response := dto.PaginatedUsersResponse{
 		Users:      adminUsers,
 		TotalCount: totalCount,
 		Page:       page,
@@ -225,7 +226,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		return
 	}
 
-	var req user.AdminLockUserRequest
+	var req dto.AdminLockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		utils.SendValidationError(ctx, err, &req)
 		return
@@ -292,10 +293,10 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		return
 	}
 
-	var req user.AdminUnlockUserRequest
+	var req dto.AdminUnlockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// Allow empty body for unlock requests
-		req = user.AdminUnlockUserRequest{}
+		req = dto.AdminUnlockUserRequest{}
 	}
 
 	// Validate request if reason is provided

@@ -13,6 +13,8 @@ func (c *Controller) ChangeEmail(ctx *gin.Context) {
 	UserId := ctx.GetString("user_id")
 	username := ctx.GetString("username")
 	userAuth := c.repo.GetUserAuthRepository()
+	ip := ctx.ClientIP()                     // Gets the real client IP, considering X-Forwarded-For etc.
+	userAgent := ctx.GetHeader("User-Agent") // Gets the User-Agent string
 
 	var req dto.ChangeEmailRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -20,7 +22,7 @@ func (c *Controller) ChangeEmail(ctx *gin.Context) {
 		return
 	}
 
-	err := userAuth.ChangeEmail(UserId, req.NewEmail)
+	err := userAuth.ChangeEmail(UserId, req.NewEmail, ip, userAgent)
 	if err != nil {
 		utils.HandleError(ctx, err, nil)
 		return

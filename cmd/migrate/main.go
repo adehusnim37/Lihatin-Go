@@ -75,6 +75,7 @@ func runMigrations(db *gorm.DB) {
 		&user.AuthMethod{},
 		&user.LoginAttempt{},
 		&user.APIKey{},
+		&user.HistoryUser{},
 
 		// ShortLink models
 		&shortlink.ShortLink{},

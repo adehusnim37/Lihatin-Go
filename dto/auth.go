@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 // Auth-related Data Transfer Objects (DTOs)
 
 // LoginRequest represents the login request payload
@@ -78,4 +80,39 @@ type ChangePasswordRequest struct {
 type ForgotPasswordRequest struct {
 	Email    string `json:"email" label:"Email" binding:"omitempty,email"`
 	Username string `json:"username" label:"Username" binding:"omitempty,min=3,max=30,alphanum"`
+}
+
+// AdminLockUserRequest represents the request to lock a user account
+type AdminLockUserRequest struct {
+	Reason string `json:"reason" validate:"required,min=10,max=500"`
+}
+
+// AdminUnlockUserRequest represents the request to unlock a user account
+type AdminUnlockUserRequest struct {
+	Reason string `json:"reason,omitempty" validate:"max=500"`
+}
+
+// AdminUserResponse represents the response format for admin user data
+type AdminUserResponse struct {
+	ID           string     `json:"id"`
+	Username     string     `json:"username"`
+	FirstName    string     `json:"first_name"`
+	LastName     string     `json:"last_name"`
+	Email        string     `json:"email"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	IsPremium    bool       `json:"is_premium"`
+	IsLocked     bool       `json:"is_locked"`
+	LockedAt     *time.Time `json:"locked_at,omitempty"`
+	LockedReason string     `json:"locked_reason,omitempty"`
+	Role         string     `json:"role"`
+}
+
+// PaginatedUsersResponse represents paginated user results
+type PaginatedUsersResponse struct {
+	Users      []AdminUserResponse `json:"users"`
+	TotalCount int64               `json:"total_count"`
+	Page       int                 `json:"page"`
+	Limit      int                 `json:"limit"`
+	TotalPages int                 `json:"total_pages"`
 }

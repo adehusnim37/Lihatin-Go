@@ -3,36 +3,26 @@ package user
 import "time"
 
 type UserAuth struct {
-	ID     string `json:"id" gorm:"primaryKey;type:char(36);"`                                               // Primary Key with UUID v7 auto-generation
-	UserID string `json:"user_id" gorm:"size:191;not null;uniqueIndex"`                                      // Foreign Key to User.ID, same size as User.ID
-	User   *User  `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
-
-	// Password-based authentication
-	PasswordHash string `json:"-" gorm:"size:255"` // Store the hashed password, never expose in JSON responses
-
-	// Email verification
+	ID                              string     `json:"id" gorm:"primaryKey;type:char(36);"`                                               // Primary Key with UUID v7 auto-generation
+	UserID                          string     `json:"user_id" gorm:"size:191;not null;uniqueIndex"`                                      // Foreign Key to User.ID, same size as User.ID
+	User                            *User      `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
 	IsEmailVerified                 bool       `json:"is_email_verified" gorm:"default:false"`
-	EmailVerificationToken          string     `json:"-" gorm:"size:255"` // Token sent to user's email
-	EmailVerificationTokenExpiresAt *time.Time `json:"-"`                 // Expiry for the verification token
-
-	// Password reset
-	PasswordResetToken          string     `json:"-" gorm:"size:255"` // Token for password reset
-	PasswordResetTokenExpiresAt *time.Time `json:"-"`                 // Expiry for the reset token
-
-	// Account status & security
-	DeviceID            *string    `json:"device_id,omitempty" gorm:"size:255;index"` // Current active device ID, if any
-	LastIP              *string    `json:"last_ip,omitempty" gorm:"size:45"`          // Last IP address used, if any
-	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
-	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
-	FailedLoginAttempts int        `json:"failed_login_attempts,omitempty" gorm:"default:0"` // Counter for failed login attempts
-	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`                          // Timestamp until which the account is locked
-	IsActive            bool       `json:"is_active" gorm:"default:true"`                    // General account active status
-	IsTOTPEnabled       bool       `json:"is_totp_enabled" gorm:"default:false"`             // Whether TOTP is enabled for this user
-
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at,omitempty" gorm:"index"` // For soft deletes
-
+	PasswordHash                    string     `json:"password_hash" gorm:"type:text"`            // Hashed password for this auth method
+	EmailVerificationToken          string     `json:"-" gorm:"size:255"`                         // Token sent to user's email
+	EmailVerificationTokenExpiresAt *time.Time `json:"-"`                                         // Expiry for the verification token
+	PasswordResetToken              string     `json:"-" gorm:"size:255"`                         // Token for password reset
+	PasswordResetTokenExpiresAt     *time.Time `json:"-"`                                         // Expiry for the reset token
+	DeviceID                        *string    `json:"device_id,omitempty" gorm:"size:255;index"` // Current active device ID, if any
+	LastIP                          *string    `json:"last_ip,omitempty" gorm:"size:45"`          // Last IP address used, if any
+	LastLoginAt                     *time.Time `json:"last_login_at,omitempty"`
+	LastLogoutAt                    *time.Time `json:"last_logout_at,omitempty"`
+	FailedLoginAttempts             int        `json:"failed_login_attempts,omitempty" gorm:"default:0"` // Counter for failed login attempts
+	LockoutUntil                    *time.Time `json:"lockout_until,omitempty"`                          // Timestamp until which the account is locked
+	IsActive                        bool       `json:"is_active" gorm:"default:true"`                    // General account active status
+	IsTOTPEnabled                   bool       `json:"is_totp_enabled" gorm:"default:false"`             // Whether TOTP is enabled for this user
+	CreatedAt                       time.Time  `json:"created_at"`
+	UpdatedAt                       time.Time  `json:"updated_at"`
+	DeletedAt                       *time.Time `json:"deleted_at,omitempty" gorm:"index"` // For soft deletes
 	// Relationships
 	AuthMethods []AuthMethod `json:"auth_methods,omitempty" gorm:"foreignKey:UserAuthID"`
 }
@@ -57,38 +47,22 @@ const (
 // AuthMethod represents a specific authentication method enabled for a user's account.
 // This allows for multiple factors like TOTP, FIDO2 keys, OAuth, etc.
 type AuthMethod struct {
-	ID         string    `json:"id" gorm:"primaryKey"`                                                     // Primary Key
-	UserAuthID string    `json:"user_auth_id" gorm:"type:char(36);not null;index"`                         // Foreign Key to UserAuth.ID, matching UserAuth ID type
-	UserAuth   *UserAuth `json:"-" gorm:"foreignKey:UserAuthID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading
-
-	Type AuthMethodType `json:"type" gorm:"size:50;not null" validate:"required"` // Type of authentication method (e.g., "totp", "oauth_google")
-
-	// Common fields for various auth methods
-	IsEnabled    bool       `json:"is_enabled" gorm:"default:true"`                             // Whether this method is currently active
-	IsVerified   bool       `json:"is_verified" gorm:"default:false"`                           // e.g., TOTP setup confirmed, OAuth successful
-	VerifiedAt   *time.Time `json:"verified_at,omitempty"`                                      // Timestamp when this method was verified/added
-	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`                                     // Timestamp when this method was last used for login
-	FriendlyName string     `json:"friendly_name,omitempty" gorm:"size:100" validate:"max=100"` // User-defined name (e.g., "My YubiKey", "Authenticator App")
-
-	// Method-specific data (should be encrypted at rest if sensitive)
-	// For TOTP: stores the encrypted TOTP secret.
-	// For OAuth: might store encrypted refresh tokens or provider-specific identifiers.
-	// For MagicLink/EmailOTP: could store the token itself or its hash.
-	Secret string `json:"-" gorm:"type:text"` // Encrypted secret/token
-
-	// For TOTP: stores hashed recovery codes.
-	RecoveryCodes []string `json:"-" gorm:"type:json"` // Hashed recovery codes
-
-	// For OAuth providers: stores the user's ID from that provider.
-	ProviderUserID string `json:"provider_user_id,omitempty" gorm:"size:255"`
-
-	// For OAuth or other methods needing to store additional non-sensitive metadata.
-	// Could be a JSON string.
-	Metadata string `json:"metadata,omitempty" gorm:"type:text"`
-
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at,omitempty" gorm:"index"` // For soft deletes
+	ID             string         `json:"id" gorm:"primaryKey"`                                                     // Primary Key
+	UserAuthID     string         `json:"user_auth_id" gorm:"type:char(36);not null;index"`                         // Foreign Key to UserAuth.ID, matching UserAuth ID type
+	UserAuth       *UserAuth      `json:"-" gorm:"foreignKey:UserAuthID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading
+	Type           AuthMethodType `json:"type" gorm:"size:50;not null" validate:"required"`                         // Type of authentication method (e.g., "totp", "oauth_google")
+	IsEnabled      bool           `json:"is_enabled" gorm:"default:true"`                                           // Whether this method is currently active
+	IsVerified     bool           `json:"is_verified" gorm:"default:false"`                                         // e.g., TOTP setup confirmed, OAuth successful
+	VerifiedAt     *time.Time     `json:"verified_at,omitempty"`                                                    // Timestamp when this method was verified/added
+	LastUsedAt     *time.Time     `json:"last_used_at,omitempty"`                                                   // Timestamp when this method was last used for login
+	FriendlyName   string         `json:"friendly_name,omitempty" gorm:"size:100" validate:"max=100"`               // User-defined name (e.g., "My YubiKey", "Authenticator App")
+	Secret         string         `json:"-" gorm:"type:text"`                                                       // Encrypted secret/token
+	RecoveryCodes  []string       `json:"-" gorm:"type:json"`                                                       // Hashed recovery codes
+	ProviderUserID string         `json:"provider_user_id,omitempty" gorm:"size:255"`
+	Metadata       string         `json:"metadata,omitempty" gorm:"type:text"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt      *time.Time     `json:"deleted_at,omitempty" gorm:"index"` // For soft deletes
 }
 
 // TableName specifies the table name for GORM

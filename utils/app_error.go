@@ -211,6 +211,12 @@ var (
 		http.StatusBadRequest,
 		"user",
 	)
+	ErrUserHistoryCreationFailed = NewAppError(
+		"USER_HISTORY_CREATION_FAILED",
+		"Failed to create user history record",
+		http.StatusBadRequest,
+		"user_history",
+	)
 )
 
 // Short Link Errors
