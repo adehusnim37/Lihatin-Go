@@ -155,6 +155,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 		IsEmailVerified:                 false,
 		EmailVerificationToken:          token,
 		EmailVerificationTokenExpiresAt: &expirationTime,
+		EmailVerificationSource:         user.EmailSourceSignup,
 		IsActive:                        true,
 	}
 

@@ -509,6 +509,12 @@ var (
 
 // Email Verification Errors
 var (
+	ErrEmailVerificationTokenInvalidOrExpired = NewAppError(
+		"INVALID_OR_EXPIRED_VERIFICATION_TOKEN",
+		"Invalid or expired email verification token",
+		http.StatusBadRequest,
+		"token",
+	)
 	ErrEmailVerificationFailed = NewAppError(
 		"EMAIL_VERIFICATION_FAILED",
 		"Failed to verify email",
@@ -543,6 +549,18 @@ var (
 
 // Token Errors
 var (
+	ErrRevokeTokenExpired	 = NewAppError(
+		"REVOKE_TOKEN_EXPIRED",
+		"Revoke token has expired",
+		http.StatusBadRequest,
+		"token",
+	)
+	ErrRevokeTokenNotFound	 = NewAppError(
+		"REVOKE_TOKEN_NOT_FOUND",
+		"Revoke token not found",
+		http.StatusBadRequest,
+		"token",
+	)
 	ErrTokenGenerationFailed = NewAppError(
 		"TOKEN_GENERATION_FAILED",
 		"Failed to generate token",

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"gorm.io/datatypes"
@@ -70,7 +71,7 @@ func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 }
 
 // SetEmailVerificationToken sets email verification token and expiry
-func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, expiry ...time.Time) error {
+func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, source user.EmailVerificationSource, expiry ...time.Time) error {
 	// Set token expiry (2 hours from now)
 	var expiresAt time.Time
 	if len(expiry) > 0 {
@@ -83,6 +84,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, exp
 		Updates(map[string]any{
 			"email_verification_token":            token,
 			"email_verification_token_expires_at": expiresAt,
+			"email_verification_source":           source,
 		}).Error
 
 	if err != nil {
@@ -92,24 +94,107 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, exp
 }
 
 // VerifyEmail marks email as verified and clears verification token
-func (r *UserAuthRepository) VerifyEmail(token string) error {
-	result := r.db.Model(&user.UserAuth{}).
+func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailResponse, err error) {
+	tx := r.db.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			err = fmt.Errorf("panic during email verification: %v", r)
+		}
+	}()
+
+	// 1️⃣ Cari userAuth berdasarkan token dan pastikan belum expired
+	var userAuth user.UserAuth
+	if err = tx.
 		Where("email_verification_token = ? AND email_verification_token_expires_at > ?", token, time.Now()).
-		Updates(map[string]interface{}{
-			"is_email_verified":                   true,
-			"email_verification_token":            "",
-			"email_verification_token_expires_at": nil,
-		})
-
-	if result.Error != nil {
-		return utils.ErrEmailVerificationFailed
+		First(&userAuth).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationTokenInvalidOrExpired
+		}
+		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
 	}
 
-	if result.RowsAffected == 0 {
-		return utils.ErrEmailVerificationTokenExpired
+	// 2️⃣ Ambil data user
+	var usr user.User
+	if err = tx.Where("id = ?", userAuth.UserID).First(&usr).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return dto.VerifyEmailResponse{}, utils.ErrUserNotFound
+		}
+		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
 	}
 
-	return nil
+	// 3️⃣ Pastikan user belum diverifikasi
+	if userAuth.IsEmailVerified {
+		tx.Rollback()
+		return dto.VerifyEmailResponse{
+			Email:    usr.Email,
+			Username: usr.Username,
+			Source:   userAuth.EmailVerificationSource,
+			OldEmail: "",
+		}, utils.ErrEmailAlreadyVerified
+	}
+
+	// 4️⃣ Update kolom verifikasi secara aman (reset token juga)
+	if err = tx.Model(&userAuth).Updates(map[string]any{
+		"is_email_verified":                   true,
+		"email_verification_token":            "",
+		"email_verification_token_expires_at": nil,
+	}).Error; err != nil {
+		tx.Rollback()
+		return dto.VerifyEmailResponse{}, utils.ErrUserAuthUpdateFailed
+	}
+
+	// 5️⃣ (Opsional) Insert log ke HistoryUser
+	history := user.HistoryUser{
+		UserID:     usr.ID,
+		ActionType: "email_verification",
+		OldValue:   datatypes.JSON([]byte(`{"is_email_verified": false}`)),
+		NewValue:   datatypes.JSON([]byte(`{"is_email_verified": true}`)),
+		Reason:     "User verified email successfully",
+		ChangedAt:  time.Now(),
+	}
+	if err := tx.Create(&history).Error; err != nil {
+		tx.Rollback()
+		utils.Logger.Warn("failed to record history for email verification", "user_id", usr.ID, "error", err)
+	}
+
+	// 6️⃣ Ambil history email change terakhir untuk user ini
+	var lastEmailChange user.HistoryUser
+	var oldEmail string
+	err = tx.Where("user_id = ? AND action_type = ?", usr.ID, user.ActionEmailChange).
+		Order("changed_at DESC").
+		First(&lastEmailChange).Error
+	if err == nil {
+		var oldEmailMap map[string]string
+		if err := json.Unmarshal(lastEmailChange.OldValue, &oldEmailMap); err == nil {
+			oldEmail = oldEmailMap["email"]
+		}
+	}
+
+	if lastEmailChange.RevokeToken == "" {
+		return dto.VerifyEmailResponse{}, utils.ErrRevokeTokenNotFound
+	}
+
+	// Optional: check expiry
+	if lastEmailChange.RevokeExpires != nil && time.Now().After(*lastEmailChange.RevokeExpires) {
+		return dto.VerifyEmailResponse{}, utils.ErrRevokeTokenExpired
+	}
+
+	// 7️⃣ Commit transaksi
+	if err = tx.Commit().Error; err != nil {
+		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
+	}
+
+	return dto.VerifyEmailResponse{
+		Email:    usr.Email,
+		Username: usr.Username,
+		Source:   userAuth.EmailVerificationSource,
+		OldEmail: oldEmail,
+		Token:    lastEmailChange.RevokeToken,
+	}, nil
 }
 
 func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent string) error {

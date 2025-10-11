@@ -97,6 +97,7 @@ const (
 	EnvAppPort       = "APP_PORT"
 	EnvJWTExpired    = "JWT_EXPIRED"
 	EnvIPGeoAPIKey   = "IP_GEOLOCATION_API_KEY"
+	EnvFrontendURL   = "FRONTEND_URL"
 	EnvBackendURL    = "BACKEND_URL"
 	EnvRedisAddr     = "REDIS_ADDR"
 	EnvRedisPassword = "REDIS_PASSWORD"

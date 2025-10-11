@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/adehusnim37/lihatin-go/models/user"
+)
 
 // Auth-related Data Transfer Objects (DTOs)
 
@@ -115,4 +119,11 @@ type PaginatedUsersResponse struct {
 	Page       int                 `json:"page"`
 	Limit      int                 `json:"limit"`
 	TotalPages int                 `json:"total_pages"`
+}
+type VerifyEmailResponse struct {
+	Email    string                       `json:"email"`
+	Username string                       `json:"username"`
+	Source   user.EmailVerificationSource `json:"source,omitempty"`
+	OldEmail string                       `json:"old_email,omitempty"`
+	Token    string                       `json:"token,omitempty"`
 }

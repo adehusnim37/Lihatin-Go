@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -40,7 +41,7 @@ func (c *Controller) ChangeEmail(ctx *gin.Context) {
 	}
 
 	// Save token to database
-	if err := userAuth.SetEmailVerificationToken(UserId, token, time.Now().Add(1*time.Hour)); err != nil {
+	if err := userAuth.SetEmailVerificationToken(UserId, token, user.EmailSourceChange, time.Now().Add(1*time.Hour)); err != nil {
 		utils.Logger.Error("Failed to save verification token",
 			"user_id", UserId,
 			"error", err.Error(),

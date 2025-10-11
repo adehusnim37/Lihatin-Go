@@ -3,6 +3,7 @@ package email
 import (
 	"net/http"
 
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -51,7 +52,7 @@ func (c *Controller) ResendVerificationEmail(ctx *gin.Context) {
 	}
 
 	// Save token to database
-	if err := c.repo.GetUserAuthRepository().SetEmailVerificationToken(userID, token); err != nil {
+	if err := c.repo.GetUserAuthRepository().SetEmailVerificationToken(userID, token, user.EmailSourceResend); err != nil {
 		utils.Logger.Error("Failed to save verification token",
 			"user_id", userID,
 			"error", err.Error(),

@@ -37,28 +37,30 @@ func (User) TableName() string {
 }
 
 type HistoryUser struct {
-	ID            uint           `gorm:"primaryKey"`
-	UserID        string         `gorm:"index:idx_user_action,priority:1;not null"`
-	ActionType    string         `gorm:"index:idx_user_action,priority:2;type:varchar(50);not null"` // e.g. email_change, password_change
-	OldValue      datatypes.JSON `gorm:"type:jsonb"`                                                 // JSON snapshot before change
-	NewValue      datatypes.JSON `gorm:"type:jsonb"`                                                 // JSON snapshot after change
-	Reason        string         `gorm:"type:varchar(255)"`                                          // Reason for change (user/admin/system)
-	ChangedBy     *string        `gorm:"type:varchar(50)"`                                           // Who made the change (userID/adminID/system)
-	RevokeToken   string         `gorm:"type:varchar(100);index"`                                    // Token to revoke sessions if needed
-	RevokeExpires *time.Time     `gorm:""`                                                           // Expiry for the revoke token
-	IPAddress     *string        `gorm:"type:varchar(45)"`                                           // IPv4/IPv6
-	UserAgent     *string        `gorm:"type:text"`                                                  // User agent string
-	ChangedAt     time.Time      `gorm:"autoCreateTime;index"`                                       // Timestamp of change
-	DeletedAt     gorm.DeletedAt `gorm:"index"`
+	ID            uint              `gorm:"primaryKey"`
+	UserID        string            `gorm:"index:idx_user_action,priority:1;not null"`
+	ActionType    ActionHistoryUser `gorm:"index:idx_user_action,priority:2;type:varchar(50);not null"` // e.g. email_change, password_change
+	OldValue      datatypes.JSON    `gorm:"type:jsonb"`                                                 // JSON snapshot before change
+	NewValue      datatypes.JSON    `gorm:"type:jsonb"`                                                 // JSON snapshot after change
+	Reason        string            `gorm:"type:varchar(255)"`                                          // Reason for change (user/admin/system)
+	ChangedBy     *string           `gorm:"type:varchar(50)"`                                           // Who made the change (userID/adminID/system)
+	RevokeToken   string            `gorm:"type:varchar(100);index"`                                    // Token to revoke sessions if needed
+	RevokeExpires *time.Time        `gorm:""`                                                           // Expiry for the revoke token
+	IPAddress     *string           `gorm:"type:varchar(45)"`                                           // IPv4/IPv6
+	UserAgent     *string           `gorm:"type:text"`                                                  // User agent string
+	ChangedAt     time.Time         `gorm:"autoCreateTime;index"`                                       // Timestamp of change
+	DeletedAt     gorm.DeletedAt    `gorm:"index"`
 }
+
+type ActionHistoryUser string
 
 // ActionType constants for audit trail
 const (
-	ActionEmailChange    = "email_change"
-	ActionPasswordChange = "password_change"
-	ActionPhoneChange    = "phone_change"
-	ActionUsernameChange = "username_change"
-	ActionProfileUpdate  = "profile_update"
-	ActionAccountLock    = "account_lock"
-	ActionAccountUnlock  = "account_unlock"
+	ActionEmailChange    ActionHistoryUser = "email_change"
+	ActionPasswordChange ActionHistoryUser = "password_change"
+	ActionPhoneChange    ActionHistoryUser = "phone_change"
+	ActionUsernameChange ActionHistoryUser = "username_change"
+	ActionProfileUpdate  ActionHistoryUser = "profile_update"
+	ActionAccountLock    ActionHistoryUser = "account_lock"
+	ActionAccountUnlock  ActionHistoryUser = "account_unlock"
 )
