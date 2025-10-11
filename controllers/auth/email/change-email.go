@@ -62,5 +62,5 @@ func (c *Controller) ChangeEmail(ctx *gin.Context) {
 	}
 
 	// Process the request
-	utils.SendSuccessResponse(ctx, http.StatusOK, nil, "Change email request processed. Please verify your new email address as soon as possible.")
+	utils.SendSuccessResponse(ctx, http.StatusOK, req.NewEmail, "Change email request processed. Please verify your new email address as soon as possible.")
 }

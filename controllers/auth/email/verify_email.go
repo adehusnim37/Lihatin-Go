@@ -30,7 +30,10 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 		return
 	}
 
-	if response.Source == user.EmailSourceSignup {
+	// Send appropriate notification based on verification source
+	switch response.Source {
+	case user.EmailSourceSignup:
+		// For signup, send success verification email
 		if err := c.emailService.SendSuccessEmailVerification(response.Email, response.Username); err != nil {
 			utils.Logger.Error("Failed to send verification email",
 				"username", response.Username,
@@ -40,15 +43,30 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 			utils.SendErrorResponse(ctx, http.StatusInternalServerError, "EMAIL_SEND_FAILED", "Failed to send verification email", "email", response.Email)
 			return
 		}
-	} else if response.Source == user.EmailSourceChange {
-		if err := c.emailService.SendChangeOldEmailNotification(response.OldEmail, response.Email, response.Username, response.Token); err != nil {
-			utils.Logger.Error("Failed to send change email success notification",
+	case user.EmailSourceChange:
+		// For email change, send notification to OLD email with revoke link
+		if response.OldEmail != "" && response.Token != "" {
+			if err := c.emailService.SendChangeOldEmailNotification(response.OldEmail, response.Email, response.Username, response.Token); err != nil {
+				utils.Logger.Error("Failed to send change email notification to old email",
+					"username", response.Username,
+					"old_email", response.OldEmail,
+					"new_email", response.Email,
+					"error", err.Error(),
+				)
+				// Don't fail the verification if notification fails, just log it
+				utils.Logger.Warn("Email verification succeeded but notification to old email failed")
+			}
+		}
+
+		// Also send success notification to NEW email
+		if err := c.emailService.SendSuccessEmailVerification(response.Email, response.Username); err != nil {
+			utils.Logger.Error("Failed to send success verification to new email",
 				"username", response.Username,
 				"email", response.Email,
 				"error", err.Error(),
 			)
-			utils.SendErrorResponse(ctx, http.StatusInternalServerError, "EMAIL_SEND_FAILED", "Failed to send change email success notification", "email", response.Email)
-			return
+			// Don't fail, just log
+			utils.Logger.Warn("Email verification succeeded but success notification failed")
 		}
 	}
 

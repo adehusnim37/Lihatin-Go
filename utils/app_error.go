@@ -73,6 +73,18 @@ var (
 		http.StatusBadRequest,
 		"email",
 	)
+	ErrEmailChangeRateLimitExceeded = NewAppError(
+		"EMAIL_CHANGE_RATE_LIMIT_EXCEEDED",
+		"You can only change your email once every 30 days. Please try again later.",
+		http.StatusTooManyRequests,
+		"email",
+	)
+	ErrEmailChangeLocked = NewAppError(
+		"EMAIL_CHANGE_LOCKED",
+		"Email change is temporarily locked due to suspicious activity. Please contact support.",
+		http.StatusForbidden,
+		"email",
+	)
 	ErrUserUsernameExists = NewAppError(
 		"USERNAME_EXISTS",
 		"Username already exists",
@@ -549,13 +561,13 @@ var (
 
 // Token Errors
 var (
-	ErrRevokeTokenExpired	 = NewAppError(
+	ErrRevokeTokenExpired = NewAppError(
 		"REVOKE_TOKEN_EXPIRED",
 		"Revoke token has expired",
 		http.StatusBadRequest,
 		"token",
 	)
-	ErrRevokeTokenNotFound	 = NewAppError(
+	ErrRevokeTokenNotFound = NewAppError(
 		"REVOKE_TOKEN_NOT_FOUND",
 		"Revoke token not found",
 		http.StatusBadRequest,
@@ -566,6 +578,24 @@ var (
 		"Failed to generate token",
 		http.StatusInternalServerError,
 		"token",
+	)
+	ErrInvalidActionType = NewAppError(
+		"INVALID_ACTION_TYPE",
+		"Invalid action type for this operation",
+		http.StatusBadRequest,
+		"action_type",
+	)
+	ErrInvalidHistoryData = NewAppError(
+		"INVALID_HISTORY_DATA",
+		"Invalid or corrupted history data",
+		http.StatusInternalServerError,
+		"history",
+	)
+	ErrUserHistoryFindFailed = NewAppError(
+		"USER_HISTORY_FIND_FAILED",
+		"Failed to find user history",
+		http.StatusInternalServerError,
+		"history",
 	)
 	ErrTokenInvalid = NewAppError(
 		"INVALID_TOKEN",

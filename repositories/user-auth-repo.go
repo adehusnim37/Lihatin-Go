@@ -161,9 +161,11 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		utils.Logger.Warn("failed to record history for email verification", "user_id", usr.ID, "error", err)
 	}
 
-	// 6️⃣ Ambil history email change terakhir untuk user ini
+	// 6️⃣ Ambil history email change terakhir untuk user ini (jika ada)
 	var lastEmailChange user.HistoryUser
 	var oldEmail string
+	var revokeToken string
+
 	err = tx.Where("user_id = ? AND action_type = ?", usr.ID, user.ActionEmailChange).
 		Order("changed_at DESC").
 		First(&lastEmailChange).Error
@@ -172,15 +174,11 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		if err := json.Unmarshal(lastEmailChange.OldValue, &oldEmailMap); err == nil {
 			oldEmail = oldEmailMap["email"]
 		}
-	}
-
-	if lastEmailChange.RevokeToken == "" {
-		return dto.VerifyEmailResponse{}, utils.ErrRevokeTokenNotFound
-	}
-
-	// Optional: check expiry
-	if lastEmailChange.RevokeExpires != nil && time.Now().After(*lastEmailChange.RevokeExpires) {
-		return dto.VerifyEmailResponse{}, utils.ErrRevokeTokenExpired
+		revokeToken = lastEmailChange.RevokeToken
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// Only rollback if there's a real database error, not if history not found
+		tx.Rollback()
+		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
 	}
 
 	// 7️⃣ Commit transaksi
@@ -193,7 +191,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		Username: usr.Username,
 		Source:   userAuth.EmailVerificationSource,
 		OldEmail: oldEmail,
-		Token:    lastEmailChange.RevokeToken,
+		Token:    revokeToken,
 	}, nil
 }
 
@@ -236,6 +234,47 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	var existingUser user.User
 	if err := r.db.Where("email = ?", newEmail).First(&existingUser).Error; err == nil {
 		return utils.ErrUserEmailExists
+	}
+
+	// 🔒 SECURITY: Check email change history dalam 30 hari terakhir
+	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
+
+	// Check untuk email_change atau email_change_revoked dalam 30 hari
+	var recentHistory []user.HistoryUser
+	err := r.db.Where(
+		"user_id = ? AND action_type IN (?, ?) AND changed_at > ?",
+		userID,
+		user.ActionEmailChange,
+		"email_change_revoked",
+		thirtyDaysAgo,
+	).Order("changed_at DESC").Find(&recentHistory).Error
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.Logger.Error("Failed to check email change history", "user_id", userID, "error", err)
+		return utils.ErrUserDatabaseError
+	}
+
+	// Jika ada history dalam 30 hari terakhir
+	if len(recentHistory) > 0 {
+		lastChange := recentHistory[0]
+
+		// 🚨 Jika ada revoke dalam 30 hari = SUSPICIOUS ACTIVITY
+		if lastChange.ActionType == "email_change_revoked" {
+			utils.Logger.Warn("Suspicious activity: Email change attempted after recent revoke",
+				"user_id", userID,
+				"last_revoke", lastChange.ChangedAt,
+			)
+			return utils.ErrEmailChangeLocked
+		}
+
+		// 🚨 Jika sudah change email dalam 30 hari = RATE LIMIT
+		if lastChange.ActionType == user.ActionEmailChange {
+			utils.Logger.Warn("Email change rate limit exceeded",
+				"user_id", userID,
+				"last_change", lastChange.ChangedAt,
+			)
+			return utils.ErrEmailChangeRateLimitExceeded
+		}
 	}
 
 	token, err := utils.GenerateSecureToken(25)
@@ -284,53 +323,117 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	return nil
 }
 
-// // UndoChangeEmail reverts email change if the user has not verified the new email
-// func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) error {
-// 	var usrHistory user.HistoryUser
-// 	var usr user.User
-// 	var userAuth user.UserAuth
+// UndoChangeEmail reverts email change if the user has not verified the new email
+func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) (email, username string, err error) {
+	tx := r.db.Begin()
 
-// 	// Cari history berdasarkan token
-// 	if err := r.db.Where("revoke_token = ?", revokeToken).First(&usrHistory).Error; err != nil {
-// 		if errors.Is(err, gorm.ErrRecordNotFound) {
-// 			return utils.ErrRevokeTokenNotFound
-// 		}
-// 		return utils.ErrUserHistoryFindFailed
-// 	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
-// 	// Pastikan token belum expired
-// 	if usrHistory.RevokeExpiresAt == nil || time.Now().After(*usrHistory.RevokeExpiresAt) {
-// 		return utils.ErrRevokeTokenExpired
-// 	}
+	var usrHistory user.HistoryUser
+	var usr user.User
+	var userAuth user.UserAuth
 
-// 	// Ambil user dan auth
-// 	if err := r.db.Where("id = ?", usrHistory.UserID).First(&usr).Error; err != nil {
-// 		return utils.ErrUserNotFound
-// 	}
+	// 1️⃣ Cari history berdasarkan revoke token
+	if err := tx.Where("revoke_token = ?", revokeToken).First(&usrHistory).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", "", utils.ErrRevokeTokenNotFound
+		}
+		return "", "", utils.ErrUserHistoryFindFailed
+	}
 
-// 	if err := r.db.Where("user_id = ?", usrHistory.UserID).First(&userAuth).Error; err != nil {
-// 		return utils.ErrUserNotFound
-// 	}
+	// 2️⃣ Pastikan token belum expired
+	if usrHistory.RevokeExpires == nil || time.Now().After(*usrHistory.RevokeExpires) {
+		tx.Rollback()
+		return "", "", utils.ErrRevokeTokenExpired
+	}
 
-// 	// Kembalikan email lama
-// 	if err := r.db.Model(&usr).Update("email", usrHistory.EmailChanged).Error; err != nil {
-// 		return utils.ErrUserUpdateFailed
-// 	}
+	// 3️⃣ Pastikan action type adalah email change
+	if usrHistory.ActionType != user.ActionEmailChange {
+		tx.Rollback()
+		return "", "", utils.ErrInvalidActionType
+	}
 
-// 	// Reset flag
-// 	if err := r.db.Model(&userAuth).Updates(map[string]any{
-// 		"is_email_verified":                   true,
-// 		"email_verification_token":            "",
-// 		"email_verification_token_expires_at": nil,
-// 	}).Error; err != nil {
-// 		return utils.ErrUserAuthUpdateFailed
-// 	}
+	// 4️⃣ Ambil user dan auth
+	if err := tx.Where("id = ?", usrHistory.UserID).First(&usr).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", "", utils.ErrUserNotFound
+		}
+		return "", "", utils.ErrUserFindFailed
+	}
 
-// 	// Optional: tandai token sudah digunakan
-// 	r.db.Model(&usrHistory).Update("revoke_expires_at", time.Now())
+	if err := tx.Where("user_id = ?", usrHistory.UserID).First(&userAuth).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", "", utils.ErrUserNotFound
+		}
+		return "", "", utils.ErrUserFindFailed
+	}
 
-// 	return nil
-// }
+	// 5️⃣ Ekstrak old email dari history
+	var oldEmailMap map[string]string
+	if err := json.Unmarshal(usrHistory.OldValue, &oldEmailMap); err != nil {
+		tx.Rollback()
+		return "", "", utils.ErrInvalidHistoryData
+	}
+	oldEmail := oldEmailMap["email"]
+	if oldEmail == "" {
+		tx.Rollback()
+		return "", "", utils.ErrInvalidHistoryData
+	}
+
+	// 6️⃣ Kembalikan email lama
+	if err := tx.Model(&usr).Where("id = ?", usrHistory.UserID).Update("email", oldEmail).Error; err != nil {
+		tx.Rollback()
+		return "", "", utils.ErrUserUpdateFailed
+	}
+
+	// 7️⃣ Reset flag verifikasi (email lama sudah pasti verified)
+	if err := tx.Model(&userAuth).Where("user_id = ?", usrHistory.UserID).Updates(map[string]any{
+		"is_email_verified":                   true,
+		"email_verification_token":            "",
+		"email_verification_token_expires_at": nil,
+	}).Error; err != nil {
+		tx.Rollback()
+		return "", "", utils.ErrUserAuthUpdateFailed
+	}
+
+	// 8️⃣ Tandai token sudah digunakan (expire immediately)
+	now := time.Now()
+	if err := tx.Model(&usrHistory).Updates(map[string]any{
+		"revoke_expires": &now,
+	}).Error; err != nil {
+		tx.Rollback()
+		utils.Logger.Warn("Failed to mark revoke token as used", "error", err)
+	}
+
+	// 9️⃣ Log revoke action ke history
+	revokeHistory := user.HistoryUser{
+		UserID:     usr.ID,
+		ActionType: "email_change_revoked",
+		OldValue:   usrHistory.NewValue, // New email becomes old
+		NewValue:   usrHistory.OldValue, // Old email becomes new
+		Reason:     "User revoked email change using revoke token",
+		ChangedAt:  time.Now(),
+		ChangedBy:  &usr.ID,
+	}
+	if err := tx.Create(&revokeHistory).Error; err != nil {
+		tx.Rollback()
+		utils.Logger.Warn("Failed to record revoke history", "error", err)
+	}
+
+	// 🔟 Commit transaksi
+	if err := tx.Commit().Error; err != nil {
+		return "", "", utils.ErrUserUpdateFailed
+	}
+
+	return oldEmail, usr.Username, nil
+}
 
 // SetPasswordResetToken sets password reset token and expiry
 func (r *UserAuthRepository) SetPasswordResetToken(userID, token string, expiresAt time.Time) error {
@@ -602,4 +705,59 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 	})
 
 	return nil
+}
+
+// CheckEmailChangeEligibility checks if user is eligible to change email
+// Returns error if user has changed email or revoked in last 30 days
+func (r *UserAuthRepository) CheckEmailChangeEligibility(userID string) (eligible bool, daysRemaining int, err error) {
+	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
+
+	var recentHistory user.HistoryUser
+	err = r.db.Where(
+		"user_id = ? AND action_type IN (?, ?) AND changed_at > ?",
+		userID,
+		user.ActionEmailChange,
+		"email_change_revoked",
+		thirtyDaysAgo,
+	).Order("changed_at DESC").First(&recentHistory).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// No recent history, user is eligible
+			return true, 0, nil
+		}
+		return false, 0, err
+	}
+
+	// Calculate days remaining until eligible
+	daysSinceChange := int(time.Since(recentHistory.ChangedAt).Hours() / 24)
+	daysRemaining = 30 - daysSinceChange
+
+	if daysRemaining <= 0 {
+		return true, 0, nil
+	}
+
+	return false, daysRemaining, nil
+}
+
+// GetEmailChangeHistory returns email change history for a user
+func (r *UserAuthRepository) GetEmailChangeHistory(userID string, days int) ([]user.HistoryUser, error) {
+	var history []user.HistoryUser
+
+	cutoffDate := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+
+	err := r.db.Where(
+		"user_id = ? AND action_type IN (?, ?, ?) AND changed_at > ?",
+		userID,
+		user.ActionEmailChange,
+		"email_change_revoked",
+		"email_verification",
+		cutoffDate,
+	).Order("changed_at DESC").Find(&history).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return history, nil
 }

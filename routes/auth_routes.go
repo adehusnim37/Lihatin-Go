@@ -29,7 +29,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Email verification
 		authGroup.GET("/verify-email", emailController.VerifyEmail) // Token passed as query param
 		authGroup.POST("/resend-verification-email", emailController.ResendVerificationEmail)
-		authGroup.POST("/revoke-email-change", emailController.UndoChangeEmail)
+		authGroup.GET("/revoke-email-change", emailController.UndoChangeEmail) // Token passed as query param
 
 		// Token refresh
 		authGroup.POST("/refresh-token", authController.RefreshToken)
@@ -47,6 +47,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.DELETE("/delete-account", authController.DeleteAccount, middleware.RequireEmailVerification())
 		protectedAuth.POST("/send-verification-email", emailController.SendVerificationEmails)
 		protectedAuth.POST("/change-email", emailController.ChangeEmail)
+		protectedAuth.GET("/check-email-change-eligibility", emailController.CheckEmailChangeEligibility)
+		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")
 		{
