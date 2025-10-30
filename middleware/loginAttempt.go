@@ -1,36 +1,95 @@
 package middleware
 
 import (
-	"bytes"
+    "bytes"
+    "encoding/json"
+    "io"
+    "net/http"
 
-	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/gin-gonic/gin"
+    "github.com/adehusnim37/lihatin-go/repositories"
+    "github.com/adehusnim37/lihatin-go/utils"
+    "github.com/gin-gonic/gin"
 )
 
-// RecordLoginAttempt is a middleware that records login attempts
+// RecordLoginAttempt middleware records login attempts
 func RecordLoginAttempt(loginAttemptRepo *repositories.LoginAttemptRepository) gin.HandlerFunc {
-	return func(c *gin.Context) {
+    return func(c *gin.Context) {
+        // 1. Capture request body BEFORE handler consumes it
+        var requestBody []byte
+        var emailOrUsername string
+        
+        if c.Request.Body != nil {
+            requestBody, _ = io.ReadAll(c.Request.Body)
+            // Restore body so handler can read it
+            c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+            
+            // Extract email_or_username from request
+            var payload map[string]interface{}
+            if err := json.Unmarshal(requestBody, &payload); err == nil {
+                if val, ok := payload["email_or_username"].(string); ok {
+                    emailOrUsername = val
+                }
+            }
+        }
 
-		blw := &bodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
-		c.Writer = blw
-		// Get user information from the context
-		userID := c.GetString("user_id")
-		ipAddress := c.ClientIP()
-		userAgent := c.GetHeader("User-Agent")
-		// Check if the login attempt was successful
-		success := func() bool {
-			return c.Writer.Status() == 200
-		}()
-		failreason := func() string {
-			if success {
-				return "All good"
-			}
-			return blw.body.String()
-		}()
+        if emailOrUsername == "" {
+            emailOrUsername = "unknown"
+        }
 
-		// Record the login attempt
-		if err := loginAttemptRepo.RecordLoginAttempt(userID, ipAddress, userAgent, success, failreason); err != nil {
-			c.Error(err)
-		}
-	}
+        // 2. Wrap response writer to capture response body
+        blw := &bodyLogWriter{
+            body:           bytes.NewBufferString(""),
+            ResponseWriter: c.Writer,
+        }
+        c.Writer = blw
+
+        // 3. Execute the actual login handler
+        c.Next()
+
+        // 4. After handler execution, collect data
+        status := c.Writer.Status()
+        success := status == http.StatusOK
+        ipAddress := c.ClientIP()
+        userAgent := c.GetHeader("User-Agent")
+
+        // 5. Get failure reason from response body
+        failReason := ""
+        if !success {
+            failReason = blw.body.String()
+            
+            // Try to extract error message from JSON response
+            var responseBody map[string]interface{}
+            if err := json.Unmarshal(blw.body.Bytes(), &responseBody); err == nil {
+                if errMap, ok := responseBody["error"].(map[string]interface{}); ok {
+                    if authErr, ok := errMap["auth"].(string); ok {
+                        failReason = authErr
+                    }
+                } else if msg, ok := responseBody["message"].(string); ok {
+                    failReason = msg
+                }
+            }
+        } else {
+            failReason = "Login successful"
+        }
+
+        // 6. Record the login attempt
+        if err := loginAttemptRepo.RecordLoginAttempt(
+            ipAddress,
+            userAgent,
+            success,
+            failReason,
+            emailOrUsername,
+        ); err != nil {
+            utils.Logger.Error("Failed to record login attempt", "error", err.Error())
+        }
+
+        // 7. Log the attempt
+        utils.Logger.Info("Login attempt recorded",
+            "email_or_username", emailOrUsername,
+            "ip_address", ipAddress,
+            "success", success,
+            "status", status,
+            "fail_reason", failReason,
+        )
+    }
 }

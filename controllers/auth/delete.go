@@ -15,7 +15,7 @@ func (c *Controller) DeleteAccount(ctx *gin.Context) {
 	}
 
 	// Call the repository to delete the account
-	if err := c.repo.GetUserRepository().DeleteUserPermanent(userID); err != nil {
+	if err := c.repo.GetUserAdminRepository().DeleteUserPermanent(userID); err != nil {
 		utils.HandleError(ctx, err, userID)
 		return
 	}

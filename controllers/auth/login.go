@@ -72,6 +72,17 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
+	// Check if account is locked
+	if user.IsLocked {
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Account locked",
+			Error:   map[string]string{"auth": "Your account has been locked. Please contact support."},
+		})
+		return
+	}
+
 	// Check if account is active
 	if !userAuth.IsActive {
 		ctx.JSON(http.StatusForbidden, common.APIResponse{

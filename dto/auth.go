@@ -63,7 +63,12 @@ type UpdateProfileRequest struct {
 
 // DeleteAccountRequest represents the request to delete a user account
 type DeleteAccountRequest struct {
-	ID string `json:"id" binding:"required,uuid7" label:"ID Pengguna" uri:"id"`
+	ID string `json:"id" binding:"required,uuid" label:"ID Pengguna" uri:"id"`
+}
+
+// User Id Generic Request represents a request that requires user ID in the URI
+type UserIDGenericRequest struct {
+	ID string `json:"id" binding:"required,uuid" label:"ID Pengguna" uri:"id"`
 }
 
 // UserAuthResponse represents user authentication details (without sensitive data)
