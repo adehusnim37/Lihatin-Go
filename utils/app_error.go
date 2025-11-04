@@ -231,6 +231,64 @@ var (
 	)
 )
 
+// User Auth Errors
+var (
+	ErrInvalidCredentials = NewAppError(
+		"INVALID_CREDENTIALS",
+		"Invalid email/username or password",
+		http.StatusUnauthorized,
+		"auth",
+	)
+	ErrUserAuthNotFound = NewAppError(
+		"USER_AUTH_NOT_FOUND",
+		"User authentication data not found",
+		http.StatusNotFound,
+		"user_auth",
+	)
+	ErrUserAuthFindFailed = NewAppError(
+		"USER_AUTH_FIND_FAILED",
+		"Failed to find user authentication data",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+	ErrUserAuthUpdateFailed = NewAppError(
+		"USER_AUTH_UPDATE_FAILED",
+		"Failed to update user authentication data",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+	ErrUserAuthCreateFailed = NewAppError(
+		"USER_AUTH_CREATE_FAILED",
+		"Failed to create user authentication data",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+	ErrUserAuthDeleteFailed = NewAppError(
+		"USER_AUTH_DELETE_FAILED",
+		"Failed to delete user authentication data",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+	ErrUserAuthLockFailed = NewAppError(
+		"USER_AUTH_LOCK_FAILED",
+		"Failed to lock user authentication data",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+	ErrUserAuthPasswordResetFailed = NewAppError(
+		"USER_AUTH_PASSWORD_RESET_FAILED",
+		"Failed to reset user password",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+	ErrUserAuthExpiredOrInvalidToken = NewAppError(
+		"USER_AUTH_EXPIRED_OR_INVALID_TOKEN",
+		"User authentication token is expired or invalid",
+		http.StatusBadRequest,
+		"user_auth",
+	)
+)
+
 // Short Link Errors
 var (
 	ErrShortCreatedFailed = NewAppError(
@@ -700,11 +758,5 @@ var (
 		"TOTP is not enabled for this user",
 		http.StatusBadRequest,
 		"totp",
-	)
-	ErrUserAuthUpdateFailed = NewAppError(
-		"USER_AUTH_UPDATE_FAILED",
-		"Failed to update user authentication data",
-		http.StatusBadRequest,
-		"user_auth",
 	)
 )

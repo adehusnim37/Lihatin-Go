@@ -61,6 +61,13 @@ type UpdateProfileRequest struct {
 	Avatar    *string `json:"avatar" binding:"omitempty,url"`
 }
 
+// ResetPasswordRequest represents the request to reset password using a token
+type ResetPasswordRequest struct {
+	Token           string `json:"token" binding:"required"`
+	NewPassword     string `json:"new_password" label:"Kata Sandi Baru" binding:"required,min=8,max=50,pwdcomplex"`
+	ConfirmPassword string `json:"confirm_password" label:"Konfirmasi Kata Sandi Baru" binding:"required,eqfield=NewPassword"`
+}
+
 // DeleteAccountRequest represents the request to delete a user account
 type DeleteAccountRequest struct {
 	ID string `json:"id" binding:"required,uuid7" label:"ID Pengguna" uri:"id"`
@@ -82,8 +89,8 @@ type ChangePasswordRequest struct {
 }
 
 type ForgotPasswordRequest struct {
-	Email    string `json:"email" label:"Email" binding:"omitempty,email"`
-	Username string `json:"username" label:"Username" binding:"omitempty,min=3,max=30,alphanum"`
+	Email    *string `json:"email" label:"Email" binding:"omitempty,email"`
+	Username *string `json:"username" label:"Username" binding:"omitempty,min=3,max=30,alphanum"`
 }
 
 // AdminLockUserRequest represents the request to lock a user account
@@ -120,10 +127,17 @@ type PaginatedUsersResponse struct {
 	Limit      int                 `json:"limit"`
 	TotalPages int                 `json:"total_pages"`
 }
+
+// VerifyEmailResponse represents the response after verifying an email
 type VerifyEmailResponse struct {
 	Email    string                       `json:"email"`
 	Username string                       `json:"username"`
 	Source   user.EmailVerificationSource `json:"source,omitempty"`
 	OldEmail string                       `json:"old_email,omitempty"`
 	Token    string                       `json:"token,omitempty"`
+}
+
+// ForgotPasswordToken represents the token extracted from URL parameters for password reset
+type ForgotPasswordToken struct {
+	Token string `json:"token" binding:"required,min=10,max=255,no_space" uri:"token" label:"Token Reset`
 }

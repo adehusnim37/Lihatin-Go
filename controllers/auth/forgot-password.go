@@ -13,37 +13,37 @@ import (
 
 func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	var req dto.ForgotPasswordRequest
-	userID := ctx.GetString("user_id")
-
-	if (req.Email == "" && req.Username == "") || (req.Email != "" && req.Username != "") {
-		utils.SendErrorResponse(
-			ctx,
-			http.StatusBadRequest,
-			"INVALID_INPUT",
-			"Either email or username must be provided, but not both",
-			"Request body",
-			userID,
-		)
-		return
-	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		utils.SendValidationError(ctx, err, &req)
 		return
 	}
 
-	if err := c.Validate.Struct(req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Validation failed",
-			Error:   map[string]string{"email": "Valid email address is required"},
-		})
+	emailProvided := req.Email != nil
+	usernameProvided := req.Username != nil
+
+	// XOR logic: exactly one must be provided
+	if emailProvided == usernameProvided {
+		utils.SendErrorResponse(
+			ctx,
+			http.StatusBadRequest,
+			"INVALID_INPUT",
+			"Either email or username must be provided, but not boths",
+			"Request body",
+			nil,
+		)
 		return
 	}
 
-	// Get user by email
-	user, err := c.repo.GetUserRepository().GetUserByEmailOrUsername(req.Email)
+	// Get user by email or username
+	var identifier string
+	if req.Email != nil {
+		identifier = *req.Email
+	} else if req.Username != nil {
+		identifier = *req.Username
+	}
+
+	user, err := c.repo.GetUserRepository().GetUserByEmailOrUsername(identifier)
 	if err != nil {
 		// Always return success to prevent email enumeration
 		ctx.JSON(http.StatusOK, common.APIResponse{

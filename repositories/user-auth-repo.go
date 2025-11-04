@@ -451,19 +451,28 @@ func (r *UserAuthRepository) SetPasswordResetToken(userID, token string, expires
 }
 
 // ValidatePasswordResetToken validates password reset token
-func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.UserAuth, error) {
+func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.User, error) {
 	var userAuth user.UserAuth
+	var usr user.User
 	err := r.db.Where("password_reset_token = ? AND password_reset_token_expires_at > ?", token, time.Now()).
 		First(&userAuth).Error
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf("invalid or expired reset token")
+			return nil, utils.ErrUserAuthNotFound
 		}
-		return nil, fmt.Errorf("failed to validate password reset token: %w", err)
+		return nil, utils.ErrUserAuthFindFailed
 	}
 
-	return &userAuth, nil
+	// Ambil data user terkait
+	if err := r.db.Where("id = ?", userAuth.UserID).First(&usr).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrUserNotFound
+		}
+		return nil, utils.ErrUserFindFailed
+	}
+
+	return &usr, nil
 }
 
 // ResetPassword updates password and clears reset token
@@ -479,11 +488,11 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 		})
 
 	if result.Error != nil {
-		return fmt.Errorf("failed to reset password: %w", result.Error)
+		return utils.ErrUserAuthPasswordResetFailed
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("invalid or expired reset token")
+		return utils.ErrUserAuthPasswordResetFailed
 	}
 
 	return nil

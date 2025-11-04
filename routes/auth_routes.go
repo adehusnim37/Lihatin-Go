@@ -24,6 +24,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Password reset flow
 		authGroup.Use(middleware.RateLimitMiddleware(5)) // Limit to 5 requests per minute per IP
 		authGroup.POST("/forgot-password", authController.ForgotPassword)
+		authGroup.GET("/validate-reset/:token", authController.ValidateResetToken) // Token passed as URL param to validate
 		authGroup.POST("/reset-password", authController.ResetPassword)
 
 		// Email verification
