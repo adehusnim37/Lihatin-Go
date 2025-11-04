@@ -49,6 +49,18 @@ func (r *LoginAttemptRepository) GetLoginAttemptsByIDorUsername(userID string, u
 	return attempts, nil
 }
 
+// GetLoginAttemptByID retrieves a login attempt by its ID
+func (r *LoginAttemptRepository) GetLoginAttemptByID(attemptID string) (*user.LoginAttempt, error) {
+	var attempt user.LoginAttempt
+	if err := r.db.Where("id = ?", attemptID).First(&attempt).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, utils.ErrLoginAttemptNotFound
+		}
+		return nil, utils.ErrLoginAttemptFailed
+	}
+	return &attempt, nil
+}
+
 // GetLoginAttemptsByIP retrieves login attempts by IP address
 func (r *LoginAttemptRepository) GetLoginAttemptsByIP(ipAddress string, since time.Time) ([]user.LoginAttempt, error) {
 	var attempts []user.LoginAttempt
@@ -161,9 +173,11 @@ func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int, successF
 
 // CleanupOldAttempts removes login attempts older than specified days
 func (r *LoginAttemptRepository) CleanupOldAttempts(olderThanDays int) error {
-	cutoff := time.Now().AddDate(0, 0, -olderThanDays)
-	if err := r.db.Where("created_at < ?", cutoff).Delete(&user.LoginAttempt{}).Error; err != nil {
-		return fmt.Errorf("failed to cleanup old login attempts: %w", err)
-	}
-	return nil
+	cutoff := time.Now().UTC().AddDate(0, 0, -olderThanDays)
+	result := r.db.Where("created_at < ?", cutoff).Delete(&user.LoginAttempt{})
+    utils.Logger.Info("CleanupOldAttempts executed", "cutoff", cutoff.Format(time.RFC3339), "rows_affected", result.RowsAffected)
+    if result.Error != nil {
+        return fmt.Errorf("failed to cleanup old login attempts: %w", result.Error)
+    }
+    return nil
 }

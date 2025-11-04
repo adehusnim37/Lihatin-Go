@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-
+	
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
@@ -99,6 +99,8 @@ func main() {
 	} else {
 		log.Println("✅ Session manager initialized successfully!")
 	}
+
+
 
 	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()

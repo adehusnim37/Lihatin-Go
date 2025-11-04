@@ -86,6 +86,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		{
 			adminAuth.GET("/login-attempts", adminController.GetLoginAttempts)
 			adminAuth.GET("/login-attempts/stats/:email_or_username/:days", adminController.LoginAttemptsStats)
+			adminAuth.GET("/login-attempts/:id", adminController.GetLoginAttempt)
+			// adminAuth.DELETE("/login-attempts/:id", adminController.DeleteLoginAttempt)
+			// adminAuth.DELETE("/login-attempts", adminController.ClearLoginAttempts)
 		}
 	}
 
