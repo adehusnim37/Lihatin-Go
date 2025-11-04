@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -144,75 +143,6 @@ func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
 	})
 }
 
-// GetAllUsers returns all users (admin only)
-func (c *Controller) GetAllUsers(ctx *gin.Context) {
-	// Parse pagination parameters
-	page := 1
-	limit := 20
-
-	if pageStr := ctx.Query("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-
-	if limitStr := ctx.Query("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
-			limit = l
-		}
-	}
-
-	offset := (page - 1) * limit
-
-	// Get users with pagination
-	users, totalCount, err := c.repo.GetUserRepository().GetAllUsersWithPagination(limit, offset)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve users",
-			Error:   map[string]string{"error": "Failed to retrieve users, please try again later"},
-		})
-		return
-	}
-
-	// Convert to admin response format (remove passwords)
-	adminUsers := make([]dto.AdminUserResponse, len(users))
-	for i, u := range users {
-		adminUsers[i] = dto.AdminUserResponse{
-			ID:           u.ID,
-			Username:     u.Username,
-			FirstName:    u.FirstName,
-			LastName:     u.LastName,
-			Email:        u.Email,
-			CreatedAt:    u.CreatedAt,
-			UpdatedAt:    u.UpdatedAt,
-			IsPremium:    u.IsPremium,
-			IsLocked:     u.IsLocked,
-			LockedAt:     u.LockedAt,
-			LockedReason: u.LockedReason,
-			Role:         u.Role,
-		}
-	}
-
-	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
-
-	response := dto.PaginatedUsersResponse{
-		Users:      adminUsers,
-		TotalCount: totalCount,
-		Page:       page,
-		Limit:      limit,
-		TotalPages: totalPages,
-	}
-
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    response,
-		Message: "Users retrieved successfully",
-		Error:   nil,
-	})
-}
-
 // LockUser locks a user account (admin only)
 func (c *Controller) LockUser(ctx *gin.Context) {
 	userID := ctx.Param("user_id")
@@ -262,7 +192,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 	}
 
 	// Lock the user
-	if err := c.repo.GetUserRepository().LockUser(userID, req.Reason); err != nil {
+	if err := c.repo.GetUserAdminRepository().LockUser(userID, req.Reason); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -331,7 +261,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	}
 
 	// Unlock the user
-	if err := c.repo.GetUserRepository().UnlockUser(userID, req.Reason); err != nil {
+	if err := c.repo.GetUserAdminRepository().UnlockUser(userID, req.Reason); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -345,56 +275,6 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		Success: true,
 		Data:    nil,
 		Message: "User account unlocked successfully",
-		Error:   nil,
-	})
-}
-
-// GetLoginAttempts returns login attempt history (admin only)
-func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
-	// Parse pagination parameters
-	page := 1
-	limit := 50
-
-	if pageStr := ctx.Query("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-
-	if limitStr := ctx.Query("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 500 {
-			limit = l
-		}
-	}
-
-	offset := (page - 1) * limit
-
-	// Get login attempts
-	attempts, totalCount, err := c.repo.GetLoginAttemptRepository().GetAllLoginAttempts(limit, offset)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve login attempts",
-			Error:   map[string]string{"error": "Failed to retrieve login attempts, please try again later"},
-		})
-		return
-	}
-
-	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
-
-	response := map[string]interface{}{
-		"attempts":    attempts,
-		"total_count": totalCount,
-		"page":        page,
-		"limit":       limit,
-		"total_pages": totalPages,
-	}
-
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    response,
-		Message: "Login attempts retrieved successfully",
 		Error:   nil,
 	})
 }

@@ -93,6 +93,17 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			return
 		}
 
+		if user.IsLocked {
+			c.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "User account is locked",
+				Error:   map[string]string{"auth": "Your account has been locked. Please contact support."},
+			})
+			c.Abort()
+			return
+		}
+
 		if claims.SessionID != "" {
 			// Basic validation
 			_, isValid := session.ValidateSessionID(claims.SessionID)

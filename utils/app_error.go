@@ -577,6 +577,29 @@ var (
 	)
 )
 
+// login Attempt Errors
+var (
+	ErrLoginAttemptNotFound = NewAppError(
+		"LOGIN_ATTEMPT_NOT_FOUND",
+		"Login attempt not found",
+		http.StatusNotFound,
+		"login_attempt",
+	)
+	ErrLoginAttemptFailed = NewAppError(
+		"LOGIN_ATTEMPT_FAILED",
+		"Failed to process login attempt",
+		http.StatusBadRequest,
+		"login_attempt",
+	)
+	ErrCreateLoginAttemptFailed = NewAppError(
+		"LOGIN_ATTEMPT_CREATE_FAILED",
+		"Failed to create login attempt",
+		http.StatusBadRequest,
+		"login_attempt",
+	)
+	
+)
+
 // Email Verification Errors
 var (
 	ErrEmailVerificationTokenInvalidOrExpired = NewAppError(

@@ -548,6 +548,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 // IsAccountLocked checks if account is currently locked
 func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
 	var userAuth user.UserAuth
+
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		return false, fmt.Errorf("failed to check account lock status: %w", err)
 	}

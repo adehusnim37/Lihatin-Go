@@ -70,7 +70,12 @@ type ResetPasswordRequest struct {
 
 // DeleteAccountRequest represents the request to delete a user account
 type DeleteAccountRequest struct {
-	ID string `json:"id" binding:"required,uuid7" label:"ID Pengguna" uri:"id"`
+	ID string `json:"id" binding:"required,uuid" label:"ID Pengguna" uri:"id"`
+}
+
+// User Id Generic Request represents a request that requires user ID in the URI
+type UserIDGenericRequest struct {
+	ID string `json:"id" binding:"required,uuid" label:"ID Pengguna" uri:"id"`
 }
 
 // UserAuthResponse represents user authentication details (without sensitive data)
@@ -140,4 +145,10 @@ type VerifyEmailResponse struct {
 // ForgotPasswordToken represents the token extracted from URL parameters for password reset
 type ForgotPasswordToken struct {
 	Token string `json:"token" binding:"required,min=10,max=255,no_space" uri:"token" label:"Token Reset`
+}
+
+// LoginAttemptsStatsDTO represents the login attempts statistics data
+type LoginAttemptsStatsRequest struct {
+	EmailOrUsername string `json:"email_or_username" label:"Email atau Username" binding:"required,min=3,max=100" uri:"email_or_username"`
+	Days            int    `json:"days" label:"Jumlah Hari" binding:"required,min=1,max=365" uri:"days"`
 }

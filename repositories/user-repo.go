@@ -20,13 +20,6 @@ type UserRepository interface {
 	CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error)
 	CreateUser(user *user.User) error
 	UpdateUser(id string, user dto.UpdateProfileRequest) error
-	DeleteUserPermanent(id string) error
-
-	// Admin methods
-	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
-	LockUser(userID, reason string) error
-	UnlockUser(userID, reason string) error
-	IsUserLocked(userID string) (bool, error)
 }
 
 type userRepository struct {
@@ -169,7 +162,6 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 		currentUser.Username = *updateUser.Username
 	}
 
-
 	currentUser.UsernameChanged = currentUser.UsernameChanged || (updateUser.Username != nil)
 
 	// Perform the update using GORM
@@ -189,127 +181,7 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	if updateUser.Username != nil {
 		updatedFields++
 	}
-	
+
 	utils.Logger.Info("User updated successfully", "user_id", id, "fields_updated", updatedFields)
 	return nil
-}
-
-func (ur *userRepository) DeleteUserPermanent(id string) error {
-	var user user.User
-
-	result := ur.db.Where("id = ? AND deleted_at IS NULL", id).First(&user)
-	if result.Error != nil {
-		utils.Logger.Error("Failed to find user for permanent deletion", "user_id", id, "error", result.Error)
-		return utils.ErrUserNotFound
-	}
-
-	result = ur.db.Unscoped().Delete(&user, "id = ?", id)
-	if result.Error != nil {
-		utils.Logger.Error("Failed to permanently delete user", "user_id", id, "error", result.Error)
-		return utils.ErrUserDeleteFailed
-	}
-
-	if result.RowsAffected == 0 {
-		return utils.ErrUserNotFound
-	}
-
-	utils.Logger.Info("User permanently deleted", "user_id", id)
-	return nil
-}
-
-// GetAllUsersWithPagination retrieves all users with pagination (admin only)
-func (ur *userRepository) GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error) {
-	var users []user.User
-	var totalCount int64
-
-	// Get total count
-	countResult := ur.db.Model(&user.User{}).Where("deleted_at IS NULL").Count(&totalCount)
-	if countResult.Error != nil {
-		utils.Logger.Error("Error getting total user count", "error", countResult.Error)
-		return nil, 0, utils.ErrUserDatabaseError
-	}
-
-	// Get users with pagination
-	result := ur.db.Where("deleted_at IS NULL").
-		Order("created_at DESC").
-		Limit(limit).
-		Offset(offset).
-		Find(&users)
-
-	if result.Error != nil {
-		utils.Logger.Error("Error getting paginated users", "error", result.Error)
-		return nil, 0, utils.ErrUserDatabaseError
-	}
-
-	utils.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
-	return users, totalCount, nil
-}
-
-// LockUser locks a user account with a reason
-func (ur *userRepository) LockUser(userID, reason string) error {
-	now := time.Now()
-	updates := map[string]interface{}{
-		"is_locked":     true,
-		"locked_at":     &now,
-		"locked_reason": reason,
-		"updated_at":    now,
-	}
-
-	result := ur.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
-	if result.Error != nil {
-		utils.Logger.Error("Failed to lock user", "user_id", userID, "error", result.Error)
-		return utils.ErrUserLockFailed
-	}
-
-	if result.RowsAffected == 0 {
-		return utils.ErrUserNotFound
-	}
-
-	utils.Logger.Info("User locked successfully", "user_id", userID, "reason", reason)
-	return nil
-}
-
-// UnlockUser unlocks a user account
-func (ur *userRepository) UnlockUser(userID, reason string) error {
-	now := time.Now()
-	unlockReason := "Account unlocked"
-	if reason != "" {
-		unlockReason = reason
-	}
-
-	updates := map[string]interface{}{
-		"is_locked":     false,
-		"locked_at":     nil,
-		"locked_reason": unlockReason,
-		"updated_at":    now,
-	}
-
-	result := ur.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
-	if result.Error != nil {
-		utils.Logger.Error("Failed to unlock user", "user_id", userID, "error", result.Error)
-		return utils.ErrUserUnlockFailed
-	}
-
-	if result.RowsAffected == 0 {
-		return utils.ErrUserNotFound
-	}
-
-	utils.Logger.Info("User unlocked successfully", "user_id", userID, "reason", unlockReason)
-	return nil
-}
-
-// IsUserLocked checks if a user account is locked
-func (ur *userRepository) IsUserLocked(userID string) (bool, error) {
-	var user user.User
-	result := ur.db.Select("is_locked").Where("id = ? AND deleted_at IS NULL", userID).First(&user)
-
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return false, utils.ErrUserNotFound
-		}
-		utils.Logger.Error("Error checking user lock status", "user_id", userID, "error", result.Error)
-		return false, utils.ErrUserDatabaseError
-	}
-
-	return user.IsLocked, nil
 }

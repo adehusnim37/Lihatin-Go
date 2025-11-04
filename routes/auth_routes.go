@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
+	"github.com/adehusnim37/lihatin-go/controllers/auth/admin"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
 	"github.com/adehusnim37/lihatin-go/middleware"
@@ -14,11 +15,13 @@ import (
 func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, emailController *email.Controller, baseController interface{}) {
 	// Create API key controller
 	apiKeyController := api.NewAPIKeyController(baseController.(*controllers.BaseController))
+	// Create admin controller
+	adminController := admin.NewAdminController(baseController.(*controllers.BaseController))
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
 		// Basic authentication
-		authGroup.POST("/login", authController.Login, middleware.RecordLoginAttempt(&loginAttemptRepo))
+		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), authController.Login)
 		authGroup.POST("/register", authController.Register)
 
 		// Password reset flow
@@ -76,10 +79,14 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	adminAuth := rg.Group("/auth/admin")
 	adminAuth.Use(middleware.AuthMiddleware(userRepo), middleware.AdminAuth())
 	{
-		adminAuth.GET("/users", authController.GetAllUsers)
-		adminAuth.POST("/users/:id/lock", authController.LockUser)
-		adminAuth.POST("/users/:id/unlock", authController.UnlockUser)
-		adminAuth.GET("/login-attempts", authController.GetLoginAttempts)
+		adminAuth.GET("/users", adminController.GetAllUsers)
+		adminAuth.GET("/users/:id", adminController.GetUserByID)
+		adminAuth.POST("/users/:id/lock", adminController.LockUser)
+		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
+		{
+			adminAuth.GET("/login-attempts", adminController.GetLoginAttempts)
+			adminAuth.GET("/login-attempts/stats/:email_or_username/:days", adminController.LoginAttemptsStats)
+		}
 	}
 
 	// Super Admin-only routes (super_admin access only)
