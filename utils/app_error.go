@@ -533,6 +533,13 @@ var (
 		http.StatusBadRequest,
 		"login_attempt",
 	)
+	ErrCreateLoginAttemptFailed = NewAppError(
+		"LOGIN_ATTEMPT_CREATE_FAILED",
+		"Failed to create login attempt",
+		http.StatusBadRequest,
+		"login_attempt",
+	)
+	
 )
 
 // Email Verification Errors

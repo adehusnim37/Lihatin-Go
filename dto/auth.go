@@ -132,3 +132,9 @@ type VerifyEmailResponse struct {
 	OldEmail string                       `json:"old_email,omitempty"`
 	Token    string                       `json:"token,omitempty"`
 }
+
+// LoginAttemptsStatsDTO represents the login attempts statistics data
+type LoginAttemptsStatsRequest struct {
+	EmailOrUsername string `json:"email_or_username" label:"Email atau Username" binding:"required,min=3,max=100" uri:"email_or_username"`
+	Days            int    `json:"days" label:"Jumlah Hari" binding:"required,min=1,max=365" uri:"days"`
+}

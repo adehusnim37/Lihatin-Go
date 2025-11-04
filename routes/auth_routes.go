@@ -82,10 +82,10 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		adminAuth.GET("/users/:id", adminController.GetUserByID)
 		adminAuth.POST("/users/:id/lock", adminController.LockUser)
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
-		adminAuth.GET("/login-attempts", adminController.GetLoginAttempts)
-		// adminAuth.GET("/users/login-attempts/:id", adminController.GetLoginAttemptByID)
-		// adminAuth.GET("/users/:id/login-attempts", adminController.GetUserLoginAttempts)
-		// adminAuth.DELETE("/users/login-attempts/clear", adminController.ClearLoginAttempts)
+		{
+			adminAuth.GET("/login-attempts", adminController.GetLoginAttempts)
+			adminAuth.GET("/login-attempts/stats/:email_or_username/:days", adminController.LoginAttemptsStats)
+		}
 	}
 
 	// Super Admin-only routes (super_admin access only)

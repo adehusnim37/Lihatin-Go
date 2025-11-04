@@ -30,25 +30,23 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 	}
 
 	// Parse success filter (optional)
-    var successFilter *bool
-    if successStr := ctx.Query("success"); successStr != "" {
-        if success, err := strconv.ParseBool(successStr); err == nil {
-            successFilter = &success
-            utils.Logger.Info("Filtering login attempts by success", "success", success)
-        }
-    }
+	var successFilter *bool
+	if successStr := ctx.Query("success"); successStr != "" {
+		if success, err := strconv.ParseBool(successStr); err == nil {
+			successFilter = &success
+			utils.Logger.Info("Filtering login attempts by success", "success", success)
+		}
+	}
+
+	id := ctx.Query("id")
+	username := ctx.Query("username")
 
 	offset := (page - 1) * limit
 
 	// Get login attempts
-	attempts, totalCount, err := c.repo.GetLoginAttemptRepository().GetAllLoginAttempts(limit, offset, successFilter)
+	attempts, totalCount, err := c.repo.GetLoginAttemptRepository().GetAllLoginAttempts(limit, offset, successFilter, id, username)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve login attempts",
-			Error:   map[string]string{"error": "Failed to retrieve login attempts, please try again later"},
-		})
+		utils.HandleError(ctx, err, nil)
 		return
 	}
 
