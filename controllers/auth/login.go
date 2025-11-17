@@ -206,12 +206,28 @@ func (c *Controller) Login(ctx *gin.Context) {
 		c.emailService.SendLoginAlertEmail(user.Email, user.FirstName, clientIP, userAgent)
 	}()
 
+	ctx.SetCookie(
+		"access_token", // Nama Cookie
+		token,          // Nilai Token
+		2000,           // MaxAge (dalam detik)
+		"/",            // Path: Tersedia untuk seluruh aplikasi
+		"",             // Domain: Kosong berarti domain saat ini
+		false,          // Secure: True if using HTTPS
+		true,           // HttpOnly: MUST be TRUE to prevent JS from reading
+	)
+
+	ctx.SetCookie(
+		"refresh_token", // Nama Cookie
+		refreshToken,    // Nilai Token
+		604800,          // MaxAge (dalam detik) - 7 days
+		"/",             // Path: Tersedia untuk seluruh aplikasi
+		"",              // Domain: Kosong berarti domain saat ini
+		false,           // Secure: True if using HTTPS
+		true,            // HttpOnly: MUST be TRUE to prevent JS from reading
+	)
+
 	// Prepare response data
 	responseData := dto.LoginResponse{
-		Token: dto.TokenResponse{
-			AccessToken:  token,
-			RefreshToken: refreshToken,
-		},
 		User: dto.UserProfile{
 			ID:        user.ID,
 			Username:  user.Username,

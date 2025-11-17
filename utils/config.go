@@ -104,4 +104,5 @@ const (
 	EnvRedisDB       = "REDIS_DB"
 	EnvSessionSecret = "SESSION_SECRET"
 	EnvSessionTTL    = "SESSION_TTL_HOURS"
+	EnvAllowedOrigins = "ALLOWED_ORIGINS"
 )

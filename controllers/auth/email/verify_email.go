@@ -13,9 +13,12 @@ import (
 func (c *Controller) VerifyEmail(ctx *gin.Context) {
 	var response dto.VerifyEmailResponse
 	token := ctx.Query("token")
+	frontendURL := utils.GetEnvOrDefault(utils.EnvFrontendURL, "http://localhost:3000")
+
 	if token == "" {
 		utils.Logger.Warn("Email verification attempted without token")
-		utils.SendErrorResponse(ctx, http.StatusBadRequest, "TOKEN_REQUIRED", "Verification token is required", "token", nil)
+		// Redirect to login with error query param
+		ctx.Redirect(http.StatusFound, frontendURL+"/auth/login?error=token_required")
 		return
 	}
 
@@ -26,7 +29,8 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 			"token", token,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, nil)
+		// Redirect to login with error query param
+		ctx.Redirect(http.StatusFound, frontendURL+"/auth/login?error=verification_failed")
 		return
 	}
 
@@ -72,8 +76,9 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 
 	utils.Logger.Info("Email verified successfully", "token", token)
 
-	// Send success response
-	utils.SendOKResponse(ctx, map[string]interface{}{
-		"message": "Email verification completed successfully",
-	}, "Email verified successfully")
+	// Redirect to frontend success page
+	redirectURL := frontendURL + "/auth/success-verify-email"
+
+	utils.Logger.Info("Redirecting to success page", "redirect_url", redirectURL)
+	ctx.Redirect(http.StatusFound, redirectURL)
 }

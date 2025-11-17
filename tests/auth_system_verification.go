@@ -90,10 +90,6 @@ func (sv *SystemVerification) VerifyLogin() error {
 		return fmt.Errorf("failed to parse login response: %w", err)
 	}
 
-	if loginResponse.Token.AccessToken == "" {
-		return fmt.Errorf("login response missing access token")
-	}
-
 	fmt.Println("✓ User login endpoint working")
 	return nil
 }
@@ -142,8 +138,6 @@ func (sv *SystemVerification) VerifyProtectedEndpoint() error {
 	if err != nil {
 		return fmt.Errorf("failed to create profile request: %w", err)
 	}
-
-	req.Header.Add("Authorization", "Bearer "+loginResponse.Token.AccessToken)
 
 	client := &http.Client{}
 	profileResp, err := client.Do(req)
