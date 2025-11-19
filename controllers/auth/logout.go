@@ -12,9 +12,17 @@ func (c *Controller) Logout(ctx *gin.Context) {
 	sessionID := ctx.GetString("session_id")
 	userID := ctx.GetString("user_id")
 
+	// Get JWT token from cookie or Authorization header
+	var token string
+	cookieToken, err := ctx.Cookie("access_token")
+	if err == nil && cookieToken != "" {
+		token = cookieToken
+	} else {
+		authHeader := ctx.GetHeader("Authorization")
+		token = utils.ExtractTokenFromHeader(authHeader)
+	}
+
 	// Get JWT claims to extract jti and expiration
-	authHeader := ctx.GetHeader("Authorization")
-	token := utils.ExtractTokenFromHeader(authHeader)
 	claims, err := utils.ValidateJWT(token)
 	if err != nil {
 		utils.Logger.Warn("Failed to extract JWT claims during logout",
@@ -76,6 +84,39 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		utils.SendErrorResponse(ctx, 500, "Failed to invalidate session", "ERR_SESSION_INVALIDATION_FAILED", utils.ErrSessionInvalidationFailed.Error(), nil)
 		return
 	}
+
+	// Clear HTTP-Only cookies (XSS protection)
+	// Detect if running on HTTPS
+	isSecure := ctx.GetHeader("X-Forwarded-Proto") == "https" ||
+		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
+		ctx.Request.TLS != nil
+
+	// Clear access_token cookie
+	ctx.SetCookie(
+		"access_token", // name
+		"",             // empty value
+		-1,             // maxAge -1 to delete immediately
+		"/",            // path
+		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"),    // domain (must match the domain used when setting)
+		isSecure,       // secure (match original cookie setting)
+		true,           // httpOnly
+	)
+
+	// Clear refresh_token cookie
+	ctx.SetCookie(
+		"refresh_token", // name
+		"",              // empty value
+		-1,              // maxAge -1 to delete immediately
+		"/",             // path
+		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // domain (must match the domain used when setting)
+		isSecure, // secure
+		true,     // httpOnly
+	)
+
+	utils.Logger.Info("HTTP-Only cookies cleared",
+		"user_id", userID,
+		"is_secure", isSecure,
+	)
 
 	utils.SendOKResponse(ctx, nil, "Logout successful")
 }

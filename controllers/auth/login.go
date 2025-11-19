@@ -206,24 +206,38 @@ func (c *Controller) Login(ctx *gin.Context) {
 		c.emailService.SendLoginAlertEmail(user.Email, user.FirstName, clientIP, userAgent)
 	}()
 
+	// Determine if we're in production (HTTPS) or development (HTTP)
+	isSecure := ctx.Request.TLS != nil || ctx.GetHeader("X-Forwarded-Proto") == "https"
+
+	// Set Access Token Cookie (HttpOnly, Secure in prod, Short-lived)
+	// Domain set to localhost for cross-port development (3000 <-> 8080)
 	ctx.SetCookie(
-		"access_token", // Nama Cookie
-		token,          // Nilai Token
-		2000,           // MaxAge (dalam detik)
-		"/",            // Path: Tersedia untuk seluruh aplikasi
-		"",             // Domain: Kosong berarti domain saat ini
-		false,          // Secure: True if using HTTPS
-		true,           // HttpOnly: MUST be TRUE to prevent JS from reading
+		"access_token", // Name
+		token,          // Value
+		utils.GetEnvAsInt(utils.EnvJWTExpired, 24)*3600, // MaxAge in seconds (default 24 hours)
+		"/", // Path
+		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
+		isSecure, // Secure (true in production/HTTPS)
+		true,     // HttpOnly (MUST be true for security)
 	)
 
+	// Set Refresh Token Cookie (HttpOnly, Secure in prod, Long-lived)
 	ctx.SetCookie(
-		"refresh_token", // Nama Cookie
-		refreshToken,    // Nilai Token
-		604800,          // MaxAge (dalam detik) - 7 days
-		"/",             // Path: Tersedia untuk seluruh aplikasi
-		"",              // Domain: Kosong berarti domain saat ini
-		false,           // Secure: True if using HTTPS
-		true,            // HttpOnly: MUST be TRUE to prevent JS from reading
+		"refresh_token", // Name
+		refreshToken,    // Value
+		utils.GetEnvAsInt(utils.EnvRefreshTokenExpired, 168)*3600, // MaxAge in seconds (default 7 days)
+		"/", // Path
+		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
+		isSecure, // Secure (true in production/HTTPS)
+		true,     // HttpOnly (MUST be true for security)
+	)
+
+	// Log successful cookie setting (but not the actual token values)
+	utils.Logger.Info("Authentication cookies set successfully",
+		"user_id", user.ID,
+		"secure", isSecure,
+		"access_token_max_age_hours", utils.GetEnvAsInt(utils.EnvJWTExpired, 24),
+		"refresh_token_max_age_hours", utils.GetEnvAsInt(utils.EnvRefreshTokenExpired, 168),
 	)
 
 	// Prepare response data

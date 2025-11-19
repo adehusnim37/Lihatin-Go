@@ -14,31 +14,42 @@ import (
 )
 
 // AuthMiddleware provides JWT authentication middleware
+// 🔐 SECURITY: Prioritizes HTTP-Only cookies over Authorization header for token validation
 func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+		var token string
 
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Authorization header required.",
-				Error:   map[string]string{"auth": "Missing authorization header. Login required."},
-			})
-			c.Abort()
-			return
-		}
+		// Try to get token from HTTP-Only cookie first (preferred method)
+		cookieToken, err := c.Cookie("access_token")
+		if err == nil && cookieToken != "" {
+			token = cookieToken
+			utils.Logger.Debug("Token read from HTTP-Only cookie")
+		} else {
+			// Fallback to Authorization header for backward compatibility
+			authHeader := c.GetHeader("Authorization")
+			if authHeader == "" {
+				c.JSON(http.StatusUnauthorized, common.APIResponse{
+					Success: false,
+					Data:    nil,
+					Message: "Authorization required",
+					Error:   map[string]string{"auth": "Missing authentication. Login required."},
+				})
+				c.Abort()
+				return
+			}
 
-		token := utils.ExtractTokenFromHeader(authHeader)
-		if token == "" {
-			c.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Invalid authorization header format. Please provide a valid token.",
-				Error:   map[string]string{"auth": "Authorization header must be 'Bearer <token>'"},
-			})
-			c.Abort()
-			return
+			token = utils.ExtractTokenFromHeader(authHeader)
+			if token == "" {
+				c.JSON(http.StatusUnauthorized, common.APIResponse{
+					Success: false,
+					Data:    nil,
+					Message: "Invalid authorization header format",
+					Error:   map[string]string{"auth": "Authorization header must be 'Bearer <token>'"},
+				})
+				c.Abort()
+				return
+			}
+			utils.Logger.Debug("Token read from Authorization header")
 		}
 
 		claims, err := utils.ValidateJWT(token)

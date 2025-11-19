@@ -43,6 +43,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	protectedAuth := rg.Group("/auth")
 	protectedAuth.Use(middleware.AuthMiddleware(userRepo))
 	{
+		// Current user info (for cookie-based auth check)
+		protectedAuth.GET("/me", authController.GetCurrentUser)
+
 		// Account management
 		protectedAuth.POST("/logout", authController.Logout)
 		protectedAuth.POST("/change-password", authController.ChangePassword)

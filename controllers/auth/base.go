@@ -280,17 +280,17 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 }
 
 // RefreshToken generates new access token from refresh token (Redis-based)
+// 🔐 SECURITY: Reads refresh_token from HTTP-Only cookie (not JSON body) to prevent XSS attacks
+// Returns new tokens via Set-Cookie headers only (never in response body)
 func (c *Controller) RefreshToken(ctx *gin.Context) {
-	var req struct {
-		RefreshToken string `json:"refresh_token" validate:"required"`
-	}
-
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
+	// Read refresh token from HTTP-Only cookie (secure approach)
+	refreshTokenCookie, err := ctx.Cookie("refresh_token")
+	if err != nil || refreshTokenCookie == "" {
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Invalid input",
-			Error:   map[string]string{"input": "Refresh token is required"},
+			Message: "Refresh token missing",
+			Error:   map[string]string{"refresh_token": "Please login again"},
 		})
 		return
 	}
@@ -301,7 +301,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 
 	// Validate refresh token from Redis
 	refreshTokenManager := utils.NewRefreshTokenManager(redisClient)
-	tokenData, err := refreshTokenManager.GetRefreshToken(context.Background(), req.RefreshToken)
+	tokenData, err := refreshTokenManager.GetRefreshToken(context.Background(), refreshTokenCookie)
 	if err != nil {
 		utils.Logger.Warn("Invalid refresh token",
 			"error", err.Error(),
@@ -367,7 +367,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	}
 
 	// Rotate refresh token (delete old, create new) - security best practice
-	err = refreshTokenManager.DeleteRefreshToken(context.Background(), req.RefreshToken)
+	err = refreshTokenManager.DeleteRefreshToken(context.Background(), refreshTokenCookie)
 	if err != nil {
 		utils.Logger.Warn("Failed to delete old refresh token",
 			"user_id", tokenData.UserID,
@@ -403,14 +403,118 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		"session_id", utils.GetKeyPreview(tokenData.SessionID),
 	)
 
-	// Return new tokens
+	// ✅ Set tokens as HTTP-Only cookies (XSS protection)
+	// Detect if running on HTTPS (check standard headers)
+	isSecure := ctx.GetHeader("X-Forwarded-Proto") == "https" ||
+		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
+		ctx.Request.TLS != nil
+
+	// Access token cookie (short-lived: default 48 hours)
+	ctx.SetCookie(
+		"access_token", // name
+		newToken,       // value
+		48*60*60,       // maxAge in seconds (48 hours)
+		"/",            // path
+		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
+		isSecure, // secure (HTTPS only in production)
+		true,     // httpOnly (prevent JavaScript access)
+	)
+
+	// Refresh token cookie (long-lived: default 168 hours = 7 days)
+	ctx.SetCookie(
+		"refresh_token", // name
+		newRefreshToken, // value
+		168*60*60,       // maxAge in seconds (168 hours = 7 days)
+		"/",             // path
+		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
+		isSecure, // secure
+		true,     // httpOnly
+	)
+
+	utils.Logger.Info("Tokens rotated and set as HTTP-Only cookies",
+		"user_id", user.ID,
+		"is_secure", isSecure,
+	)
+
+	// ⚠️ DO NOT return tokens in response body (security requirement)
+	// Tokens are only accessible via HTTP-Only cookies
+	ctx.JSON(http.StatusOK, common.APIResponse{
+		Success: true,
+		Data:    nil, // No token in response body for security
+		Message: "Token refreshed successfully",
+		Error:   nil,
+	})
+}
+
+// GetCurrentUser returns the current authenticated user's information
+// 🔐 Used by frontend to check authentication status via cookie validation
+func (c *Controller) GetCurrentUser(ctx *gin.Context) {
+	userID, exists := ctx.Get("user_id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Authentication required",
+			Error:   map[string]string{"auth": "Please login to access this feature"},
+		})
+		return
+	}
+
+	// Get user details
+	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
+	if err != nil {
+		utils.Logger.Error("Failed to get user for /me endpoint",
+			"user_id", userID,
+			"error", err.Error(),
+		)
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Failed to get user information",
+			Error:   map[string]string{"error": "Internal server error"},
+		})
+		return
+	}
+
+	// Get user auth info
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Failed to get user authentication info",
+			Error:   map[string]string{"error": "Internal server error"},
+		})
+		return
+	}
+
+	// Convert to DTO
+	userProfile := dto.UserProfile{
+		ID:        user.ID,
+		Username:  user.Username,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Email:     user.Email,
+		Avatar:    user.Avatar,
+		IsPremium: user.IsPremium,
+		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05"),
+	}
+
+	authResponse := dto.UserAuthResponse{
+		ID:              userAuth.ID,
+		UserID:          userAuth.UserID,
+		IsEmailVerified: userAuth.IsEmailVerified,
+		IsTOTPEnabled:   userAuth.IsTOTPEnabled,
+		LastLoginAt:     userAuth.LastLoginAt.Format("2006-01-02 15:04:05"),
+	}
+
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
-			"token":         newToken,
-			"refresh_token": newRefreshToken,
+			"user": userProfile,
+			"auth": authResponse,
 		},
-		Message: "Token refreshed successfully",
+		Message: "User information retrieved successfully",
 		Error:   nil,
 	})
 }
