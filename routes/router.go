@@ -1,14 +1,17 @@
 package routes
 
 import (
+	"log"
 	"net/http"
-	"strings"
+	"time"
+	"context"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
 	"github.com/adehusnim37/lihatin-go/controllers/logger"
 	"github.com/adehusnim37/lihatin-go/controllers/shortlink"
+	jobs "github.com/adehusnim37/lihatin-go/cron-job"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
@@ -91,6 +94,11 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 
 	// Apply global middleware for activity logging
 	r.Use(middleware.ActivityLogger(loggerRepo))
+
+	// Initialize login attempts cleanup scheduler
+	log.Println("Starting login attempts cleanup scheduler...")
+	go jobs.RunCleanupScheduler(context.Background(), loginAttemptRepo, 24*time.Hour, 0)
+	log.Println("✅ Login attempts cleanup scheduler succeeded.")
 
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")

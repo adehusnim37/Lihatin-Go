@@ -93,6 +93,7 @@ type LoginAttempt struct {
 	FailReason      string    `json:"fail_reason,omitempty" gorm:"size:255"`
 	CreatedAt       time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt       time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty" gorm:"index"`
 }
 
 func (LoginAttempt) TableName() string {

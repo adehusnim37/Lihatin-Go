@@ -78,6 +78,11 @@ type UserIDGenericRequest struct {
 	ID string `json:"id" binding:"required,uuid" label:"ID Pengguna" uri:"id"`
 }
 
+// IDGenericRequest represents a request that requires an ID in the URI
+type IDGenericRequest struct {
+	ID string `json:"id" binding:"required,uuid" label:"ID" uri:"id"`
+}
+
 // UserAuthResponse represents user authentication details (without sensitive data)
 type UserAuthResponse struct {
 	ID              string `json:"id"`
