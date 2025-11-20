@@ -17,8 +17,13 @@ type LoginRequest struct {
 // LoginResponse represents the successful login response
 type LoginResponse struct {
 	// Token TokenResponse    `json:"token"`
-	User  UserProfile      `json:"user"`
-	Auth  UserAuthResponse `json:"auth"`
+	User UserProfile      `json:"user"`
+	Auth UserAuthResponse `json:"auth"`
+}
+
+type ProfileAuthResponse struct {
+	User UserProfile               `json:"user"`
+	Auth CompletedUserAuthResponse `json:"auth"`
 }
 
 // TokenResponse represents access and refresh tokens
@@ -90,6 +95,22 @@ type UserAuthResponse struct {
 	IsEmailVerified bool   `json:"is_email_verified"`
 	IsTOTPEnabled   bool   `json:"is_totp_enabled"`
 	LastLoginAt     string `json:"last_login_at"`
+}
+
+type CompletedUserAuthResponse struct {
+	ID                  string     `json:"id"`
+	UserID              string     `json:"user_id"`
+	IsEmailVerified     bool       `json:"is_email_verified"`
+	DeviceID            *string    `json:"device_id,omitempty"`
+	LastIP              *string    `json:"last_ip,omitempty"`
+	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
+	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
+	FailedLoginAttempts int        `json:"failed_login_attempts"`
+	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`
+	IsActive            bool       `json:"is_active"`
+	IsTOTPEnabled       bool       `json:"is_totp_enabled"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type ChangePasswordRequest struct {

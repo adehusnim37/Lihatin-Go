@@ -189,7 +189,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	}
 
 	// Update last login and reset failed attempts
-	if err := c.repo.GetUserAuthRepository().UpdateLastLogin(user.ID); err != nil {
+	if err := c.repo.GetUserAuthRepository().UpdateLastLogin(user.ID, *deviceID, *lastIP); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,

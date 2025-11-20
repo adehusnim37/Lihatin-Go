@@ -499,18 +499,20 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 }
 
 // UpdateLastLogin updates last login timestamp
-func (r *UserAuthRepository) UpdateLastLogin(userID string) error {
+func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) error {
 	now := time.Now()
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"last_login_at":         &now,
 			"failed_login_attempts": 0,
 			"lockout_until":         nil,
+			"device_id":             deviceId,
+			"last_ip":               LastIp,
 		}).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to update last login: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -708,11 +710,16 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 		return utils.ErrUserDatabaseError
 	}
 
-	result = ur.db.Model(&userAuth).Updates(map[string]interface{}{
-		"session_id": nil,
-		"device_id":  nil,
-		"last_ip":    nil,
+	result = ur.db.Model(&userAuth).Updates(map[string]any{
+		"session_id":     nil,
+		"device_id":      nil,
+		"last_logout_at": time.Now(),
 	})
+
+	if result.Error != nil {
+		utils.Logger.Error("Error clearing session on logout", "user_id", userID, "error", result.Error)
+		return utils.ErrUserDatabaseError
+	}
 
 	return nil
 }

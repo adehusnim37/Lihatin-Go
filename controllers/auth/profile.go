@@ -18,23 +18,38 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 	}
 
 	// Get user auth information
-	_, err = c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
 		utils.HandleError(ctx, err, userID)
 		return
 	}
 
-	// Create profile response
-	profile := dto.UserProfile{
-		ID:        user.ID,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		IsPremium: user.IsPremium,
-		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	profile := dto.ProfileAuthResponse{
+		User: dto.UserProfile{
+			ID:        user.ID,
+			Username:  user.Username,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Email:     user.Email,
+			Avatar:    user.Avatar,
+			IsPremium: user.IsPremium,
+			CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05"),
+		},
+		Auth: dto.CompletedUserAuthResponse{
+			ID:                  userAuth.ID,
+			UserID:              userAuth.UserID,
+			IsEmailVerified:     userAuth.IsEmailVerified,
+			DeviceID:            userAuth.DeviceID,
+			LastIP:              userAuth.LastIP,
+			LastLoginAt:         userAuth.LastLoginAt,
+			LastLogoutAt:        userAuth.LastLogoutAt,
+			FailedLoginAttempts: userAuth.FailedLoginAttempts,
+			LockoutUntil:        userAuth.LockoutUntil,
+			IsActive:            userAuth.IsActive,
+			IsTOTPEnabled:       userAuth.IsTOTPEnabled,
+			CreatedAt:           userAuth.CreatedAt,
+			UpdatedAt:           userAuth.UpdatedAt,
+		},
 	}
-
 	utils.SendOKResponse(ctx, profile, "Profile retrieved successfully")
 }
