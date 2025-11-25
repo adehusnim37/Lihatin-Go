@@ -46,3 +46,4 @@ bin/
 test-build
 lihatin-go
 main
+.DS_Store
