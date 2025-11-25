@@ -107,6 +107,7 @@ type CompletedUserAuthResponse struct {
 	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
 	FailedLoginAttempts int        `json:"failed_login_attempts"`
 	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`
+	PasswordChangedAt   *time.Time `json:"password_changed_at,omitempty"`
 	IsActive            bool       `json:"is_active"`
 	IsTOTPEnabled       bool       `json:"is_totp_enabled"`
 	CreatedAt           time.Time  `json:"created_at"`

@@ -20,6 +20,7 @@ type UserAuth struct {
 	User                            *User                   `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
 	IsEmailVerified                 bool                    `json:"is_email_verified" gorm:"default:false"`
 	PasswordHash                    string                  `json:"password_hash" gorm:"type:text"`            // Hashed password for this auth method
+	PasswordChangedAt               *time.Time              `json:"password_changed_at,omitempty"`              // Timestamp of last password change
 	EmailVerificationToken          string                  `json:"-" gorm:"size:255"`                         // Token sent to user's email
 	EmailVerificationTokenExpiresAt *time.Time              `json:"-"`                                         // Expiry for the verification token
 	EmailVerificationSource         EmailVerificationSource `json:"-" gorm:"size:255"`                         // Source email before change, if applicable

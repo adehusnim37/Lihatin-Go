@@ -479,12 +479,13 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.Use
 func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 	result := r.db.Model(&user.UserAuth{}).
 		Where("password_reset_token = ? AND password_reset_token_expires_at IS NOT NULL AND password_reset_token_expires_at > ?", token, time.Now()).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"password_hash":                   hashedPassword,
 			"password_reset_token":            "",
 			"password_reset_token_expires_at": nil,
 			"failed_login_attempts":           0,
 			"lockout_until":                   nil,
+			"password_changed_at":            time.Now(),
 		})
 
 	if result.Error != nil {
@@ -609,6 +610,7 @@ func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error
 			"password_hash":         hashedPassword,
 			"failed_login_attempts": 0,
 			"lockout_until":         nil,
+			"password_changed_at":   time.Now(),
 		}).Error
 
 	if err != nil {

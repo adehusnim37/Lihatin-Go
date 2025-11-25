@@ -44,6 +44,7 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 			LastLoginAt:         userAuth.LastLoginAt,
 			LastLogoutAt:        userAuth.LastLogoutAt,
 			FailedLoginAttempts: userAuth.FailedLoginAttempts,
+			PasswordChangedAt:   userAuth.PasswordChangedAt,
 			LockoutUntil:        userAuth.LockoutUntil,
 			IsActive:            userAuth.IsActive,
 			IsTOTPEnabled:       userAuth.IsTOTPEnabled,

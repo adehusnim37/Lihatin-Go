@@ -521,16 +521,7 @@ func (c *Controller) GetCurrentUser(ctx *gin.Context) {
 
 // ChangePassword changes user password (requires current password)
 func (c *Controller) ChangePassword(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication required",
-			Error:   map[string]string{"auth": "Please login to access this feature"},
-		})
-		return
-	}
+	userID := ctx.GetString("user_id")
 
 	var req struct {
 		CurrentPassword string `json:"current_password" validate:"required"`
@@ -558,7 +549,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	}
 
 	// Get user auth data
-	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -593,7 +584,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	}
 
 	// Update password
-	if err := c.repo.GetUserAuthRepository().UpdatePassword(userID.(string), hashedPassword); err != nil {
+	if err := c.repo.GetUserAuthRepository().UpdatePassword(userID, hashedPassword); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
