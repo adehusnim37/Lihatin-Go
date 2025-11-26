@@ -6,17 +6,18 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers/auth/admin"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
+	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, emailController *email.Controller, baseController interface{}) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, emailController *email.Controller, totpController *totp.Controller, baseController *controllers.BaseController) {
 	// Create API key controller
-	apiKeyController := api.NewAPIKeyController(baseController.(*controllers.BaseController))
+	apiKeyController := api.NewAPIKeyController(baseController)
 	// Create admin controller
-	adminController := admin.NewAdminController(baseController.(*controllers.BaseController))
+	adminController := admin.NewAdminController(baseController)
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
@@ -60,11 +61,11 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")
 		{
-			totpGroup.POST("/setup", authController.SetupTOTP)
-			totpGroup.POST("/verify", authController.VerifyTOTP)
-			totpGroup.POST("/disable", authController.DisableTOTP)
-			totpGroup.GET("/recovery-codes", authController.GetRecoveryCodes)
-			totpGroup.POST("/regenerate-recovery-codes", authController.RegenerateRecoveryCodes)
+			totpGroup.POST("/setup", totpController.SetupTOTP)
+			totpGroup.POST("/verify", totpController.VerifyTOTP)
+			totpGroup.POST("/disable", totpController.DisableTOTP)
+			totpGroup.GET("/recovery-codes", totpController.GetRecoveryCodes)
+			totpGroup.POST("/regenerate-recovery-codes", totpController.RegenerateRecoveryCodes)
 		}
 
 		// Email verification for authenticated users

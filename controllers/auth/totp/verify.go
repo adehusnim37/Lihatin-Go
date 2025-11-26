@@ -13,11 +13,6 @@ import (
 func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 
-	if userID == "" {
-		utils.SendErrorResponse(ctx, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", "auth")
-		return
-	}
-
 	// Bind request
 	var req dto.VerifyTOTPRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

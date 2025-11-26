@@ -59,7 +59,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	}
 
 	// Generate recovery codes
-	recoveryCodes, err := utils.GenerateRecoveryCodes(8)
+	recoveryCodes, err := utils.GenerateRecoveryCodes(9)
 	if err != nil {
 		utils.Logger.Error("Failed to generate recovery codes",
 			"user_id", userID,
@@ -86,11 +86,10 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 	// Generate QR code URL
 	qrCodeURL := utils.GenerateQRCodeURL(secret)
 
-	response := map[string]interface{}{
-		"secret":         utils.FormatTOTPSecret(secret.Secret),
+	response := map[string]any{
+		"secret":         secret.Secret,
 		"qr_code_url":    qrCodeURL,
 		"recovery_codes": recoveryCodes,
-		"backup_codes":   recoveryCodes, // Alternative name
 	}
 
 	utils.SendOKResponse(ctx, response, "TOTP setup initiated. Please scan QR code and verify to complete setup")

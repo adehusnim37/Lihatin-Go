@@ -1,15 +1,16 @@
 package routes
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strings"
 	"time"
-	"context"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
+	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
 	"github.com/adehusnim37/lihatin-go/controllers/logger"
 	"github.com/adehusnim37/lihatin-go/controllers/shortlink"
 	jobs "github.com/adehusnim37/lihatin-go/cron-job"
@@ -86,6 +87,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	loggerController := logger.NewLoggerController(baseController)
 	shortController := shortlink.NewController(baseController)
 	emailController := email.NewController(baseController)
+	totpController := totp.NewController(baseController)
 
 	// Setup repositories for middleware
 	loggerRepo := repositories.NewLoggerRepository(gormDB)
@@ -103,7 +105,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")
-	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, emailController, baseController)
+	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, emailController, totpController, baseController)
 	RegisterLoggerRoutes(v1, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, authRepo)
 

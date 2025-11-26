@@ -1,6 +1,10 @@
 package user
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
 
 type EmailVerificationSource string
 
@@ -72,7 +76,7 @@ type AuthMethod struct {
 	LastUsedAt     *time.Time     `json:"last_used_at,omitempty"`                                                   // Timestamp when this method was last used for login
 	FriendlyName   string         `json:"friendly_name,omitempty" gorm:"size:100" validate:"max=100"`               // User-defined name (e.g., "My YubiKey", "Authenticator App")
 	Secret         string         `json:"-" gorm:"type:text"`                                                       // Encrypted secret/token
-	RecoveryCodes  []string       `json:"-" gorm:"type:json"`                                                       // Hashed recovery codes
+	RecoveryCodes  datatypes.JSON `json:"-" gorm:"type:json"`                                                       // Hashed recovery codes stored as JSON
 	ProviderUserID string         `json:"provider_user_id,omitempty" gorm:"size:255"`
 	Metadata       string         `json:"metadata,omitempty" gorm:"type:text"`
 	CreatedAt      time.Time      `json:"created_at"`

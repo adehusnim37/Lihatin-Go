@@ -14,11 +14,6 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 	username := ctx.GetString("username")
 
-	if userID == "" {
-		utils.SendErrorResponse(ctx, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", "auth", userID)
-		return
-	}
-
 	// Bind request
 	var req dto.DisableTOTPRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

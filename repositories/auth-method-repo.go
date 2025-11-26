@@ -2,10 +2,12 @@ package repositories
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -95,16 +97,21 @@ func (r *AuthMethodRepository) DisableAuthMethod(id string) error {
 // VerifyAuthMethod marks an auth method as verified
 func (r *AuthMethodRepository) VerifyAuthMethod(id string) error {
 	now := time.Now()
-	err := r.db.Model(&user.AuthMethod{}).
+	if err := r.db.Model(&user.AuthMethod{}).
 		Where("id = ?", id).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"is_verified": true,
 			"verified_at": &now,
-		}).Error
-
-	if err != nil {
+		}).Error; err != nil {
 		return fmt.Errorf("failed to verify auth method: %w", err)
 	}
+
+	if err := r.db.Model(&user.UserAuth{}).
+		Where("id = (SELECT user_auth_id FROM auth_methods WHERE id = ?)", id).
+		Update("is_totp_enabled", true).Error; err != nil {
+		return fmt.Errorf("failed to enable TOTP on user auth: %w", err)
+	}
+
 	return nil
 }
 
@@ -192,14 +199,26 @@ func (r *AuthMethodRepository) GetRecoveryCodes(userAuthID string) ([]string, er
 		return nil, fmt.Errorf("failed to get recovery codes: %w", err)
 	}
 
-	return authMethod.RecoveryCodes, nil
+	// Deserialize recovery codes from JSON
+	var recoveryCodes []string
+	if err := json.Unmarshal(authMethod.RecoveryCodes, &recoveryCodes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal recovery codes: %w", err)
+	}
+
+	return recoveryCodes, nil
 }
 
 // UpdateRecoveryCodes updates recovery codes for TOTP
 func (r *AuthMethodRepository) UpdateRecoveryCodes(userAuthID string, recoveryCodes []string) error {
-	err := r.db.Model(&user.AuthMethod{}).
+	// Serialize recovery codes to JSON
+	recoveryCodesJSON, err := json.Marshal(recoveryCodes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recovery codes: %w", err)
+	}
+
+	err = r.db.Model(&user.AuthMethod{}).
 		Where("user_auth_id = ? AND type = ?", userAuthID, user.AuthMethodTypeTOTP).
-		Update("recovery_codes", recoveryCodes).Error
+		Update("recovery_codes", recoveryCodesJSON).Error
 
 	if err != nil {
 		return fmt.Errorf("failed to update recovery codes: %w", err)
@@ -209,17 +228,27 @@ func (r *AuthMethodRepository) UpdateRecoveryCodes(userAuthID string, recoveryCo
 
 // SetupTOTP creates or updates TOTP auth method
 func (r *AuthMethodRepository) SetupTOTP(userAuthID, encryptedSecret string, recoveryCodes []string, friendlyName string) error {
+	// Serialize recovery codes to JSON
+	recoveryCodesJSON, err := json.Marshal(recoveryCodes)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recovery codes: %w", err)
+	}
+
 	// Check if TOTP already exists
 	var existing user.AuthMethod
-	err := r.db.Where("user_auth_id = ? AND type = ?", userAuthID, user.AuthMethodTypeTOTP).First(&existing).Error
+	err = r.db.Where("user_auth_id = ? AND type = ?", userAuthID, user.AuthMethodTypeTOTP).First(&existing).Error
+
+	uuidV7, _ := uuid.NewV7()
 
 	if err == gorm.ErrRecordNotFound {
+
 		// Create new TOTP method
 		authMethod := &user.AuthMethod{
+			ID:            uuidV7.String(),
 			UserAuthID:    userAuthID,
 			Type:          user.AuthMethodTypeTOTP,
 			Secret:        encryptedSecret,
-			RecoveryCodes: recoveryCodes,
+			RecoveryCodes: recoveryCodesJSON,
 			FriendlyName:  friendlyName,
 			IsEnabled:     true,
 			IsVerified:    false,
@@ -231,7 +260,7 @@ func (r *AuthMethodRepository) SetupTOTP(userAuthID, encryptedSecret string, rec
 
 	// Update existing TOTP method
 	existing.Secret = encryptedSecret
-	existing.RecoveryCodes = recoveryCodes
+	existing.RecoveryCodes = recoveryCodesJSON
 	existing.FriendlyName = friendlyName
 	existing.IsEnabled = true
 	existing.IsVerified = false
