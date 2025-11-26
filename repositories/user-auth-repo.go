@@ -85,6 +85,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, sou
 			"email_verification_token":            token,
 			"email_verification_token_expires_at": expiresAt,
 			"email_verification_source":           source,
+			"last_email_send_at":                  time.Now(),
 		}).Error
 
 	if err != nil {

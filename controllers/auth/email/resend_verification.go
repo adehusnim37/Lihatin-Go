@@ -2,6 +2,7 @@ package email
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/utils"
@@ -20,7 +21,7 @@ func (c *Controller) ResendVerificationEmail(ctx *gin.Context) {
 		return
 	}
 
-	// Check if user email is already verified
+	// Check if user email is already verified and is valid for resending
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
 	if err != nil {
 		utils.Logger.Error("Failed to get user auth info",
@@ -38,6 +39,19 @@ func (c *Controller) ResendVerificationEmail(ctx *gin.Context) {
 		)
 		utils.SendErrorResponse(ctx, http.StatusBadRequest, "EMAIL_ALREADY_VERIFIED", "Email is already verified", "email", userID)
 		return
+	}
+
+	if userAuth.LastEmailSendAt != nil {
+		timeSinceLastSend := time.Since(*userAuth.LastEmailSendAt)
+		if timeSinceLastSend < 5*time.Minute {
+			utils.Logger.Warn("Resend verification email attempted too soon",
+				"user_id", userID,
+				"email", userEmail,
+				"seconds_since_last_send", timeSinceLastSend.Seconds(),
+			)
+			utils.SendErrorResponse(ctx, http.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Please wait before requesting another verification email", "email", userID)
+			return
+		}
 	}
 
 	// Generate new verification token

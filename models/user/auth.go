@@ -20,10 +20,11 @@ type UserAuth struct {
 	User                            *User                   `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
 	IsEmailVerified                 bool                    `json:"is_email_verified" gorm:"default:false"`
 	PasswordHash                    string                  `json:"password_hash" gorm:"type:text"`            // Hashed password for this auth method
-	PasswordChangedAt               *time.Time              `json:"password_changed_at,omitempty"`              // Timestamp of last password change
+	PasswordChangedAt               *time.Time              `json:"password_changed_at,omitempty"`             // Timestamp of last password change
 	EmailVerificationToken          string                  `json:"-" gorm:"size:255"`                         // Token sent to user's email
 	EmailVerificationTokenExpiresAt *time.Time              `json:"-"`                                         // Expiry for the verification token
 	EmailVerificationSource         EmailVerificationSource `json:"-" gorm:"size:255"`                         // Source email before change, if applicable
+	LastEmailSendAt                 *time.Time              `json:"last_email_send_at,omitempty"`              // Timestamp of last verification email sent to prevent spamming
 	PasswordResetToken              string                  `json:"-" gorm:"size:255"`                         // Token for password reset
 	PasswordResetTokenExpiresAt     *time.Time              `json:"-"`                                         // Expiry for the reset token
 	DeviceID                        *string                 `json:"device_id,omitempty" gorm:"size:255;index"` // Current active device ID, if any
@@ -86,14 +87,14 @@ func (AuthMethod) TableName() string {
 
 // LoginAttempt represents a login attempt record
 type LoginAttempt struct {
-	ID              string    `json:"id" gorm:"primaryKey"`
-	EmailOrUsername string    `json:"email_or_username" gorm:"size:100"`
-	IPAddress       string    `json:"ip_address" gorm:"size:45"` // IPv4/IPv6
-	UserAgent       string    `json:"user_agent" gorm:"size:255"`
-	Success         bool      `json:"success" gorm:"default:false"`
-	FailReason      string    `json:"fail_reason,omitempty" gorm:"size:255"`
-	CreatedAt       time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt       time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID              string     `json:"id" gorm:"primaryKey"`
+	EmailOrUsername string     `json:"email_or_username" gorm:"size:100"`
+	IPAddress       string     `json:"ip_address" gorm:"size:45"` // IPv4/IPv6
+	UserAgent       string     `json:"user_agent" gorm:"size:255"`
+	Success         bool       `json:"success" gorm:"default:false"`
+	FailReason      string     `json:"fail_reason,omitempty" gorm:"size:255"`
+	CreatedAt       time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt       time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt       *time.Time `json:"deleted_at,omitempty" gorm:"index"`
 }
 

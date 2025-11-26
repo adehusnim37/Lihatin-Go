@@ -56,6 +56,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.POST("/change-email", emailController.ChangeEmail)
 		protectedAuth.GET("/check-email-change-eligibility", emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
+		protectedAuth.GET("/check-verification-email", emailController.CheckVerificationEmail)
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")
 		{
