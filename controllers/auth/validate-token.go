@@ -12,7 +12,7 @@ func (c *Controller) ValidateResetToken(ctx *gin.Context) {
 	var req dto.ForgotPasswordToken
 
 	// Bind and validate request
-	if err := ctx.ShouldBindUri(&req); err != nil {
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		utils.SendValidationError(ctx, err, &req)
 		return
 	}

@@ -9,7 +9,7 @@ import (
 // SendPasswordResetEmail sends password reset email
 func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) error {
 	subject := "Password Reset Request - Lihatin"
-	resetURL := fmt.Sprintf(utils.GetRequiredEnv(utils.EnvBackendURL)+`/v1/auth/validate-reset?token=%s`, token)
+	resetURL := fmt.Sprintf(utils.GetRequiredEnv(utils.EnvFrontendURL)+`/auth/reset-password?token=%s`, token)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>

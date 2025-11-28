@@ -171,7 +171,7 @@ type VerifyEmailResponse struct {
 
 // ForgotPasswordToken represents the token extracted from URL parameters for password reset
 type ForgotPasswordToken struct {
-	Token string `json:"token" binding:"required,min=10,max=255,no_space" uri:"token" label:"Token Reset"`
+	Token string `json:"token" binding:"required,min=10,max=255,no_space" form:"token" label:"Token Reset"`
 }
 
 // LoginAttemptsStatsDTO represents the login attempts statistics data
