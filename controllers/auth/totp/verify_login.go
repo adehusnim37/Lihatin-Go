@@ -165,6 +165,15 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
+	// Update TOTP auth method last_used_at
+	if err := c.repo.GetAuthMethodRepository().UpdateTOTPLastUsed(userAuth.ID); err != nil {
+		utils.Logger.Warn("Failed to update TOTP last_used_at",
+			"user_id", user.ID,
+			"error", err.Error(),
+		)
+		// Don't fail login for this
+	}
+
 	// Send login alert email (async)
 	go func() {
 		userAgent := ctx.GetHeader("User-Agent")

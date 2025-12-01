@@ -138,6 +138,19 @@ func (r *AuthMethodRepository) UpdateLastUsed(id string) error {
 	return nil
 }
 
+// UpdateTOTPLastUsed updates the last used timestamp for TOTP auth method by userAuthID
+func (r *AuthMethodRepository) UpdateTOTPLastUsed(userAuthID string) error {
+	now := time.Now()
+	err := r.db.Model(&user.AuthMethod{}).
+		Where("user_auth_id = ? AND type = ? AND is_enabled = ?", userAuthID, user.AuthMethodTypeTOTP, true).
+		Update("last_used_at", &now).Error
+
+	if err != nil {
+		return utils.ErrAuthMethodUpdateFailed
+	}
+	return nil
+}
+
 // DeleteAuthMethod soft deletes an auth method
 func (r *AuthMethodRepository) DeleteAuthMethod(id string) error {
 	err := r.db.Where("id = ?", id).Delete(&user.AuthMethod{}).Error

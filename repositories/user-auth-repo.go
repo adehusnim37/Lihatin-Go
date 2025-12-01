@@ -481,7 +481,7 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.Use
 		}
 		return nil, utils.ErrUserFindFailed
 	}
-	
+
 	return &usr, nil
 }
 
@@ -512,7 +512,9 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 // UpdateLastLogin updates last login timestamp
 func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) error {
 	now := time.Now()
-	err := r.db.Model(&user.UserAuth{}).
+	
+	// Update user auth fields
+	if err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]any{
 			"last_login_at":         &now,
@@ -520,11 +522,11 @@ func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) er
 			"lockout_until":         nil,
 			"device_id":             deviceId,
 			"last_ip":               LastIp,
-		}).Error
-
-	if err != nil {
+			"last_email_send_at":    nil,
+		}).Error; err != nil {
 		return utils.ErrUserAuthUpdateFailed
 	}
+	
 	return nil
 }
 
