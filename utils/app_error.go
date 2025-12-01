@@ -740,6 +740,24 @@ var (
 		http.StatusNotFound,
 		"auth_method",
 	)
+	ErrAuthMethodUpdateFailed = NewAppError(
+		"AUTH_METHOD_UPDATE_FAILED",
+		"Failed to update authentication method",
+		http.StatusBadRequest,
+		"auth_method",
+	)
+	ErrAuthMethodCreateFailed = NewAppError(
+		"AUTH_METHOD_CREATE_FAILED",
+		"Failed to create authentication method",
+		http.StatusBadRequest,
+		"auth_method",
+	)
+	ErrAuthMethodFindFailed = NewAppError(
+		"AUTH_METHOD_FIND_FAILED",
+		"Failed to find authentication method",
+		http.StatusNotFound,
+		"auth_method",
+	)
 	ErrAuthMethodAlreadyExists = NewAppError(
 		"AUTH_METHOD_EXISTS",
 		"Authentication method already exists",
@@ -781,5 +799,11 @@ var (
 		"TOTP is not enabled for this user",
 		http.StatusBadRequest,
 		"totp",
+	)
+	ErrAuthMethodDeleteFailed = NewAppError(
+		"AUTH_METHOD_DELETE_FAILED",
+		"Failed to delete authentication method",
+		http.StatusBadRequest,
+		"auth_method",
 	)
 )

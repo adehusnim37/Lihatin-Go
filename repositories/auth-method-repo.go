@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -24,7 +25,7 @@ func NewAuthMethodRepository(db *gorm.DB) *AuthMethodRepository {
 // CreateAuthMethod creates a new auth method
 func (r *AuthMethodRepository) CreateAuthMethod(authMethod *user.AuthMethod) error {
 	if err := r.db.Create(authMethod).Error; err != nil {
-		return fmt.Errorf("failed to create auth method: %w", err)
+		return utils.ErrAuthMethodCreateFailed
 	}
 	return nil
 }
@@ -36,7 +37,7 @@ func (r *AuthMethodRepository) GetAuthMethodByID(id string) (*user.AuthMethod, e
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
 		}
-		return nil, fmt.Errorf("failed to get auth method: %w", err)
+		return nil, utils.ErrAuthMethodFindFailed
 	}
 	return &authMethod, nil
 }
@@ -45,7 +46,7 @@ func (r *AuthMethodRepository) GetAuthMethodByID(id string) (*user.AuthMethod, e
 func (r *AuthMethodRepository) GetAuthMethodsByUserAuthID(userAuthID string) ([]user.AuthMethod, error) {
 	var authMethods []user.AuthMethod
 	if err := r.db.Where("user_auth_id = ?", userAuthID).Find(&authMethods).Error; err != nil {
-		return nil, fmt.Errorf("failed to get auth methods: %w", err)
+		return nil, utils.ErrAuthMethodFindFailed
 	}
 	return authMethods, nil
 }
@@ -57,7 +58,7 @@ func (r *AuthMethodRepository) GetAuthMethodByType(userAuthID string, methodType
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
 		}
-		return nil, fmt.Errorf("failed to get auth method by type: %w", err)
+		return nil, utils.ErrAuthMethodFindFailed
 	}
 	return &authMethod, nil
 }
@@ -65,7 +66,7 @@ func (r *AuthMethodRepository) GetAuthMethodByType(userAuthID string, methodType
 // UpdateAuthMethod updates an auth method
 func (r *AuthMethodRepository) UpdateAuthMethod(authMethod *user.AuthMethod) error {
 	if err := r.db.Save(authMethod).Error; err != nil {
-		return fmt.Errorf("failed to update auth method: %w", err)
+		return utils.ErrAuthMethodUpdateFailed
 	}
 	return nil
 }
@@ -77,20 +78,29 @@ func (r *AuthMethodRepository) EnableAuthMethod(id string) error {
 		Update("is_enabled", true).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to enable auth method: %w", err)
+		return utils.ErrAuthMethodUpdateFailed
 	}
 	return nil
 }
 
 // DisableAuthMethod disables an auth method
 func (r *AuthMethodRepository) DisableAuthMethod(id string) error {
-	err := r.db.Model(&user.AuthMethod{}).
+	now := time.Now()
+	if err := r.db.Model(&user.AuthMethod{}).
 		Where("id = ?", id).
-		Update("is_enabled", false).Error
-
-	if err != nil {
-		return fmt.Errorf("failed to disable auth method: %w", err)
+		Updates(map[string]any{
+			"is_enabled":  false,
+			"disabled_at": &now,
+		}).Error; err != nil {
+		return utils.ErrAuthMethodUpdateFailed
 	}
+
+	if err := r.db.Model(&user.UserAuth{}).
+		Where("id = (SELECT user_auth_id FROM auth_methods WHERE id = ?)", id).
+		Update("is_totp_enabled", false).Error; err != nil {
+		return utils.ErrUserAuthUpdateFailed
+	}
+
 	return nil
 }
 
@@ -103,13 +113,13 @@ func (r *AuthMethodRepository) VerifyAuthMethod(id string) error {
 			"is_verified": true,
 			"verified_at": &now,
 		}).Error; err != nil {
-		return fmt.Errorf("failed to verify auth method: %w", err)
+		return utils.ErrAuthMethodUpdateFailed
 	}
 
 	if err := r.db.Model(&user.UserAuth{}).
 		Where("id = (SELECT user_auth_id FROM auth_methods WHERE id = ?)", id).
 		Update("is_totp_enabled", true).Error; err != nil {
-		return fmt.Errorf("failed to enable TOTP on user auth: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 
 	return nil
@@ -123,7 +133,7 @@ func (r *AuthMethodRepository) UpdateLastUsed(id string) error {
 		Update("last_used_at", &now).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to update last used: %w", err)
+		return utils.ErrAuthMethodUpdateFailed
 	}
 	return nil
 }
@@ -132,7 +142,7 @@ func (r *AuthMethodRepository) UpdateLastUsed(id string) error {
 func (r *AuthMethodRepository) DeleteAuthMethod(id string) error {
 	err := r.db.Where("id = ?", id).Delete(&user.AuthMethod{}).Error
 	if err != nil {
-		return fmt.Errorf("failed to delete auth method: %w", err)
+		return utils.ErrAuthMethodDeleteFailed
 	}
 	return nil
 }
@@ -141,7 +151,7 @@ func (r *AuthMethodRepository) DeleteAuthMethod(id string) error {
 func (r *AuthMethodRepository) GetEnabledAuthMethods(userAuthID string) ([]user.AuthMethod, error) {
 	var authMethods []user.AuthMethod
 	if err := r.db.Where("user_auth_id = ? AND is_enabled = ?", userAuthID, true).Find(&authMethods).Error; err != nil {
-		return nil, fmt.Errorf("failed to get enabled auth methods: %w", err)
+		return nil, utils.ErrAuthMethodFindFailed
 	}
 	return authMethods, nil
 }
@@ -150,7 +160,7 @@ func (r *AuthMethodRepository) GetEnabledAuthMethods(userAuthID string) ([]user.
 func (r *AuthMethodRepository) GetVerifiedAuthMethods(userAuthID string) ([]user.AuthMethod, error) {
 	var authMethods []user.AuthMethod
 	if err := r.db.Where("user_auth_id = ? AND is_verified = ?", userAuthID, true).Find(&authMethods).Error; err != nil {
-		return nil, fmt.Errorf("failed to get verified auth methods: %w", err)
+		return nil, utils.ErrAuthMethodFindFailed
 	}
 	return authMethods, nil
 }
@@ -164,7 +174,7 @@ func (r *AuthMethodRepository) HasTOTPEnabled(userAuthID string) (bool, error) {
 		Count(&count).Error
 
 	if err != nil {
-		return false, fmt.Errorf("failed to check TOTP status: %w", err)
+		return false, utils.ErrAuthMethodFindFailed
 	}
 
 	return count > 0, nil
@@ -178,9 +188,9 @@ func (r *AuthMethodRepository) GetTOTPSecret(userAuthID string) (string, error) 
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return "", fmt.Errorf("TOTP not enabled for user")
+			return "", sql.ErrNoRows
 		}
-		return "", fmt.Errorf("failed to get TOTP secret: %w", err)
+		return "", utils.ErrAuthMethodFindFailed
 	}
 
 	return authMethod.Secret, nil

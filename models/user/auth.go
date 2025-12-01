@@ -82,6 +82,7 @@ type AuthMethod struct {
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DeletedAt      *time.Time     `json:"deleted_at,omitempty" gorm:"index"` // For soft deletes
+	DisabledAt     *time.Time     `json:"disabled_at,omitempty" gorm:"index"`              // Timestamp when this method was disabled
 }
 
 // TableName specifies the table name for GORM

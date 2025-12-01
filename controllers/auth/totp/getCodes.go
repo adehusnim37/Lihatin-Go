@@ -10,19 +10,10 @@ import (
 
 // GetRecoveryCodes returns TOTP recovery codes
 func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication required",
-			Error:   map[string]string{"auth": "Please login to access this feature"},
-		})
-		return
-	}
+	userID := ctx.GetString("user_id")
 
 	// Get user auth record first
-	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, common.APIResponse{
 			Success: false,

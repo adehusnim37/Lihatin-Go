@@ -65,7 +65,7 @@ func (r *UserAuthRepository) GetUserAuthByID(id string) (*user.UserAuth, error) 
 // UpdateUserAuth updates UserAuth record
 func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 	if err := r.db.Save(userAuth).Error; err != nil {
-		return fmt.Errorf("failed to update user auth: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -108,7 +108,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 	// 1️⃣ Cari userAuth berdasarkan token dan pastikan belum expired
 	var userAuth user.UserAuth
 	if err = tx.
-		Where("email_verification_token = ? AND email_verification_token_expires_at > ?", token, time.Now()).
+		Where("email_verification_token = ? AND email_verification_token_expires_at > ? AND is_email_verified = ?", token, time.Now(), false).
 		First(&userAuth).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -143,6 +143,8 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		"is_email_verified":                   true,
 		"email_verification_token":            "",
 		"email_verification_token_expires_at": nil,
+		"email_verification_source":           nil,
+		"last_email_send_at":                  nil,
 	}).Error; err != nil {
 		tx.Rollback()
 		return dto.VerifyEmailResponse{}, utils.ErrUserAuthUpdateFailed
@@ -465,6 +467,13 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.Use
 		return nil, utils.ErrUserAuthFindFailed
 	}
 
+	// update the last_email_send_at to now
+	if err := r.db.Model(&user.UserAuth{}).
+		Where("id = ?", usr.ID).
+		Update("last_email_send_at", time.Now()).Error; err != nil {
+		return nil, utils.ErrUserAuthUpdateFailed
+	}
+
 	// Ambil data user terkait
 	if err := r.db.Where("id = ?", userAuth.UserID).First(&usr).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -472,7 +481,7 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.Use
 		}
 		return nil, utils.ErrUserFindFailed
 	}
-
+	
 	return &usr, nil
 }
 
@@ -486,7 +495,7 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 			"password_reset_token_expires_at": nil,
 			"failed_login_attempts":           0,
 			"lockout_until":                   nil,
-			"password_changed_at":            time.Now(),
+			"password_changed_at":             time.Now(),
 		})
 
 	if result.Error != nil {
@@ -524,11 +533,11 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 	// Get current failed attempts
 	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
-		return fmt.Errorf("failed to get user auth for failed login: %w", err)
+		return utils.ErrUserAuthFindFailed
 	}
 
 	newAttempts := userAuth.FailedLoginAttempts + 1
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"failed_login_attempts": newAttempts,
 	}
 
@@ -544,7 +553,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 		Updates(updates).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to increment failed login: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -554,7 +563,7 @@ func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
 	var userAuth user.UserAuth
 
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
-		return false, fmt.Errorf("failed to check account lock status: %w", err)
+		return false, utils.ErrUserAuthFindFailed
 	}
 
 	if userAuth.LockoutUntil != nil && time.Now().Before(*userAuth.LockoutUntil) {
@@ -574,7 +583,7 @@ func (r *UserAuthRepository) UnlockAccount(userID string) error {
 		}).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to unlock account: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -586,7 +595,7 @@ func (r *UserAuthRepository) ActivateAccount(userID string) error {
 		Update("is_active", true).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to activate account: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -598,7 +607,7 @@ func (r *UserAuthRepository) DeactivateAccount(userID string) error {
 		Update("is_active", false).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to deactivate account: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -607,7 +616,7 @@ func (r *UserAuthRepository) DeactivateAccount(userID string) error {
 func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error {
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"password_hash":         hashedPassword,
 			"failed_login_attempts": 0,
 			"lockout_until":         nil,
@@ -615,7 +624,7 @@ func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error
 		}).Error
 
 	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
+		return utils.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -631,16 +640,16 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil, sql.ErrNoRows
 		}
-		return nil, nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, nil, utils.ErrUserAuthFindFailed
 	}
 
 	// Then get the auth data
 	err = r.db.Where("user_id = ?", userx.ID).First(&userAuth).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, nil, fmt.Errorf("user auth data not found")
+			return nil, nil, utils.ErrUserAuthFindFailed
 		}
-		return nil, nil, fmt.Errorf("failed to get user auth: %w", err)
+		return nil, nil, utils.ErrUserAuthFindFailed
 	}
 
 	return &userx, &userAuth, nil
@@ -650,7 +659,7 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 func (r *UserAuthRepository) DeleteUserAuth(userID string) error {
 	err := r.db.Where("user_id = ?", userID).Delete(&user.UserAuth{}).Error
 	if err != nil {
-		return fmt.Errorf("failed to delete user auth: %w", err)
+		return utils.ErrUserAuthDeleteFailed
 	}
 	return nil
 }
@@ -660,7 +669,7 @@ func (r *UserAuthRepository) GetActiveUserAuthCount() (int64, error) {
 	var count int64
 	err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&count).Error
 	if err != nil {
-		return 0, fmt.Errorf("failed to get active user auth count: %w", err)
+		return 0, utils.ErrUserAuthFindFailed
 	}
 	return count, nil
 }
@@ -672,28 +681,28 @@ func (r *UserAuthRepository) GetUserAuthStats() (map[string]interface{}, error) 
 	// Total users
 	var totalUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Count(&totalUsers).Error; err != nil {
-		return nil, fmt.Errorf("failed to count total users: %w", err)
+		return nil, utils.ErrUserAuthFindFailed
 	}
 	stats["total_users"] = totalUsers
 
 	// Active users
 	var activeUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&activeUsers).Error; err != nil {
-		return nil, fmt.Errorf("failed to count active users: %w", err)
+		return nil, utils.ErrUserAuthFindFailed
 	}
 	stats["active_users"] = activeUsers
 
 	// Verified users
 	var verifiedUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Where("is_email_verified = ?", true).Count(&verifiedUsers).Error; err != nil {
-		return nil, fmt.Errorf("failed to count verified users: %w", err)
+		return nil, utils.ErrUserAuthFindFailed
 	}
 	stats["verified_users"] = verifiedUsers
 
 	// Locked users
 	var lockedUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Where("lockout_until > ?", time.Now()).Count(&lockedUsers).Error; err != nil {
-		return nil, fmt.Errorf("failed to count locked users: %w", err)
+		return nil, utils.ErrUserAuthFindFailed
 	}
 	stats["locked_users"] = lockedUsers
 

@@ -25,6 +25,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), authController.Login)
 		authGroup.POST("/register", authController.Register)
 
+		// TOTP Login verification (no auth required - this IS the auth step)
+		authGroup.POST("/verify-totp-login", totpController.VerifyTOTPLogin)
+
 		// Password reset flow
 		authGroup.Use(middleware.RateLimitMiddleware(5)) // Limit to 5 requests per minute per IP
 		authGroup.POST("/forgot-password", authController.ForgotPassword)

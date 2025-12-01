@@ -10,6 +10,7 @@ import (
 )
 
 // DisableTOTP disables TOTP for user account
+// Requires either password OR valid TOTP code for verification
 func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 	username := ctx.GetString("username")
@@ -32,6 +33,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 		return
 	}
 
+	// Check if TOTP is enabled
 	if !userAuth.IsTOTPEnabled {
 		utils.Logger.Warn("TOTP disable attempted for user without TOTP enabled",
 			"user_id", userID,
@@ -40,14 +42,54 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 		return
 	}
 
-	if err := utils.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
-		utils.Logger.Warn("Invalid password provided for TOTP disable",
-			"user_id", userID,
-		)
-		utils.SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid password provided", "auth", userID)
+	// Must provide either password OR TOTP code
+	if req.Password == "" && req.TOTPCode == "" {
+		utils.SendErrorResponse(ctx, http.StatusBadRequest, "VERIFICATION_REQUIRED", "Please provide password or TOTP code to disable 2FA", "auth", userID)
 		return
 	}
 
+	// Verify with password if provided
+	if req.Password != "" {
+		if err := utils.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
+			utils.Logger.Warn("Invalid password provided for TOTP disable",
+				"user_id", userID,
+			)
+			c.repo.GetUserAuthRepository().IncrementFailedLogin(userID)
+			utils.SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid password provided", "auth", userID)
+			return
+		}
+		// Password valid - proceed to disable
+	} else if req.TOTPCode != "" {
+		// Verify with TOTP code
+		encryptedSecret, err := c.repo.GetAuthMethodRepository().GetTOTPSecret(userAuth.ID)
+		if err != nil {
+			utils.Logger.Error("Failed to get TOTP secret",
+				"user_id", userID,
+				"error", err.Error(),
+			)
+			utils.HandleError(ctx, err, userID)
+			return
+		}
+
+		secret, err := utils.DecryptTOTPSecret(encryptedSecret)
+		if err != nil {
+			utils.Logger.Error("Failed to decrypt TOTP secret",
+				"user_id", userID,
+				"error", err.Error(),
+			)
+			utils.HandleError(ctx, err, userID)
+			return
+		}
+
+		if !utils.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1) {
+			utils.Logger.Warn("Invalid TOTP code provided for disable",
+				"user_id", userID,
+			)
+			utils.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_TOTP", "Invalid TOTP code", "totp")
+			return
+		}
+		// TOTP valid - proceed to disable
+	}
 
 	// Get TOTP method
 	totpMethod, err := c.repo.GetAuthMethodRepository().GetAuthMethodByType(userAuth.ID, user.AuthMethodTypeTOTP)
@@ -75,7 +117,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 		"username", username,
 	)
 
-	utils.SendOKResponse(ctx, map[string]interface{}{
+	utils.SendOKResponse(ctx, map[string]any{
 		"user_id": userID,
 		"message": "Two-factor authentication has been successfully disabled",
 		"status":  "disabled",

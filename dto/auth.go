@@ -21,6 +21,20 @@ type LoginResponse struct {
 	Auth UserAuthResponse `json:"auth"`
 }
 
+// PendingTOTPResponse represents login response when TOTP verification is required
+// NO tokens are issued - user MUST verify TOTP first
+type PendingTOTPResponse struct {
+	RequiresTOTP     bool        `json:"requires_totp"`
+	PendingAuthToken string      `json:"pending_auth_token"` // Temporary token for TOTP verification
+	User             UserProfile `json:"user"`               // Basic user info for display
+}
+
+// VerifyTOTPLoginRequest represents the request to verify TOTP during login
+type VerifyTOTPLoginRequest struct {
+	PendingAuthToken string `json:"pending_auth_token" binding:"required" label:"Token Autentikasi"`
+	TOTPCode         string `json:"totp_code" binding:"required,len=6,numeric" label:"Kode TOTP"`
+}
+
 type ProfileAuthResponse struct {
 	User UserProfile               `json:"user"`
 	Auth CompletedUserAuthResponse `json:"auth"`
@@ -86,6 +100,11 @@ type UserIDGenericRequest struct {
 // IDGenericRequest represents a request that requires an ID in the URI
 type IDGenericRequest struct {
 	ID string `json:"id" binding:"required,uuid" label:"ID" uri:"id"`
+}
+
+// Generic Request password field
+type PasswordGenericRequest struct {
+	Password string `json:"password" binding:"required,min=8,max=50,pwdcomplex" label:"Kata Sandi"`
 }
 
 // UserAuthResponse represents user authentication details (without sensitive data)

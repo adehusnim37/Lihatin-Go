@@ -120,6 +120,51 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
+	// If TOTP is enabled, DO NOT issue JWT tokens yet
+	// Return a pending auth token that must be verified with TOTP
+	if hasTOTP {
+		// Generate pending auth token and store in Redis (5 min expiry)
+		pendingToken, err := utils.GeneratePendingAuthToken(context.Background(), user.ID)
+		if err != nil {
+			utils.Logger.Error("Failed to generate pending auth token",
+				"user_id", user.ID,
+				"error", err.Error(),
+			)
+			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "Login failed",
+				Error:   map[string]string{"error": "Failed to generate authentication token"},
+			})
+			return
+		}
+
+		// Return pending response - NO JWT tokens!
+		pendingResponse := dto.PendingTOTPResponse{
+			RequiresTOTP:     true,
+			PendingAuthToken: pendingToken,
+			User: dto.UserProfile{
+				ID:        user.ID,
+				Username:  user.Username,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+				Email:     user.Email,
+				Avatar:    user.Avatar,
+				IsPremium: user.IsPremium,
+				CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			},
+		}
+
+		utils.Logger.Info("TOTP verification required for login",
+			"user_id", user.ID,
+			"pending_token_preview", utils.GetKeyPreview(pendingToken),
+		)
+
+		utils.SendOKResponse(ctx, pendingResponse, "Password verified. Please complete two-factor authentication.")
+		return
+	}
+
+	// NO TOTP - proceed with normal login flow
 	// Get device and IP info
 	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
 
@@ -261,10 +306,5 @@ func (c *Controller) Login(ctx *gin.Context) {
 		},
 	}
 
-	message := "Login successful"
-	if hasTOTP {
-		message = "Login successful. Please complete two-factor authentication."
-	}
-
-	utils.SendOKResponse(ctx, responseData, message)
+	utils.SendOKResponse(ctx, responseData, "Login successful")
 }

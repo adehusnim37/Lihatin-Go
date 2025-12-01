@@ -32,6 +32,9 @@ func InitSessionManager() error {
 	// Set as global manager for use in validation functions
 	session.SetManager(manager)
 
+	// Initialize pending auth Redis client (uses same Redis connection)
+	utils.InitPendingAuthRedis(manager.GetRedisClient())
+
 	utils.Logger.Info("Session manager initialized",
 		"redis_addr", redisAddr,
 		"session_ttl_hours", sessionTTLHours,

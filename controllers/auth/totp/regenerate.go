@@ -3,6 +3,7 @@ package totp
 import (
 	"net/http"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin"
@@ -10,20 +11,9 @@ import (
 
 // RegenerateRecoveryCodes generates new recovery codes
 func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication required",
-			Error:   map[string]string{"auth": "Please login to access this feature"},
-		})
-		return
-	}
+	userID := ctx.GetString("user_id")
 
-	var req struct {
-		Password string `json:"password" validate:"required"`
-	}
+	var req dto.PasswordGenericRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
@@ -36,7 +26,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	}
 
 	// Get user auth data
-	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID.(string))
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
