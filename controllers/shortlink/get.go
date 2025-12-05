@@ -2,7 +2,9 @@ package shortlink
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,7 +12,7 @@ func (c *Controller) GetShortLink(ctx *gin.Context) {
 	// Parse URI parameters
 	var req dto.CodeRequest
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -23,7 +25,7 @@ func (c *Controller) GetShortLink(ctx *gin.Context) {
 
 	userID, userExists := ctx.Get("user_id")
 	if !userExists {
-		utils.HandleError(ctx, utils.ErrUserUnauthorized, nil)
+		http.HandleError(ctx, errors.ErrUserUnauthorized, nil)
 		return
 	}
 	userIDStr := userID.(string)
@@ -31,9 +33,9 @@ func (c *Controller) GetShortLink(ctx *gin.Context) {
 	// Get paginated views with complete data
 	paginatedData, err := c.repo.GetShortLink(req.Code, userIDStr, userRoleStr)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
-	utils.SendOKResponse(ctx, paginatedData, "Short link views with pagination retrieved successfully")
+	http.SendOKResponse(ctx, paginatedData, "Short link views with pagination retrieved successfully")
 }

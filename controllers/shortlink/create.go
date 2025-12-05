@@ -5,7 +5,10 @@ import (
 	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +17,7 @@ func (c *Controller) Create(ctx *gin.Context) {
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		// Use new validation error handler
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -23,7 +26,7 @@ func (c *Controller) Create(ctx *gin.Context) {
 	userName := ctx.GetString("username")
 
 	// Debug logging
-	utils.Logger.Info("Request received",
+	logger.Logger.Info("Request received",
 		"is_bulky", req.IsBulky,
 		"has_link", req.Link != nil,
 		"links_count", len(req.Links),
@@ -33,7 +36,7 @@ func (c *Controller) Create(ctx *gin.Context) {
 	// Bulk mode: is_bulky true & links >= 1
 	if req.IsBulky {
 		if len(req.Links) == 0 {
-			utils.SendValidationError(ctx, fmt.Errorf("links wajib diisi untuk mode bulk"), &req)
+			validator.SendValidationError(ctx, fmt.Errorf("links wajib diisi untuk mode bulk"), &req)
 			return
 		}
 		c.handleBulkCreation(ctx, req.Links, userID, userEmail, userName)
@@ -47,7 +50,7 @@ func (c *Controller) Create(ctx *gin.Context) {
 			return
 		}
 		if len(req.Links) > 1 {
-			utils.SendValidationError(ctx, fmt.Errorf("gunakan 1 link saja untuk mode single"), &req)
+			validator.SendValidationError(ctx, fmt.Errorf("gunakan 1 link saja untuk mode single"), &req)
 			return
 		}
 		if req.Link != nil {
@@ -57,8 +60,8 @@ func (c *Controller) Create(ctx *gin.Context) {
 	}
 
 	// Final fallback: neither bulk nor single data provided
-	utils.Logger.Error("No valid request data provided", "user_id", userID)
-	utils.SendValidationError(ctx, fmt.Errorf("request harus berisi 'link' untuk single atau 'links' untuk bulk"), &req)
+	logger.Logger.Error("No valid request data provided", "user_id", userID)
+	validator.SendValidationError(ctx, fmt.Errorf("request harus berisi 'link' untuk single atau 'links' untuk bulk"), &req)
 }
 
 // Handle single short link creation
@@ -76,11 +79,11 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 	// Call repository to create short link
 	createdLink, createdDetail, err := c.repo.CreateShortLink(&link)
 	if err != nil {
-		utils.Logger.Error("Failed to create short link",
+		logger.Logger.Error("Failed to create short link",
 			"error", err.Error(),
 		)
 		// Use universal error handler
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
@@ -98,7 +101,7 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 		UpdatedAt:   createdLink.UpdatedAt,
 	}
 
-	utils.Logger.Info("Short link created successfully",
+	logger.Logger.Info("Short link created successfully",
 		"short_code", response.ShortCode,
 		"user_id", userID,
 	)
@@ -108,7 +111,7 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 		go func() {
 			// Build complete short URL
 			var fullShortURL string
-			backendURL := utils.GetRequiredEnv(utils.EnvBackendURL)
+			backendURL := config.GetRequiredEnv(config.EnvBackendURL)
 
 			// Format dates
 			createdAt := createdLink.CreatedAt.Format("January 2, 2006 at 3:04 PM MST")
@@ -146,9 +149,9 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 			)
 
 			if err != nil {
-				utils.Logger.Error("Failed to send email notification", "error", err.Error())
+				logger.Logger.Error("Failed to send email notification", "error", err.Error())
 			} else {
-				utils.Logger.Info("Email notification sent successfully",
+				logger.Logger.Info("Email notification sent successfully",
 					"user_id", userID,
 					"short_code", createdLink.ShortCode,
 					"email", userEmail,
@@ -157,7 +160,7 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 		}()
 	}
 
-	utils.SendCreatedResponse(ctx, response, "Short link created successfully")
+	http.SendCreatedResponse(ctx, response, "Short link created successfully")
 }
 
 // Handle bulk short links creation
@@ -172,8 +175,8 @@ func (c *Controller) handleBulkCreation(ctx *gin.Context, links []dto.CreateShor
 	// Create bulk short links
 	createdLinks, createdDetails, err := c.repo.CreateBulkShortLinks(links)
 	if err != nil {
-		utils.Logger.Error("Failed to create bulk short links", "error", err.Error())
-		utils.HandleError(ctx, err, userID)
+		logger.Logger.Error("Failed to create bulk short links", "error", err.Error())
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
@@ -204,17 +207,17 @@ func (c *Controller) handleBulkCreation(ctx *gin.Context, links []dto.CreateShor
 				createdDetails,
 			)
 			if err != nil {
-				utils.Logger.Error("Failed to send bulk creation email", "error", err.Error())
+				logger.Logger.Error("Failed to send bulk creation email", "error", err.Error())
 			}
 		}()
 	}
 
-	utils.Logger.Info("Bulk short links created successfully",
+	logger.Logger.Info("Bulk short links created successfully",
 		"count", len(createdLinks),
 		"user_id", userID,
 	)
 
-	utils.SendCreatedResponse(ctx, map[string]interface{}{
+	http.SendCreatedResponse(ctx, map[string]interface{}{
 		"links":       responses,
 		"total_count": len(responses),
 		"message":     fmt.Sprintf("Successfully created %d short links", len(responses)),

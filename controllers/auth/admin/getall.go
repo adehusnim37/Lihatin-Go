@@ -5,7 +5,8 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,7 +22,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	userRoleStr := userRole.(string)
 
 	// Validate and convert pagination parameters
-	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sort, orderBy, utils.Role(userRoleStr))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRoleStr))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -36,7 +37,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	offset := (page - 1) * limit
 
 	//logging
-	utils.Logger.Info("Fetching all users",
+	logger.Logger.Info("Fetching all users",
 		"page", page,
 		"limit", limit,
 		"sort", sort,

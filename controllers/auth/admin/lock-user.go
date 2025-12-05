@@ -5,7 +5,8 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 
 	var req dto.AdminLockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -62,7 +63,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("User locked successfully", "user_id", userID, "reason", req.Reason)
+	logger.Logger.Info("User locked successfully", "user_id", userID, "reason", req.Reason)
 
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,

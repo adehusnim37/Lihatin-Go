@@ -5,7 +5,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,7 +38,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	}
 
 	// Verify password
-	if err := utils.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
+	if err := auth.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -61,7 +61,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	}
 
 	// Generate new recovery codes
-	recoveryCodes, err := utils.GenerateRecoveryCodes(8)
+	recoveryCodes, err := auth.GenerateRecoveryCodes(8)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -73,7 +73,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	}
 
 	// Hash recovery codes for storage
-	hashedRecoveryCodes := utils.HashRecoveryCodes(recoveryCodes)
+	hashedRecoveryCodes := auth.HashRecoveryCodes(recoveryCodes)
 
 	// Update recovery codes in database
 	if err := c.repo.GetAuthMethodRepository().UpdateRecoveryCodes(userAuth.ID, hashedRecoveryCodes); err != nil {

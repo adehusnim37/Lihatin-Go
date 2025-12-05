@@ -5,7 +5,8 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,21 +15,21 @@ func (c *Controller) GetShortLinkStats(ctx *gin.Context) {
 	var req dto.CodeRequest
 
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	stats, err := c.repo.GetStatsShortLink(req.Code, ctx.GetString("user_id"), ctx.GetString("role"))
 	if err != nil {
 		switch {
-		case err == utils.ErrShortLinkNotFound:
+		case err == errors.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Failed to retrieve short link stats",
 				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
 			})
-		case err == utils.ErrShortLinkUnauthorized:
+		case err == errors.ErrShortLinkUnauthorized:
 			ctx.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,

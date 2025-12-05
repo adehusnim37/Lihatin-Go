@@ -1,11 +1,8 @@
 package routes
 
 import (
-	"context"
-	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
@@ -13,11 +10,10 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
 	"github.com/adehusnim37/lihatin-go/controllers/logger"
 	"github.com/adehusnim37/lihatin-go/controllers/shortlink"
-	jobs "github.com/adehusnim37/lihatin-go/cron-job"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/driver/mysql"
@@ -28,7 +24,7 @@ import (
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get allowed origins from environment or use default
-		allowedOrigins := utils.GetEnvOrDefault(utils.EnvAllowedOrigins, "http://localhost:3000,http://localhost:3001")
+		allowedOrigins := config.GetEnvOrDefault(config.EnvAllowedOrigins, "http://localhost:3000,http://localhost:3001")
 		origins := strings.Split(allowedOrigins, ",")
 
 		origin := c.Request.Header.Get("Origin")
@@ -73,7 +69,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	r.Use(CORSMiddleware())
 
 	// Initialize GORM for new auth repositories
-	dsn := utils.GetRequiredEnv(utils.EnvDatabaseURL)
+	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
 	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("Failed to connect to database with GORM: " + err.Error())
@@ -99,9 +95,9 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	r.Use(middleware.ActivityLogger(loggerRepo))
 
 	// Initialize login attempts cleanup scheduler
-	log.Println("Starting login attempts cleanup scheduler...")
-	go jobs.RunCleanupScheduler(context.Background(), loginAttemptRepo, 24*time.Hour, 0)
-	log.Println("✅ Login attempts cleanup scheduler succeeded.")
+	// log.Println("Starting login attempts cleanup scheduler...")
+	// go jobs.RunCleanupScheduler(context.Background(), loginAttemptRepo, 24*time.Hour, 0)
+	// log.Println("✅ Login attempts cleanup scheduler succeeded.")
 
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")

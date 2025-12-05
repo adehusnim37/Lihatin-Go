@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +18,7 @@ func (c *Controller) GetAllStatsShorts(ctx *gin.Context) {
 	sort := ctx.DefaultQuery("sort", "created_at")
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 
-	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sort, orderBy, utils.Role(userRoleStr))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRoleStr))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -29,7 +30,7 @@ func (c *Controller) GetAllStatsShorts(ctx *gin.Context) {
 	}
 	stats, err := c.repo.GetStatsAllShortLinks(userId.(string), userRoleStr, page, limit, sort, orderBy)
 	if err != nil {
-		utils.Logger.Error("Failed to get all stats",
+		logger.Logger.Error("Failed to get all stats",
 			"error", err.Error(),
 		)
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{

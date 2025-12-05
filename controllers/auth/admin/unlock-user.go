@@ -5,7 +5,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -62,7 +62,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("User unlocked successfully", "user_id", userID, "reason", req.Reason)
+	logger.Logger.Info("User unlocked successfully", "user_id", userID, "reason", req.Reason)
 
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,

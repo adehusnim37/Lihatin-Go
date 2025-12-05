@@ -3,7 +3,7 @@ package shortlink
 import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	shortlinkrepo "github.com/adehusnim37/lihatin-go/repositories/shortlink"
-	"github.com/adehusnim37/lihatin-go/utils/mail"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
 )
 
 // Controller menyediakan semua handler untuk operasi short link

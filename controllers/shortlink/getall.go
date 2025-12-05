@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +28,7 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 
 	// Validate and convert pagination parameters
-	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sort, orderBy, utils.Role(userRoleStr))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRoleStr))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -38,7 +39,7 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Fetching short links",
+	logger.Logger.Info("Fetching short links",
 		"user_id", userIDStr,
 		"user_role", userRoleStr,
 		"page", page,
@@ -53,16 +54,16 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 
 	if userRoleStr == "admin" {
 		// ✅ Admin: Get all short links (no user filter)
-		utils.Logger.Info("Admin accessing all short links", "admin_user", userIDStr)
+		logger.Logger.Info("Admin accessing all short links", "admin_user", userIDStr)
 		paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(page, limit, sort, orderBy)
 	} else {
 		// ✅ User: Get only user's short links (filtered by user_id)
-		utils.Logger.Info("User accessing own short links", "user_id", userIDStr)
+		logger.Logger.Info("User accessing own short links", "user_id", userIDStr)
 		paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(userIDStr, page, limit, sort, orderBy)
 	}
 
 	if repositoryErr != nil {
-		utils.Logger.Error("Failed to retrieve short links",
+		logger.Logger.Error("Failed to retrieve short links",
 			"user_id", userIDStr,
 			"user_role", userRoleStr,
 			"page", page,
@@ -82,12 +83,12 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 
 	// ✅ SUCCESS: Log different messages based on role
 	if userRoleStr == "admin" {
-		utils.Logger.Info("Admin retrieved all short links successfully",
+		logger.Logger.Info("Admin retrieved all short links successfully",
 			"admin_user", userIDStr,
 			"page", page,
 		)
 	} else {
-		utils.Logger.Info("User retrieved own short links successfully",
+		logger.Logger.Info("User retrieved own short links successfully",
 			"user_id", userIDStr,
 			"page", page,
 		)

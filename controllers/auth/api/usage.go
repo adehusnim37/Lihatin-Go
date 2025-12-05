@@ -6,7 +6,9 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/logging"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +17,7 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 
 	var reqId dto.APIKeyIDRequest
 	if err := ctx.ShouldBindUri(&reqId); err != nil {
-		utils.SendValidationError(ctx, err, &reqId)
+		validator.SendValidationError(ctx, err, &reqId)
 		return
 	}
 
@@ -28,7 +30,7 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 	// Pagination parameters
 
-	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sort, orderBy, utils.Role(userRole))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRole))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -44,7 +46,7 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 	// Fetch activity logs for the API key
 	apiKey, activityLogs, totalRecords, err := c.repo.GetAPIKeyRepository().APIKeyUsageHistory(reqId, userID, userRole, page, limit, sort, orderBy)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
@@ -96,12 +98,12 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
         APIKeyInfo: dto.APIKeyBasicInfo{
             ID:         apiKey.ID,
             Name:       apiKey.Name,
-            KeyPreview: utils.GetKeyPreview(apiKey.Key),
+            KeyPreview: auth.GetKeyPreview(apiKey.Key),
             IsActive:   apiKey.IsActive,
             CreatedAt:  apiKey.CreatedAt,
         },
     }
 
 
-	utils.SendOKResponse(ctx, response, "API key activity logs fetched successfully")
+	httputil.SendOKResponse(ctx, response, "API key activity logs fetched successfully")
 }

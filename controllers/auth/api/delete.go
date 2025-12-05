@@ -2,7 +2,8 @@ package api
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,15 +15,15 @@ func (c *Controller) RevokeAPIKey(ctx *gin.Context) {
 
 	// Bind and validate request
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Revoke the API key
 	if err := c.repo.GetAPIKeyRepository().RevokeAPIKey(req, userID.(string)); err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
-	utils.SendOKResponse(ctx, nil, "API key revoked successfully")
+	http.SendOKResponse(ctx, nil, "API key revoked successfully")
 }

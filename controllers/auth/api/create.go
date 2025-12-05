@@ -2,7 +2,9 @@ package api
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +16,7 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -26,12 +28,12 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 
 	// Handle errors using universal error handler
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
 	// Success response using proper DTO
-	utils.Logger.Info("API key created successfully",
+	logger.Logger.Info("API key created successfully",
 		"user_id", userID,
 		"api_key_id", apiKey.ID,
 		"api_key_name", apiKey.Name,
@@ -54,5 +56,5 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		Warning:     "Please save this key as it will not be shown again.",
 	}
 
-	utils.SendCreatedResponse(ctx, response, "API key created successfully")
+	http.SendCreatedResponse(ctx, response, "API key created successfully")
 }

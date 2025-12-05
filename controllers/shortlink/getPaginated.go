@@ -5,7 +5,10 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,7 +16,7 @@ func (c *Controller) GetShortLinkViewsPaginated(ctx *gin.Context) {
 	// Parse URI parameters
 	var req dto.CodeRequest
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -43,7 +46,7 @@ func (c *Controller) GetShortLinkViewsPaginated(ctx *gin.Context) {
 	orderByStr := ctx.DefaultQuery("order_by", "desc")
 
 	// Validate pagination parameters for views
-	page, limit, sort, orderBy, vErrs := utils.PaginateValidate(pageStr, limitStr, sortStr, orderByStr, utils.Role(userRoleStr))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sortStr, orderByStr, httputil.Role(userRoleStr))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -54,7 +57,7 @@ func (c *Controller) GetShortLinkViewsPaginated(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Fetching paginated short link views",
+	logger.Logger.Info("Fetching paginated short link views",
 		"user_id", userIDStr,
 		"user_role", userRoleStr,
 		"code", req.Code,
@@ -68,14 +71,14 @@ func (c *Controller) GetShortLinkViewsPaginated(ctx *gin.Context) {
 	paginatedData, err := c.repo.GetShortLinkViewsPaginated(req.Code, userIDStr, page, limit, sort, orderBy, userRoleStr)
 	if err != nil {
 		switch {
-		case err == utils.ErrShortLinkNotFound:
+		case err == errors.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Failed to retrieve short link views",
 				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
 			})
-		case err == utils.ErrShortLinkUnauthorized:
+		case err == errors.ErrShortLinkUnauthorized:
 			ctx.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,

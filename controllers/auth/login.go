@@ -8,8 +8,12 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
-	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,7 +23,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Bind and validate the request body
 	if err := ctx.ShouldBindJSON(&loginReq); err != nil {
-		utils.SendValidationError(ctx, err, &loginReq)
+		validator.SendValidationError(ctx, err, &loginReq)
 		return
 	}
 
@@ -95,7 +99,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	}
 
 	// Check password
-	if err := utils.CheckPassword(userAuth.PasswordHash, loginReq.Password); err != nil {
+	if err := auth.CheckPassword(userAuth.PasswordHash, loginReq.Password); err != nil {
 		// Increment failed login attempts
 		c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
 
@@ -124,9 +128,9 @@ func (c *Controller) Login(ctx *gin.Context) {
 	// Return a pending auth token that must be verified with TOTP
 	if hasTOTP {
 		// Generate pending auth token and store in Redis (5 min expiry)
-		pendingToken, err := utils.GeneratePendingAuthToken(context.Background(), user.ID)
+		pendingToken, err := auth.GeneratePendingAuthToken(context.Background(), user.ID)
 		if err != nil {
-			utils.Logger.Error("Failed to generate pending auth token",
+			logger.Logger.Error("Failed to generate pending auth token",
 				"user_id", user.ID,
 				"error", err.Error(),
 			)
@@ -155,18 +159,18 @@ func (c *Controller) Login(ctx *gin.Context) {
 			},
 		}
 
-		utils.Logger.Info("TOTP verification required for login",
+		logger.Logger.Info("TOTP verification required for login",
 			"user_id", user.ID,
-			"pending_token_preview", utils.GetKeyPreview(pendingToken),
+			"pending_token_preview", auth.GetKeyPreview(pendingToken),
 		)
 
-		utils.SendOKResponse(ctx, pendingResponse, "Password verified. Please complete two-factor authentication.")
+		httputil.SendOKResponse(ctx, pendingResponse, "Password verified. Please complete two-factor authentication.")
 		return
 	}
 
 	// NO TOTP - proceed with normal login flow
 	// Get device and IP info
-	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
 
 	// Create session in Redis using middleware helper
 	sessionID, err := middleware.CreateSession(
@@ -178,7 +182,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 		*deviceID,
 	)
 	if err != nil {
-		utils.Logger.Error("Failed to create session in Redis",
+		logger.Logger.Error("Failed to create session in Redis",
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
@@ -190,15 +194,15 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Session created successfully",
+	logger.Logger.Info("Session created successfully",
 		"user_id", user.ID,
-		"session_preview", utils.GetKeyPreview(sessionID),
+		"session_preview", auth.GetKeyPreview(sessionID),
 		"device_id", *deviceID,
 	)
 
 	// Generate JWT token
 	role := user.Role
-	token, err := utils.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
+	token, err := auth.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -211,7 +215,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 	// Generate refresh token and store in Redis
 	sessionManager := middleware.GetSessionManager()
-	refreshToken, err := utils.GenerateRefreshToken(
+	refreshToken, err := auth.GenerateRefreshToken(
 		context.Background(),
 		sessionManager.GetRedisClient(),
 		user.ID,
@@ -220,7 +224,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 		*lastIP,
 	)
 	if err != nil {
-		utils.Logger.Error("Failed to generate refresh token",
+		logger.Logger.Error("Failed to generate refresh token",
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
@@ -259,9 +263,9 @@ func (c *Controller) Login(ctx *gin.Context) {
 	ctx.SetCookie(
 		"access_token", // Name
 		token,          // Value
-		utils.GetEnvAsInt(utils.EnvJWTExpired, 24)*3600, // MaxAge in seconds (default 24 hours)
+		config.GetEnvAsInt(config.EnvJWTExpired, 24)*3600, // MaxAge in seconds (default 24 hours)
 		"/", // Path
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
 		isSecure, // Secure (true in production/HTTPS)
 		true,     // HttpOnly (MUST be true for security)
 	)
@@ -270,19 +274,19 @@ func (c *Controller) Login(ctx *gin.Context) {
 	ctx.SetCookie(
 		"refresh_token", // Name
 		refreshToken,    // Value
-		utils.GetEnvAsInt(utils.EnvRefreshTokenExpired, 168)*3600, // MaxAge in seconds (default 7 days)
+		config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168)*3600, // MaxAge in seconds (default 7 days)
 		"/", // Path
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
 		isSecure, // Secure (true in production/HTTPS)
 		true,     // HttpOnly (MUST be true for security)
 	)
 
 	// Log successful cookie setting (but not the actual token values)
-	utils.Logger.Info("Authentication cookies set successfully",
+	logger.Logger.Info("Authentication cookies set successfully",
 		"user_id", user.ID,
 		"secure", isSecure,
-		"access_token_max_age_hours", utils.GetEnvAsInt(utils.EnvJWTExpired, 24),
-		"refresh_token_max_age_hours", utils.GetEnvAsInt(utils.EnvRefreshTokenExpired, 168),
+		"access_token_max_age_hours", config.GetEnvAsInt(config.EnvJWTExpired, 24),
+		"refresh_token_max_age_hours", config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168),
 	)
 
 	// Prepare response data
@@ -306,5 +310,5 @@ func (c *Controller) Login(ctx *gin.Context) {
 		},
 	}
 
-	utils.SendOKResponse(ctx, responseData, "Login successful")
+	httputil.SendOKResponse(ctx, responseData, "Login successful")
 }

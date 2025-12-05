@@ -4,13 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	
+
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	appvalidator "github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/routes"
-	"github.com/adehusnim37/lihatin-go/utils"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
@@ -64,7 +65,7 @@ func main() {
 
 	// Initialize GORM for new auth repositories
 	_ = godotenv.Load() // ignore error kalau .env ga ada
-	dsn := utils.GetRequiredEnv(utils.EnvDatabaseURL)
+	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
 	// Setup database connection for sql.DB (existing code)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -100,18 +101,16 @@ func main() {
 		log.Println("✅ Session manager initialized successfully!")
 	}
 
-
-
 	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()
-	utils.SetupCustomValidators(validate)
+	appvalidator.SetupCustomValidators(validate)
 
 	// ✅ TAMBAHKAN INI: Override Gin's default validator dengan custom validator
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		utils.SetupCustomValidators(v)
+		appvalidator.SetupCustomValidators(v)
 	}
 
 	r := routes.SetupRouter(validate)
-	fmt.Println("Server running on port:", utils.GetRequiredEnv(utils.EnvAppPort))
-	r.Run(utils.GetRequiredEnv(utils.EnvAppPort))
+	fmt.Println("Server running on port:", config.GetRequiredEnv(config.EnvAppPort))
+	r.Run(config.GetRequiredEnv(config.EnvAppPort))
 }

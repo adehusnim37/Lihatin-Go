@@ -2,7 +2,9 @@ package api
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,11 +16,11 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 	// Get user's API keys
 	apiKeys, err := c.repo.GetAPIKeyRepository().GetAPIKeysByUserID(userID.(string))
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
-	utils.Logger.Info("User's API keys retrieved successfully",
+	logger.Logger.Info("User's API keys retrieved successfully",
 		"user_id", userID,
 		"api_key_count", len(apiKeys),
 	)
@@ -29,7 +31,7 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 		responses[i] = dto.APIKeyResponse{
 			ID:          key.ID,
 			Name:        key.Name,
-			KeyPreview:  utils.GetKeyPreview(key.Key), // Use method to get preview
+			KeyPreview:  auth.GetKeyPreview(key.Key), // Use method to get preview
 			LastUsedAt:  key.LastUsedAt,
 			ExpiresAt:   key.ExpiresAt,
 			IsActive:    key.IsActive,
@@ -38,5 +40,5 @@ func (c *Controller) GetAPIKeys(ctx *gin.Context) {
 		}
 	}
 
-	utils.SendOKResponse(ctx, responses, "API keys retrieved successfully")
+	http.SendOKResponse(ctx, responses, "API keys retrieved successfully")
 }

@@ -8,8 +8,10 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/utils"
-	"github.com/adehusnim37/lihatin-go/utils/session"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,7 +25,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 		cookieToken, err := c.Cookie("access_token")
 		if err == nil && cookieToken != "" {
 			token = cookieToken
-			utils.Logger.Debug("Token read from HTTP-Only cookie")
+			logger.Logger.Debug("Token read from HTTP-Only cookie")
 		} else {
 			// Fallback to Authorization header for backward compatibility
 			authHeader := c.GetHeader("Authorization")
@@ -38,7 +40,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 				return
 			}
 
-			token = utils.ExtractTokenFromHeader(authHeader)
+			token = auth.ExtractTokenFromHeader(authHeader)
 			if token == "" {
 				c.JSON(http.StatusUnauthorized, common.APIResponse{
 					Success: false,
@@ -49,10 +51,10 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			utils.Logger.Debug("Token read from Authorization header")
+			logger.Logger.Debug("Token read from Authorization header")
 		}
 
-		claims, err := utils.ValidateJWT(token)
+		claims, err := auth.ValidateJWT(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
@@ -66,10 +68,10 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 
 		// Check if JWT is blacklisted (revoked during logout)
 		sessionManager := GetSessionManager()
-		blacklistManager := utils.NewJWTBlacklistManager(sessionManager.GetRedisClient())
+		blacklistManager := auth.NewJWTBlacklistManager(sessionManager.GetRedisClient())
 		isBlacklisted, err := blacklistManager.IsJWTBlacklisted(c.Request.Context(), claims.ID)
 		if err != nil {
-			utils.Logger.Error("Failed to check JWT blacklist", "error", err.Error())
+			logger.Logger.Error("Failed to check JWT blacklist", "error", err.Error())
 			c.JSON(http.StatusInternalServerError, common.APIResponse{
 				Success: false,
 				Data:    nil,
@@ -138,7 +140,7 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			)
 
 			if err != nil {
-				utils.Logger.Warn("Session validation failed",
+				logger.Logger.Warn("Session validation failed",
 					"user_id", claims.UserID,
 					"error", err.Error(),
 				)
@@ -153,9 +155,9 @@ func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
 			}
 
 			// Log successful session validation
-			utils.Logger.Info("Session validated successfully",
+			logger.Logger.Info("Session validated successfully",
 				"user_id", claims.UserID,
-				"session_preview", utils.GetKeyPreview(claims.SessionID),
+				"session_preview", auth.GetKeyPreview(claims.SessionID),
 				"purpose", validMetadata.Purpose,
 			)
 
@@ -219,7 +221,7 @@ func RequirePremium() gin.HandlerFunc {
 func RequireRole(requiredRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
-		utils.Logger.Info("Checking user role", "role", role, "required", requiredRole)
+		logger.Logger.Info("Checking user role", "role", role, "required", requiredRole)
 		if !exists || role.(string) != requiredRole {
 			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
@@ -240,16 +242,16 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 
 		if authHeader != "" {
-			token := utils.ExtractTokenFromHeader(authHeader)
+			token := auth.ExtractTokenFromHeader(authHeader)
 			if token != "" {
-				claims, err := utils.ValidateJWT(token)
+				claims, err := auth.ValidateJWT(token)
 				if err == nil {
 					// Check if JWT is blacklisted (revoked during logout)
 					sessionManager := GetSessionManager()
-					blacklistManager := utils.NewJWTBlacklistManager(sessionManager.GetRedisClient())
+					blacklistManager := auth.NewJWTBlacklistManager(sessionManager.GetRedisClient())
 					isBlacklisted, err := blacklistManager.IsJWTBlacklisted(c.Request.Context(), claims.ID)
 					if err != nil {
-						utils.Logger.Error("Failed to check JWT blacklist", "error", err.Error())
+						logger.Logger.Error("Failed to check JWT blacklist", "error", err.Error())
 					}
 
 					if isBlacklisted {
@@ -389,8 +391,8 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 			return
 		}
 
-		utils.Logger.Info("Received API key for validation",
-			"key_preview", utils.GetKeyPreview(apiKey),
+		logger.Logger.Info("Received API key for validation",
+			"key_preview", auth.GetKeyPreview(apiKey),
 			"client_ip", c.ClientIP(),
 			"user_agent", c.GetHeader("User-Agent"),
 			"path", c.Request.URL.Path,
@@ -403,11 +405,11 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 		// Validate API key using the repository
 		user, apiKeyRecord, err := apiKeyRepo.ValidateAPIKey(apiKey, ip)
 		if err != nil {
-			utils.Logger.Warn("API key validation failed",
-				"key_preview", utils.GetKeyPreview(apiKey),
+			logger.Logger.Warn("API key validation failed",
+				"key_preview", auth.GetKeyPreview(apiKey),
 				"error", err.Error(),
 			)
-			utils.HandleError(c, err, nil)
+			httputil.HandleError(c, err, nil)
 			c.Abort()
 			return
 		}
@@ -425,7 +427,7 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 		c.Set("api_key_permissions", apiKeyRecord.Permissions)
 		c.Set("is_api_authenticated", true)
 
-		utils.Logger.Info("API key authentication successful",
+		logger.Logger.Info("API key authentication successful",
 			"user_id", user.ID,
 			"api_key_id", apiKeyRecord.ID,
 			"api_key_name", apiKeyRecord.Name,
@@ -463,7 +465,7 @@ func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermis
 		}
 
 		if err != nil {
-			utils.Logger.Error("Error checking API key permissions from database",
+			logger.Logger.Error("Error checking API key permissions from database",
 				"key_id", keyIDStr,
 				"error", err.Error(),
 			)
@@ -479,7 +481,7 @@ func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermis
 
 		if !hasPermission {
 			apiKeyName, _ := c.Get("api_key_name")
-			utils.Logger.Warn("API key lacks required permissions (database check)",
+			logger.Logger.Warn("API key lacks required permissions (database check)",
 				"api_key_name", apiKeyName,
 				"key_id", keyIDStr,
 				"required_permissions", requiredPermissions,
@@ -504,7 +506,7 @@ func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermis
 		}
 
 		// Log successful permission check
-		utils.Logger.Info("API key permission check passed (database)",
+		logger.Logger.Info("API key permission check passed (database)",
 			"key_id", keyIDStr,
 			"required_permissions", requiredPermissions,
 			"require_all", requireAll,
@@ -535,11 +537,11 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.H
 		// Validate API key using the auth repository
 		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().ValidateAPIKey(apiKey, ip)
 		if err != nil {
-			utils.Logger.Warn("API key validation failed",
-				"key_preview", utils.GetKeyPreview(apiKey),
+			logger.Logger.Warn("API key validation failed",
+				"key_preview", auth.GetKeyPreview(apiKey),
 				"error", err.Error(),
 			)
-			utils.HandleError(c, err, nil)
+			httputil.HandleError(c, err, nil)
 			c.Abort()
 			return
 		}
@@ -557,7 +559,7 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.H
 		c.Set("api_key_permissions", apiKeyRecord.Permissions)
 		c.Set("is_api_authenticated", true)
 
-		utils.Logger.Info("API key authentication successful",
+		logger.Logger.Info("API key authentication successful",
 			"user_id", user.ID,
 			"api_key_id", apiKeyRecord.ID,
 			"api_key_name", apiKeyRecord.Name,
@@ -618,7 +620,7 @@ func APIKeyPermissionMiddleware(requiredPermission string) gin.HandlerFunc {
 
 		if !hasPermission {
 			apiKeyName, _ := c.Get("api_key_name")
-			utils.Logger.Warn("API key missing required permission",
+			logger.Logger.Warn("API key missing required permission",
 				"api_key_name", apiKeyName,
 				"required_permission", requiredPermission,
 				"available_permissions", permissionList,
@@ -650,6 +652,6 @@ func RequestIDMiddleware() gin.HandlerFunc {
 // generateRequestID generates a unique request ID
 func generateRequestID() string {
 	// Simple implementation - in production use UUID or similar
-	token, _ := utils.GeneratePasswordResetToken()
+	token, _ := auth.GeneratePasswordResetToken()
 	return strings.ReplaceAll(token, "-", "")[:16]
 }

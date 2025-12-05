@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,16 +17,16 @@ func (c *Controller) GetAPIKey(ctx *gin.Context) {
 
 	// Bind and validate request
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Get the API key
 	apiKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(req, userID.(string))
 	if err != nil {
-		utils.SendErrorResponse(ctx, http.StatusNotFound, "API key not found", "error_code_not_found", "API key retrieval failed", map[string]string{"key_id": "API key with this ID does not exist"})
+		httputil.SendErrorResponse(ctx, http.StatusNotFound, "API key not found", "error_code_not_found", "API key retrieval failed", map[string]string{"key_id": "API key with this ID does not exist"})
 		return
 	}
 
-	utils.SendOKResponse(ctx, apiKey, "API key retrieved successfully")
+	httputil.SendOKResponse(ctx, apiKey, "API key retrieved successfully")
 }

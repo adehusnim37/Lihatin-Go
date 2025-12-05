@@ -7,7 +7,7 @@ import (
     "net/http"
 
     "github.com/adehusnim37/lihatin-go/repositories"
-    "github.com/adehusnim37/lihatin-go/utils"
+    "github.com/adehusnim37/lihatin-go/internal/pkg/logger"
     "github.com/gin-gonic/gin"
 )
 
@@ -80,11 +80,11 @@ func RecordLoginAttempt(loginAttemptRepo *repositories.LoginAttemptRepository) g
             failReason,
             emailOrUsername,
         ); err != nil {
-            utils.Logger.Error("Failed to record login attempt", "error", err.Error())
+            logger.Logger.Error("Failed to record login attempt", "error", err.Error())
         }
 
         // 7. Log the attempt
-        utils.Logger.Info("Login attempt recorded",
+        logger.Logger.Info("Login attempt recorded",
             "email_or_username", emailOrUsername,
             "ip_address", ipAddress,
             "success", success,

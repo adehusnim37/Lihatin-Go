@@ -5,21 +5,22 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
 func (c *Controller) CheckShortLink(ctx *gin.Context) {
 	var codeData dto.CodeRequest
 	if err := ctx.ShouldBindUri(&codeData); err != nil {
-		utils.SendValidationError(ctx, err, &codeData)
+		validator.SendValidationError(ctx, err, &codeData)
 		return
 	}
 
 	_, err := c.repo.CheckShortCode(&codeData)
 	if err != nil {
 		switch err {
-		case utils.ErrShortLinkNotFound:
+		case errors.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,

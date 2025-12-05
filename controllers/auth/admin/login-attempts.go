@@ -5,14 +5,15 @@ import (
 	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
 // GetLoginAttempts returns login attempt history (admin only)
 func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 
-	utils.Logger.Info("Admin GetLoginAttempts called")
+	logger.Logger.Info("Admin GetLoginAttempts called")
 	// Parse pagination parameters
 	page := 1
 	limit := 50
@@ -34,7 +35,7 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 	if successStr := ctx.Query("success"); successStr != "" {
 		if success, err := strconv.ParseBool(successStr); err == nil {
 			successFilter = &success
-			utils.Logger.Info("Filtering login attempts by success", "success", success)
+			logger.Logger.Info("Filtering login attempts by success", "success", success)
 		}
 	}
 
@@ -46,7 +47,7 @@ func (c *Controller) GetLoginAttempts(ctx *gin.Context) {
 	// Get login attempts
 	attempts, totalCount, err := c.repo.GetLoginAttemptRepository().GetAllLoginAttempts(limit, offset, successFilter, id, username)
 	if err != nil {
-		utils.HandleError(ctx, err, nil)
+		httputil.HandleError(ctx, err, nil)
 		return
 	}
 

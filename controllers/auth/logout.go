@@ -4,7 +4,11 @@ import (
 	"context"
 
 	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,13 +23,13 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		token = cookieToken
 	} else {
 		authHeader := ctx.GetHeader("Authorization")
-		token = utils.ExtractTokenFromHeader(authHeader)
+		token = auth.ExtractTokenFromHeader(authHeader)
 	}
 
 	// Get JWT claims to extract jti and expiration
-	claims, err := utils.ValidateJWT(token)
+	claims, err := auth.ValidateJWT(token)
 	if err != nil {
-		utils.Logger.Warn("Failed to extract JWT claims during logout",
+		logger.Logger.Warn("Failed to extract JWT claims during logout",
 			"user_id", userID,
 			"error", err.Error(),
 		)
@@ -33,12 +37,12 @@ func (c *Controller) Logout(ctx *gin.Context) {
 	}
 
 	if err := c.repo.GetUserAuthRepository().Logout(userID); err != nil {
-		utils.Logger.Error("Failed to logout user",
+		logger.Logger.Error("Failed to logout user",
 			"user_id", userID,
 			"session_id", sessionID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
@@ -48,40 +52,40 @@ func (c *Controller) Logout(ctx *gin.Context) {
 
 	// Blacklist JWT if we have valid claims
 	if claims != nil && claims.ID != "" {
-		blacklistManager := utils.NewJWTBlacklistManager(redisClient)
+		blacklistManager := auth.NewJWTBlacklistManager(redisClient)
 		if err := blacklistManager.BlacklistJWT(context.Background(), claims.ID, claims.ExpiresAt.Time); err != nil {
-			utils.Logger.Error("Failed to blacklist JWT",
+			logger.Logger.Error("Failed to blacklist JWT",
 				"user_id", userID,
 				"jti", claims.ID,
 				"error", err.Error(),
 			)
 			// Don't fail logout if blacklist fails
 		} else {
-			utils.Logger.Info("JWT blacklisted successfully",
+			logger.Logger.Info("JWT blacklisted successfully",
 				"user_id", userID,
-				"jti", utils.GetKeyPreview(claims.ID),
+				"jti", auth.GetKeyPreview(claims.ID),
 			)
 		}
 	}
 
 	// Delete all refresh tokens for this user
-	refreshTokenManager := utils.NewRefreshTokenManager(redisClient)
+	refreshTokenManager := auth.NewRefreshTokenManager(redisClient)
 	if err := refreshTokenManager.DeleteAllUserRefreshTokens(context.Background(), userID); err != nil {
-		utils.Logger.Error("Failed to delete refresh tokens",
+		logger.Logger.Error("Failed to delete refresh tokens",
 			"user_id", userID,
 			"error", err.Error(),
 		)
 		// Don't fail logout if refresh token deletion fails
 	} else {
-		utils.Logger.Info("All refresh tokens deleted",
+		logger.Logger.Info("All refresh tokens deleted",
 			"user_id", userID,
 		)
 	}
 
 	// Invalidate session in Redis
 	if err := middleware.DeleteSession(ctx, sessionID); err != nil {
-		utils.Logger.Error("Error invalidating user session", "user_id", userID, "session_id", sessionID, "error", err)
-		utils.SendErrorResponse(ctx, 500, "Failed to invalidate session", "ERR_SESSION_INVALIDATION_FAILED", utils.ErrSessionInvalidationFailed.Error(), nil)
+		logger.Logger.Error("Error invalidating user session", "user_id", userID, "session_id", sessionID, "error", err)
+		http.SendErrorResponse(ctx, 500, "Failed to invalidate session", "ERR_SESSION_INVALIDATION_FAILED", errors.ErrSessionInvalidationFailed.Error(), nil)
 		return
 	}
 
@@ -97,7 +101,7 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		"",             // empty value
 		-1,             // maxAge -1 to delete immediately
 		"/",            // path
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"),    // domain (must match the domain used when setting)
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"),    // domain (must match the domain used when setting)
 		isSecure,       // secure (match original cookie setting)
 		true,           // httpOnly
 	)
@@ -108,15 +112,15 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		"",              // empty value
 		-1,              // maxAge -1 to delete immediately
 		"/",             // path
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // domain (must match the domain used when setting)
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // domain (must match the domain used when setting)
 		isSecure, // secure
 		true,     // httpOnly
 	)
 
-	utils.Logger.Info("HTTP-Only cookies cleared",
+	logger.Logger.Info("HTTP-Only cookies cleared",
 		"user_id", userID,
 		"is_secure", isSecure,
 	)
 
-	utils.SendOKResponse(ctx, nil, "Logout successful")
+	http.SendOKResponse(ctx, nil, "Logout successful")
 }

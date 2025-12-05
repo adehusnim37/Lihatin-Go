@@ -2,7 +2,8 @@ package api
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,16 +15,16 @@ func (c *Controller) DeactivateAPIKey(ctx *gin.Context) {
 	userRole := ctx.GetString("role")
 
 	if err := ctx.ShouldBindUri(&reqId); err != nil {
-		utils.SendValidationError(ctx, err, &reqId)
+		validator.SendValidationError(ctx, err, &reqId)
 		return
 	}
 
 	// Call the service to deactivate the account
 	success, err := c.repo.GetAPIKeyRepository().DeactivateAPIKey(reqId, userID, userRole)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
-	utils.SendOKResponse(ctx, success, "Account deactivated successfully")
+	http.SendOKResponse(ctx, success, "Account deactivated successfully")
 }

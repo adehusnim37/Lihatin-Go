@@ -9,7 +9,10 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -29,11 +32,11 @@ func (r *UserAuthRepository) CreateUserAuth(userAuth *user.UserAuth) error {
 	//check if user with the userID already exists
 	var existingUserAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userAuth.UserID).First(&existingUserAuth).Error; err == nil {
-		return utils.ErrUserAlreadyExists
+		return apperrors.ErrUserAlreadyExists
 	}
 
 	if err := r.db.Create(userAuth).Error; err != nil {
-		return utils.ErrUserCreationFailed
+		return apperrors.ErrUserCreationFailed
 	}
 	return nil
 }
@@ -43,9 +46,9 @@ func (r *UserAuthRepository) GetUserAuthByUserID(userID string) (*user.UserAuth,
 	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, utils.ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
-		return nil, utils.ErrUserFindFailed
+		return nil, apperrors.ErrUserFindFailed
 	}
 	return &userAuth, nil
 }
@@ -57,7 +60,7 @@ func (r *UserAuthRepository) GetUserAuthByID(id string) (*user.UserAuth, error) 
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
 		}
-		return nil, utils.ErrUserNotFound
+		return nil, apperrors.ErrUserNotFound
 	}
 	return &userAuth, nil
 }
@@ -65,7 +68,7 @@ func (r *UserAuthRepository) GetUserAuthByID(id string) (*user.UserAuth, error) 
 // UpdateUserAuth updates UserAuth record
 func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 	if err := r.db.Save(userAuth).Error; err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -77,7 +80,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, sou
 	if len(expiry) > 0 {
 		expiresAt = expiry[0]
 	} else {
-		expiresAt = time.Now().Add(time.Duration(utils.GetEnvAsInt("EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS", 2)) * time.Hour)
+		expiresAt = time.Now().Add(time.Duration(config.GetEnvAsInt("EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS", 2)) * time.Hour)
 	}
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
@@ -89,7 +92,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, sou
 		}).Error
 
 	if err != nil {
-		return utils.ErrCreateVerificationTokenFailed
+		return apperrors.ErrCreateVerificationTokenFailed
 	}
 	return nil
 }
@@ -112,9 +115,9 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		First(&userAuth).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationTokenInvalidOrExpired
+			return dto.VerifyEmailResponse{}, apperrors.ErrEmailVerificationTokenInvalidOrExpired
 		}
-		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
+		return dto.VerifyEmailResponse{}, apperrors.ErrEmailVerificationFailed
 	}
 
 	// 2️⃣ Ambil data user
@@ -122,9 +125,9 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 	if err = tx.Where("id = ?", userAuth.UserID).First(&usr).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return dto.VerifyEmailResponse{}, utils.ErrUserNotFound
+			return dto.VerifyEmailResponse{}, apperrors.ErrUserNotFound
 		}
-		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
+		return dto.VerifyEmailResponse{}, apperrors.ErrEmailVerificationFailed
 	}
 
 	// 3️⃣ Pastikan user belum diverifikasi
@@ -135,7 +138,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 			Username: usr.Username,
 			Source:   userAuth.EmailVerificationSource,
 			OldEmail: "",
-		}, utils.ErrEmailAlreadyVerified
+		}, apperrors.ErrEmailAlreadyVerified
 	}
 
 	// 4️⃣ Update kolom verifikasi secara aman (reset token juga)
@@ -147,7 +150,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		"last_email_send_at":                  nil,
 	}).Error; err != nil {
 		tx.Rollback()
-		return dto.VerifyEmailResponse{}, utils.ErrUserAuthUpdateFailed
+		return dto.VerifyEmailResponse{}, apperrors.ErrUserAuthUpdateFailed
 	}
 
 	// 5️⃣ (Opsional) Insert log ke HistoryUser
@@ -161,7 +164,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 	}
 	if err := tx.Create(&history).Error; err != nil {
 		tx.Rollback()
-		utils.Logger.Warn("failed to record history for email verification", "user_id", usr.ID, "error", err)
+		logger.Logger.Warn("failed to record history for email verification", "user_id", usr.ID, "error", err)
 	}
 
 	// 6️⃣ Ambil history email change terakhir untuk user ini (jika ada)
@@ -181,12 +184,12 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// Only rollback if there's a real database error, not if history not found
 		tx.Rollback()
-		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
+		return dto.VerifyEmailResponse{}, apperrors.ErrEmailVerificationFailed
 	}
 
 	// 7️⃣ Commit transaksi
 	if err = tx.Commit().Error; err != nil {
-		return dto.VerifyEmailResponse{}, utils.ErrEmailVerificationFailed
+		return dto.VerifyEmailResponse{}, apperrors.ErrEmailVerificationFailed
 	}
 
 	return dto.VerifyEmailResponse{
@@ -206,37 +209,37 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	// Get user data
 	if err := r.db.Where("id = ?", userID).First(&usr).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrUserNotFound
+			return apperrors.ErrUserNotFound
 		}
-		return utils.ErrUserFindFailed
+		return apperrors.ErrUserFindFailed
 	}
 
 	// Get user auth data
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrUserNotFound
+			return apperrors.ErrUserNotFound
 		}
-		return utils.ErrUserFindFailed
+		return apperrors.ErrUserFindFailed
 	}
 
 	if !userAuth.IsEmailVerified {
-		return utils.ErrUserEmailNotVerified
+		return apperrors.ErrUserEmailNotVerified
 	}
 
 	// Check if account is active
 	if !userAuth.IsActive {
-		return utils.ErrUserAccountDeactivated
+		return apperrors.ErrUserAccountDeactivated
 	}
 
 	// Check if new email is same as current
 	if usr.Email == newEmail {
-		return utils.ErrUserEmailSameAsCurrent
+		return apperrors.ErrUserEmailSameAsCurrent
 	}
 
 	// Check if new email already exists
 	var existingUser user.User
 	if err := r.db.Where("email = ?", newEmail).First(&existingUser).Error; err == nil {
-		return utils.ErrUserEmailExists
+		return apperrors.ErrUserEmailExists
 	}
 
 	// 🔒 SECURITY: Check email change history dalam 30 hari terakhir
@@ -253,8 +256,8 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	).Order("changed_at DESC").Find(&recentHistory).Error
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		utils.Logger.Error("Failed to check email change history", "user_id", userID, "error", err)
-		return utils.ErrUserDatabaseError
+		logger.Logger.Error("Failed to check email change history", "user_id", userID, "error", err)
+		return apperrors.ErrUserDatabaseError
 	}
 
 	// Jika ada history dalam 30 hari terakhir
@@ -263,28 +266,28 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 
 		// 🚨 Jika ada revoke dalam 30 hari = SUSPICIOUS ACTIVITY
 		if lastChange.ActionType == "email_change_revoked" {
-			utils.Logger.Warn("Suspicious activity: Email change attempted after recent revoke",
+			logger.Logger.Warn("Suspicious activity: Email change attempted after recent revoke",
 				"user_id", userID,
 				"last_revoke", lastChange.ChangedAt,
 			)
-			return utils.ErrEmailChangeLocked
+			return apperrors.ErrEmailChangeLocked
 		}
 
 		// 🚨 Jika sudah change email dalam 30 hari = RATE LIMIT
 		if lastChange.ActionType == user.ActionEmailChange {
-			utils.Logger.Warn("Email change rate limit exceeded",
+			logger.Logger.Warn("Email change rate limit exceeded",
 				"user_id", userID,
 				"last_change", lastChange.ChangedAt,
 			)
-			return utils.ErrEmailChangeRateLimitExceeded
+			return apperrors.ErrEmailChangeRateLimitExceeded
 		}
 	}
 
-	token, err := utils.GenerateSecureToken(25)
+	token, err := auth.GenerateSecureToken(25)
 	if err != nil {
 		// handle error, e.g. log and use empty string or return error from function
-		utils.Logger.Error("Failed to generate revoke token", "error", err)
-		return utils.ErrTokenGenerationFailed
+		logger.Logger.Error("Failed to generate revoke token", "error", err)
+		return apperrors.ErrTokenGenerationFailed
 	}
 
 	// Archive current user data to history table
@@ -306,12 +309,12 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	}
 
 	if err := r.db.Create(&usrHistory).Error; err != nil {
-		return utils.ErrUserHistoryCreationFailed
+		return apperrors.ErrUserHistoryCreationFailed
 	}
 
 	// Update email in user table
 	if err := r.db.Model(&usr).Where("id = ?", userID).Update("email", newEmail).Error; err != nil {
-		return utils.ErrUserUpdateFailed
+		return apperrors.ErrUserUpdateFailed
 	}
 
 	// Mark email as unverified after change
@@ -320,7 +323,7 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 		"email_verification_token":            "",
 		"email_verification_token_expires_at": nil,
 	}).Error; err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 
 	return nil
@@ -344,56 +347,56 @@ func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) (email, usernam
 	if err := tx.Where("revoke_token = ?", revokeToken).First(&usrHistory).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", "", utils.ErrRevokeTokenNotFound
+			return "", "", apperrors.ErrRevokeTokenNotFound
 		}
-		return "", "", utils.ErrUserHistoryFindFailed
+		return "", "", apperrors.ErrUserHistoryFindFailed
 	}
 
 	// 2️⃣ Pastikan token belum expired
 	if usrHistory.RevokeExpires == nil || time.Now().After(*usrHistory.RevokeExpires) {
 		tx.Rollback()
-		return "", "", utils.ErrRevokeTokenExpired
+		return "", "", apperrors.ErrRevokeTokenExpired
 	}
 
 	// 3️⃣ Pastikan action type adalah email change
 	if usrHistory.ActionType != user.ActionEmailChange {
 		tx.Rollback()
-		return "", "", utils.ErrInvalidActionType
+		return "", "", apperrors.ErrInvalidActionType
 	}
 
 	// 4️⃣ Ambil user dan auth
 	if err := tx.Where("id = ?", usrHistory.UserID).First(&usr).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", "", utils.ErrUserNotFound
+			return "", "", apperrors.ErrUserNotFound
 		}
-		return "", "", utils.ErrUserFindFailed
+		return "", "", apperrors.ErrUserFindFailed
 	}
 
 	if err := tx.Where("user_id = ?", usrHistory.UserID).First(&userAuth).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", "", utils.ErrUserNotFound
+			return "", "", apperrors.ErrUserNotFound
 		}
-		return "", "", utils.ErrUserFindFailed
+		return "", "", apperrors.ErrUserFindFailed
 	}
 
 	// 5️⃣ Ekstrak old email dari history
 	var oldEmailMap map[string]string
 	if err := json.Unmarshal(usrHistory.OldValue, &oldEmailMap); err != nil {
 		tx.Rollback()
-		return "", "", utils.ErrInvalidHistoryData
+		return "", "", apperrors.ErrInvalidHistoryData
 	}
 	oldEmail := oldEmailMap["email"]
 	if oldEmail == "" {
 		tx.Rollback()
-		return "", "", utils.ErrInvalidHistoryData
+		return "", "", apperrors.ErrInvalidHistoryData
 	}
 
 	// 6️⃣ Kembalikan email lama
 	if err := tx.Model(&usr).Where("id = ?", usrHistory.UserID).Update("email", oldEmail).Error; err != nil {
 		tx.Rollback()
-		return "", "", utils.ErrUserUpdateFailed
+		return "", "", apperrors.ErrUserUpdateFailed
 	}
 
 	// 7️⃣ Reset flag verifikasi (email lama sudah pasti verified)
@@ -403,7 +406,7 @@ func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) (email, usernam
 		"email_verification_token_expires_at": nil,
 	}).Error; err != nil {
 		tx.Rollback()
-		return "", "", utils.ErrUserAuthUpdateFailed
+		return "", "", apperrors.ErrUserAuthUpdateFailed
 	}
 
 	// 8️⃣ Tandai token sudah digunakan (expire immediately)
@@ -412,7 +415,7 @@ func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) (email, usernam
 		"revoke_expires": &now,
 	}).Error; err != nil {
 		tx.Rollback()
-		utils.Logger.Warn("Failed to mark revoke token as used", "error", err)
+		logger.Logger.Warn("Failed to mark revoke token as used", "error", err)
 	}
 
 	// 9️⃣ Log revoke action ke history
@@ -427,12 +430,12 @@ func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) (email, usernam
 	}
 	if err := tx.Create(&revokeHistory).Error; err != nil {
 		tx.Rollback()
-		utils.Logger.Warn("Failed to record revoke history", "error", err)
+		logger.Logger.Warn("Failed to record revoke history", "error", err)
 	}
 
 	// 🔟 Commit transaksi
 	if err := tx.Commit().Error; err != nil {
-		return "", "", utils.ErrUserUpdateFailed
+		return "", "", apperrors.ErrUserUpdateFailed
 	}
 
 	return oldEmail, usr.Username, nil
@@ -462,24 +465,24 @@ func (r *UserAuthRepository) ValidatePasswordResetToken(token string) (*user.Use
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, utils.ErrUserAuthNotFound
+			return nil, apperrors.ErrUserAuthNotFound
 		}
-		return nil, utils.ErrUserAuthFindFailed
+		return nil, apperrors.ErrUserAuthFindFailed
 	}
 
 	// update the last_email_send_at to now
 	if err := r.db.Model(&user.UserAuth{}).
 		Where("id = ?", usr.ID).
 		Update("last_email_send_at", time.Now()).Error; err != nil {
-		return nil, utils.ErrUserAuthUpdateFailed
+		return nil, apperrors.ErrUserAuthUpdateFailed
 	}
 
 	// Ambil data user terkait
 	if err := r.db.Where("id = ?", userAuth.UserID).First(&usr).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, utils.ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
-		return nil, utils.ErrUserFindFailed
+		return nil, apperrors.ErrUserFindFailed
 	}
 
 	return &usr, nil
@@ -499,11 +502,11 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 		})
 
 	if result.Error != nil {
-		return utils.ErrUserAuthPasswordResetFailed
+		return apperrors.ErrUserAuthPasswordResetFailed
 	}
 
 	if result.RowsAffected == 0 {
-		return utils.ErrUserAuthPasswordResetFailed
+		return apperrors.ErrUserAuthPasswordResetFailed
 	}
 
 	return nil
@@ -524,7 +527,7 @@ func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) er
 			"last_ip":               LastIp,
 			"last_email_send_at":    nil,
 		}).Error; err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	
 	return nil
@@ -535,7 +538,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 	// Get current failed attempts
 	var userAuth user.UserAuth
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
-		return utils.ErrUserAuthFindFailed
+		return apperrors.ErrUserAuthFindFailed
 	}
 
 	newAttempts := userAuth.FailedLoginAttempts + 1
@@ -555,7 +558,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 		Updates(updates).Error
 
 	if err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -565,7 +568,7 @@ func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
 	var userAuth user.UserAuth
 
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
-		return false, utils.ErrUserAuthFindFailed
+		return false, apperrors.ErrUserAuthFindFailed
 	}
 
 	if userAuth.LockoutUntil != nil && time.Now().Before(*userAuth.LockoutUntil) {
@@ -585,7 +588,7 @@ func (r *UserAuthRepository) UnlockAccount(userID string) error {
 		}).Error
 
 	if err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -597,7 +600,7 @@ func (r *UserAuthRepository) ActivateAccount(userID string) error {
 		Update("is_active", true).Error
 
 	if err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -609,7 +612,7 @@ func (r *UserAuthRepository) DeactivateAccount(userID string) error {
 		Update("is_active", false).Error
 
 	if err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -626,7 +629,7 @@ func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error
 		}).Error
 
 	if err != nil {
-		return utils.ErrUserAuthUpdateFailed
+		return apperrors.ErrUserAuthUpdateFailed
 	}
 	return nil
 }
@@ -642,16 +645,16 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil, sql.ErrNoRows
 		}
-		return nil, nil, utils.ErrUserAuthFindFailed
+		return nil, nil, apperrors.ErrUserAuthFindFailed
 	}
 
 	// Then get the auth data
 	err = r.db.Where("user_id = ?", userx.ID).First(&userAuth).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, nil, utils.ErrUserAuthFindFailed
+			return nil, nil, apperrors.ErrUserAuthFindFailed
 		}
-		return nil, nil, utils.ErrUserAuthFindFailed
+		return nil, nil, apperrors.ErrUserAuthFindFailed
 	}
 
 	return &userx, &userAuth, nil
@@ -661,7 +664,7 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 func (r *UserAuthRepository) DeleteUserAuth(userID string) error {
 	err := r.db.Where("user_id = ?", userID).Delete(&user.UserAuth{}).Error
 	if err != nil {
-		return utils.ErrUserAuthDeleteFailed
+		return apperrors.ErrUserAuthDeleteFailed
 	}
 	return nil
 }
@@ -671,7 +674,7 @@ func (r *UserAuthRepository) GetActiveUserAuthCount() (int64, error) {
 	var count int64
 	err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&count).Error
 	if err != nil {
-		return 0, utils.ErrUserAuthFindFailed
+		return 0, apperrors.ErrUserAuthFindFailed
 	}
 	return count, nil
 }
@@ -683,28 +686,28 @@ func (r *UserAuthRepository) GetUserAuthStats() (map[string]interface{}, error) 
 	// Total users
 	var totalUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Count(&totalUsers).Error; err != nil {
-		return nil, utils.ErrUserAuthFindFailed
+		return nil, apperrors.ErrUserAuthFindFailed
 	}
 	stats["total_users"] = totalUsers
 
 	// Active users
 	var activeUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&activeUsers).Error; err != nil {
-		return nil, utils.ErrUserAuthFindFailed
+		return nil, apperrors.ErrUserAuthFindFailed
 	}
 	stats["active_users"] = activeUsers
 
 	// Verified users
 	var verifiedUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Where("is_email_verified = ?", true).Count(&verifiedUsers).Error; err != nil {
-		return nil, utils.ErrUserAuthFindFailed
+		return nil, apperrors.ErrUserAuthFindFailed
 	}
 	stats["verified_users"] = verifiedUsers
 
 	// Locked users
 	var lockedUsers int64
 	if err := r.db.Model(&user.UserAuth{}).Where("lockout_until > ?", time.Now()).Count(&lockedUsers).Error; err != nil {
-		return nil, utils.ErrUserAuthFindFailed
+		return nil, apperrors.ErrUserAuthFindFailed
 	}
 	stats["locked_users"] = lockedUsers
 
@@ -718,10 +721,10 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 	result := ur.db.Where("user_id = ?", userID).First(&userAuth)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return utils.ErrSessionNotFound
+			return apperrors.ErrSessionNotFound
 		}
-		utils.Logger.Error("Error finding user session", "user_id", userID, "error", result.Error)
-		return utils.ErrUserDatabaseError
+		logger.Logger.Error("Error finding user session", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserDatabaseError
 	}
 
 	result = ur.db.Model(&userAuth).Updates(map[string]any{
@@ -731,8 +734,8 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 	})
 
 	if result.Error != nil {
-		utils.Logger.Error("Error clearing session on logout", "user_id", userID, "error", result.Error)
-		return utils.ErrUserDatabaseError
+		logger.Logger.Error("Error clearing session on logout", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserDatabaseError
 	}
 
 	return nil

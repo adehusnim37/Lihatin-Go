@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 )
 
 // PermissionsList is a custom type for handling JSON serialization of permissions
@@ -74,7 +74,7 @@ func (APIKey) TableName() string {
 
 // KeyPreview returns a preview of the API key for safe display
 func (a *APIKey) KeyPreview() string {
-	return utils.GetKeyPreview(a.Key)
+	return auth.GetKeyPreview(a.Key)
 }
 
 // models/user/api_key.go - Enhanced IPList with validation

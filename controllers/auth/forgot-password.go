@@ -8,14 +8,16 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 )
 
 func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	var req dto.ForgotPasswordRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -24,7 +26,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 
 	// XOR logic: exactly one must be provided
 	if emailProvided == usernameProvided {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusBadRequest,
 			"INVALID_INPUT",
@@ -56,7 +58,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	}
 
 	// Generate reset token
-	token, err := utils.GeneratePasswordResetToken()
+	token, err := auth.GeneratePasswordResetToken()
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,

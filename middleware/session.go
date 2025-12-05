@@ -7,17 +7,19 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
-	"github.com/adehusnim37/lihatin-go/utils/session"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
 	"github.com/gin-gonic/gin"
 )
 
 // InitSessionManager initializes the global session manager
 func InitSessionManager() error {
-	redisAddr := utils.GetEnvOrDefault(utils.EnvRedisAddr, "localhost:6379")
-	redisPassword := utils.GetEnvOrDefault(utils.EnvRedisPassword, "")
-	redisDB := utils.GetEnvAsInt(utils.EnvRedisDB, 0)
-	sessionTTLHours := utils.GetEnvAsInt(utils.EnvSessionTTL, 48) // Default 48 hours
+	redisAddr := config.GetEnvOrDefault(config.EnvRedisAddr, "localhost:6379")
+	redisPassword := config.GetEnvOrDefault(config.EnvRedisPassword, "")
+	redisDB := config.GetEnvAsInt(config.EnvRedisDB, 0)
+	sessionTTLHours := config.GetEnvAsInt(config.EnvSessionTTL, 48) // Default 48 hours
 
 	manager, err := session.NewManager(
 		redisAddr,
@@ -33,9 +35,9 @@ func InitSessionManager() error {
 	session.SetManager(manager)
 
 	// Initialize pending auth Redis client (uses same Redis connection)
-	utils.InitPendingAuthRedis(manager.GetRedisClient())
+	auth.InitPendingAuthRedis(manager.GetRedisClient())
 
-	utils.Logger.Info("Session manager initialized",
+	logger.Logger.Info("Session manager initialized",
 		"redis_addr", redisAddr,
 		"session_ttl_hours", sessionTTLHours,
 	)
@@ -91,7 +93,7 @@ func SessionMiddleware() gin.HandlerFunc {
 
 		// Refresh session TTL on each request
 		if err := manager.Refresh(ctx, sessionID); err != nil {
-			utils.Logger.Warn("Failed to refresh session", "error", err)
+			logger.Logger.Warn("Failed to refresh session", "error", err)
 		}
 
 		// Set session data in context

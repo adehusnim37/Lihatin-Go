@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,9 +23,9 @@ func (c *Controller) ActivateAPIKey(ctx *gin.Context) {
 	// Call the service to activate the account
 	success, err := c.repo.GetAPIKeyRepository().ActivateAPIKey(reqId, userID, userRole)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	utils.SendOKResponse(ctx, success, "Account activated successfully")
+	httputil.SendOKResponse(ctx, success, "Account activated successfully")
 }

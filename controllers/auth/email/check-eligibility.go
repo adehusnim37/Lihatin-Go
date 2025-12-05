@@ -1,7 +1,8 @@
 package email
 
 import (
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,11 +12,11 @@ func (c *Controller) CheckEmailChangeEligibility(ctx *gin.Context) {
 
 	eligible, daysRemaining, err := c.repo.GetUserAuthRepository().CheckEmailChangeEligibility(userID)
 	if err != nil {
-		utils.Logger.Error("Failed to check email change eligibility",
+		logger.Logger.Error("Failed to check email change eligibility",
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, nil)
+		http.HandleError(ctx, err, nil)
 		return
 	}
 
@@ -35,7 +36,7 @@ func (c *Controller) CheckEmailChangeEligibility(ctx *gin.Context) {
 		response["message"] = "You are eligible to change your email"
 	}
 
-	utils.SendOKResponse(ctx, response, "Email change eligibility checked")
+	http.SendOKResponse(ctx, response, "Email change eligibility checked")
 }
 
 // GetEmailChangeHistory returns user's email change history
@@ -45,15 +46,15 @@ func (c *Controller) GetEmailChangeHistory(ctx *gin.Context) {
 	// Get last 90 days of history
 	history, err := c.repo.GetUserAuthRepository().GetEmailChangeHistory(userID, 90)
 	if err != nil {
-		utils.Logger.Error("Failed to get email change history",
+		logger.Logger.Error("Failed to get email change history",
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, nil)
+		http.HandleError(ctx, err, nil)
 		return
 	}
 
-	utils.SendOKResponse(ctx, map[string]interface{}{
+	http.SendOKResponse(ctx, map[string]interface{}{
 		"history": history,
 		"total":   len(history),
 	}, "Email change history retrieved successfully")

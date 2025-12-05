@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/adehusnim37/lihatin-go/utils"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"gorm.io/gorm"
 )
 
@@ -37,8 +38,8 @@ func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int) ([]
 	// Get total count
 	countResult := uar.db.Model(&user.User{}).Where("deleted_at IS NULL").Count(&totalCount)
 	if countResult.Error != nil {
-		utils.Logger.Error("Error getting total user count", "error", countResult.Error)
-		return nil, 0, utils.ErrUserDatabaseError
+		logger.Logger.Error("Error getting total user count", "error", countResult.Error)
+		return nil, 0, apperrors.ErrUserDatabaseError
 	}
 
 	// Get users with pagination
@@ -49,11 +50,11 @@ func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int) ([]
 		Find(&users)
 
 	if result.Error != nil {
-		utils.Logger.Error("Error getting paginated users", "error", result.Error)
-		return nil, 0, utils.ErrUserDatabaseError
+		logger.Logger.Error("Error getting paginated users", "error", result.Error)
+		return nil, 0, apperrors.ErrUserDatabaseError
 	}
 
-	utils.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
+	logger.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
 	return users, totalCount, nil
 }
 
@@ -69,15 +70,15 @@ func (uar *userAdminRepository) LockUser(userID, reason string) error {
 
 	result := uar.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
 	if result.Error != nil {
-		utils.Logger.Error("Failed to lock user", "user_id", userID, "error", result.Error)
-		return utils.ErrUserLockFailed
+		logger.Logger.Error("Failed to lock user", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserLockFailed
 	}
 
 	if result.RowsAffected == 0 {
-		return utils.ErrUserNotFound
+		return apperrors.ErrUserNotFound
 	}
 
-	utils.Logger.Info("User locked successfully", "user_id", userID, "reason", reason)
+	logger.Logger.Info("User locked successfully", "user_id", userID, "reason", reason)
 	return nil
 }
 
@@ -98,15 +99,15 @@ func (uar *userAdminRepository) UnlockUser(userID, reason string) error {
 
 	result := uar.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
 	if result.Error != nil {
-		utils.Logger.Error("Failed to unlock user", "user_id", userID, "error", result.Error)
-		return utils.ErrUserUnlockFailed
+		logger.Logger.Error("Failed to unlock user", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserUnlockFailed
 	}
 
 	if result.RowsAffected == 0 {
-		return utils.ErrUserNotFound
+		return apperrors.ErrUserNotFound
 	}
 
-	utils.Logger.Info("User unlocked successfully", "user_id", userID, "reason", unlockReason)
+	logger.Logger.Info("User unlocked successfully", "user_id", userID, "reason", unlockReason)
 	return nil
 }
 
@@ -117,10 +118,10 @@ func (uar *userAdminRepository) IsUserLocked(userID string) (bool, error) {
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return false, utils.ErrUserNotFound
+			return false, apperrors.ErrUserNotFound
 		}
-		utils.Logger.Error("Error checking user lock status", "user_id", userID, "error", result.Error)
-		return false, utils.ErrUserDatabaseError
+		logger.Logger.Error("Error checking user lock status", "user_id", userID, "error", result.Error)
+		return false, apperrors.ErrUserDatabaseError
 	}
 
 	return user.IsLocked, nil
@@ -132,20 +133,20 @@ func (uar *userAdminRepository) DeleteUserPermanent(userID string) error {
 
 	result := uar.db.Where("id = ? AND deleted_at IS NULL", userID).First(&user)
 	if result.Error != nil {
-		utils.Logger.Error("Failed to find user for permanent deletion", "user_id", userID, "error", result.Error)
-		return utils.ErrUserNotFound
+		logger.Logger.Error("Failed to find user for permanent deletion", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserNotFound
 	}
 
 	result = uar.db.Unscoped().Delete(&user, "id = ?", userID)
 	if result.Error != nil {
-		utils.Logger.Error("Failed to permanently delete user", "user_id", userID, "error", result.Error)
-		return utils.ErrUserDeleteFailed
+		logger.Logger.Error("Failed to permanently delete user", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserDeleteFailed
 	}
 
 	if result.RowsAffected == 0 {
-		return utils.ErrUserNotFound
+		return apperrors.ErrUserNotFound
 	}
 
-	utils.Logger.Info("User permanently deleted", "user_id", userID)
+	logger.Logger.Info("User permanently deleted", "user_id", userID)
 	return nil
 }

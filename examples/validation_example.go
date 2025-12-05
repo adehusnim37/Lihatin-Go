@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/adehusnim37/lihatin-go/utils"
+	appvalidator "github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -30,7 +30,7 @@ func main() {
 
 	// Setup custom validators
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		utils.SetupCustomValidators(v)
+		appvalidator.SetupCustomValidators(v)
 	}
 
 	// Create router
@@ -134,7 +134,7 @@ func handleBulkDelete(c *gin.Context) {
 	var req BulkDeleteRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(c, err, &req)
+		appvalidator.SendValidationError(c, err, &req)
 		return
 	}
 
@@ -152,7 +152,7 @@ func handleUserRegistration(c *gin.Context) {
 	var req UserRegistrationRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(c, err, &req)
+		appvalidator.SendValidationError(c, err, &req)
 		return
 	}
 

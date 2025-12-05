@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,12 +14,12 @@ func (c *Controller) ValidateResetToken(ctx *gin.Context) {
 
 	// Bind and validate request
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 	// Validate the token
 	if _, err := c.repo.GetUserAuthRepository().ValidatePasswordResetToken(req.Token); err != nil {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusUnauthorized,
 			"INVALID_TOKEN",
@@ -29,5 +30,5 @@ func (c *Controller) ValidateResetToken(ctx *gin.Context) {
 		return
 	}
 
-	utils.SendSuccessResponse(ctx, http.StatusOK, nil, "Token is valid")
+	httputil.SendSuccessResponse(ctx, http.StatusOK, nil, "Token is valid")
 }

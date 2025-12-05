@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,13 +17,13 @@ func (c *Controller) RefreshAPIKey(ctx *gin.Context) {
     userID, _ := ctx.Get("user_id")
 
     if err := ctx.ShouldBindUri(&reqId); err != nil {
-        utils.SendValidationError(ctx, err, &reqId)
+        validator.SendValidationError(ctx, err, &reqId)
         return
     }
 
     updatedKey, fullAPIKey, err := c.repo.GetAPIKeyRepository().RegenerateAPIKey(reqId.ID, userID.(string))
     if err != nil {
-        utils.HandleError(ctx, err, userID)
+        http.HandleError(ctx, err, userID)
         return
     }
 
@@ -29,7 +31,7 @@ func (c *Controller) RefreshAPIKey(ctx *gin.Context) {
    response := dto.APIKeyRefreshResponse{
         ID:          updatedKey.ID,
         Name:        updatedKey.Name,
-        KeyPreview:  utils.GetKeyPreview(updatedKey.Key),
+        KeyPreview:  auth.GetKeyPreview(updatedKey.Key),
         IsActive:    updatedKey.IsActive,
         ExpiresAt:   updatedKey.ExpiresAt,
         Permissions: []string(updatedKey.Permissions),
@@ -49,7 +51,7 @@ func (c *Controller) RefreshAPIKey(ctx *gin.Context) {
         },
     }
 
-    utils.SendOKResponse(ctx, response, "API key refreshed successfully")
+    http.SendOKResponse(ctx, response, "API key refreshed successfully")
 }
 
 // Helper function

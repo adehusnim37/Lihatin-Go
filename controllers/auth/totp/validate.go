@@ -5,7 +5,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,7 +37,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	}
 
 	// Validate JWT token
-	claims, err := utils.ValidateJWT(req.Token)
+	claims, err := auth.ValidateJWT(req.Token)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
@@ -73,7 +73,7 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	}
 
 	// Decrypt secret
-	secret, err := utils.DecryptTOTPSecret(encryptedSecret)
+	secret, err := auth.DecryptTOTPSecret(encryptedSecret)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -85,12 +85,12 @@ func (c *Controller) ValidateTOTPLogin(ctx *gin.Context) {
 	}
 
 	// Validate TOTP code
-	if !utils.ValidateTOTPCodeWithWindow(secret, req.Code, 1) {
+	if !auth.ValidateTOTPCodeWithWindow(secret, req.Code, 1) {
 		// Try recovery codes
 		recoveryCodes, err := c.repo.GetAuthMethodRepository().GetRecoveryCodes(userAuth.ID)
-		if err == nil && utils.ValidateRecoveryCode(req.Code, recoveryCodes) {
+		if err == nil && auth.ValidateRecoveryCode(req.Code, recoveryCodes) {
 			// Remove used recovery code
-			updatedCodes := utils.RemoveRecoveryCode(recoveryCodes, req.Code)
+			updatedCodes := auth.RemoveRecoveryCode(recoveryCodes, req.Code)
 			c.repo.GetAuthMethodRepository().UpdateRecoveryCodes(userAuth.ID, updatedCodes)
 		} else {
 			ctx.JSON(http.StatusBadRequest, common.APIResponse{

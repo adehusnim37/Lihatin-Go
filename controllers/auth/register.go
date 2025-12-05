@@ -10,8 +10,12 @@ import (
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/adehusnim37/lihatin-go/utils"
-	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -22,14 +26,14 @@ func (c *Controller) Register(ctx *gin.Context) {
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Check if user already exists
 	existingUser, _ := c.repo.GetUserRepository().GetUserByEmailOrUsername(req.Email)
 	if existingUser != nil {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusBadRequest,
 			"Registration failed",
@@ -41,9 +45,9 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	// Hash password
-	hashedPassword, err := utils.HashPassword(req.Password)
+	hashedPassword, err := auth.HashPassword(req.Password)
 	if err != nil {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
 			"Registration failed",
@@ -65,7 +69,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	if err := c.repo.GetUserRepository().CreateUser(newUser); err != nil {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
 			"Registration failed",
@@ -76,9 +80,9 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateVerificationToken()
+	token, err := auth.GenerateVerificationToken()
 	if err != nil {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
 			"Registration failed",
@@ -89,9 +93,9 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 
-	jwtExpiredHours, err := strconv.Atoi(utils.GetRequiredEnv("JWT_EXPIRED"))
+	jwtExpiredHours, err := strconv.Atoi(config.GetRequiredEnv("JWT_EXPIRED"))
 	if err != nil {
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
 			"Registration failed",
@@ -104,7 +108,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	expirationTime := time.Now().Add(time.Duration(jwtExpiredHours) * time.Hour)
 
 	// Get device and IP info
-	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
 
 	// Create session in Redis
 	sessionID, err := middleware.CreateSession(
@@ -117,11 +121,11 @@ func (c *Controller) Register(ctx *gin.Context) {
 	)
 
 	if err != nil {
-		utils.Logger.Error("Failed to create registration session in Redis",
+		logger.Logger.Error("Failed to create registration session in Redis",
 			"user_id", newUser.ID,
 			"error", err.Error(),
 		)
-		utils.SendErrorResponse(
+		httputil.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
 			"Registration failed",
@@ -132,9 +136,9 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Registration session created",
+	logger.Logger.Info("Registration session created",
 		"user_id", newUser.ID,
-		"session_preview", utils.GetKeyPreview(sessionID),
+		"session_preview", auth.GetKeyPreview(sessionID),
 	)
 
 	uuidV7, err := uuid.NewV7()
@@ -160,14 +164,14 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	if err := c.repo.GetUserAuthRepository().CreateUserAuth(userAuth); err != nil {
-		utils.HandleError(ctx, err, newUser.ID)
+		httputil.HandleError(ctx, err, newUser.ID)
 		return
 	}
 
 	// Send verification email (optional, continue even if fails)
 	_ = c.emailService.SendVerificationEmail(newUser.Email, newUser.FirstName, token)
 
-	utils.SendCreatedResponse(ctx, map[string]any{
+	httputil.SendCreatedResponse(ctx, map[string]any{
 		"user_id": newUser.ID,
 		"email":   newUser.Email,
 	}, "Registration successful. Please check your email for verification.")

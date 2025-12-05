@@ -2,7 +2,9 @@ package api
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,20 +18,20 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	// Bind and validate request
 	var req dto.UpdateAPIKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Bind and validate URI parameters
 	if err := ctx.ShouldBindUri(&reqId); err != nil {
-		utils.SendValidationError(ctx, err, &reqId)
+		validator.SendValidationError(ctx, err, &reqId)
 		return
 	}
 
 	// Update the API key using the corrected repository method
 	updatedKey, err := c.repo.GetAPIKeyRepository().UpdateAPIKey(reqId, userIDStr, req)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
@@ -37,7 +39,7 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 	response := dto.APIKeyResponse{
 		ID:          updatedKey.ID,
 		Name:        updatedKey.Name,
-		KeyPreview:  utils.GetKeyPreview(updatedKey.Key),
+		KeyPreview:  auth.GetKeyPreview(updatedKey.Key),
 		LimitUsage:  updatedKey.LimitUsage,
 		UsageCount:  updatedKey.UsageCount,
 		LastIPUsed:  updatedKey.LastIPUsed,
@@ -48,5 +50,5 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		CreatedAt:   updatedKey.CreatedAt,
 	}
 
-	utils.SendOKResponse(ctx, response, "API key updated successfully")
+	http.SendOKResponse(ctx, response, "API key updated successfully")
 }

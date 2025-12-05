@@ -10,7 +10,8 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/mssola/useragent"
 )
@@ -317,9 +318,9 @@ func extractAPIKey(c *gin.Context) string {
 
 // extractIDApiKey extracts the ID part from a full API key
 func extractIDApiKey(apikey string) *string {
-	keyParts := utils.SplitAPIKey(apikey)
+	keyParts := auth.SplitAPIKey(apikey)
 	if len(keyParts) != 2 {
-		utils.Logger.Warn("Invalid API key format - missing separator or the APIKey is not defined", "key_preview", utils.GetKeyPreview(apikey))
+		logger.Logger.Warn("Invalid API key format - missing separator or the APIKey is not defined", "key_preview", auth.GetKeyPreview(apikey))
 		return nil
 	}
 

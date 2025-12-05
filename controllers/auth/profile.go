@@ -2,7 +2,7 @@ package auth
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,14 +13,14 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 	// Get user information
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
 	// Get user auth information
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(user.ID)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		http.HandleError(ctx, err, userID)
 		return
 	}
 
@@ -52,5 +52,5 @@ func (c *Controller) GetProfile(ctx *gin.Context) {
 			UpdatedAt:           userAuth.UpdatedAt,
 		},
 	}
-	utils.SendOKResponse(ctx, profile, "Profile retrieved successfully")
+	http.SendOKResponse(ctx, profile, "Profile retrieved successfully")
 }

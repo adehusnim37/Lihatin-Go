@@ -9,7 +9,9 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/models/logging"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -32,13 +34,13 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 	}
 
 	// Generate API key pair first (fail fast if generation fails)
-	keyID, secretKey, secretKeyHash, keyPreview, err := utils.GenerateAPIKeyPair("")
+	keyID, secretKey, secretKeyHash, keyPreview, err := auth.GenerateAPIKeyPair("")
 	if err != nil {
-		utils.Logger.Error("Failed to generate API key pair", "error", err.Error())
-		return nil, "", utils.ErrAPIKeyCreateFailed
+		logger.Logger.Error("Failed to generate API key pair", "error", err.Error())
+		return nil, "", apperrors.ErrAPIKeyCreateFailed
 	}
 
-	utils.Logger.Info("Starting API key creation process",
+	logger.Logger.Info("Starting API key creation process",
 		"user_id", userID,
 		"key_name", req.Name,
 		"key_preview", keyPreview,
@@ -53,37 +55,37 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 		if err := tx.Where("user_id = ? AND is_email_verified = ? AND is_active = ?",
 			userID, true, true).First(&userAuth).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				utils.Logger.Warn("User not found or not eligible for API key creation",
+				logger.Logger.Warn("User not found or not eligible for API key creation",
 					"user_id", userID)
-				return utils.ErrUserNotFound
+				return apperrors.ErrUserNotFound
 			}
-			utils.Logger.Error("Failed to validate user for API key creation",
+			logger.Logger.Error("Failed to validate user for API key creation",
 				"user_id", userID, "error", err.Error())
-			return utils.ErrAPIKeyFailedFetching
+			return apperrors.ErrAPIKeyFailedFetching
 		}
 
 		// 2. Check for duplicate name and count limit in one query
 		var existingKeys []user.APIKey
 		if err := tx.Where("user_id = ? AND is_active = ? AND deleted_at IS NULL", userID, true).
 			Find(&existingKeys).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			utils.Logger.Error("Failed to fetch existing API keys",
+			logger.Logger.Error("Failed to fetch existing API keys",
 				"user_id", userID, "error", err.Error())
-			return utils.ErrAPIKeyFailedFetching
+			return apperrors.ErrAPIKeyFailedFetching
 		}
 
 		// Check for duplicate name and count limit
 		for _, key := range existingKeys {
 			if key.Name == req.Name {
-				utils.Logger.Warn("API key name already exists",
+				logger.Logger.Warn("API key name already exists",
 					"user_id", userID, "name", req.Name)
-				return utils.ErrAPIKeyNameExists
+				return apperrors.ErrAPIKeyNameExists
 			}
 		}
 
 		if len(existingKeys) >= 3 {
-			utils.Logger.Warn("API key limit reached",
+			logger.Logger.Warn("API key limit reached",
 				"user_id", userID, "current_count", len(existingKeys))
-			return utils.ErrAPIKeyLimitReached
+			return apperrors.ErrAPIKeyLimitReached
 		}
 
 		// Prepare IP lists
@@ -92,12 +94,12 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 
 		if len(req.AllowedIPs) > 0 {
 			allowedIPs = user.IPList(req.AllowedIPs) // Convert slice to IPList
-			utils.Logger.Debug("Setting allowed IPs", "allowed_ips", allowedIPs)
+			logger.Logger.Debug("Setting allowed IPs", "allowed_ips", allowedIPs)
 		}
 
 		if len(req.BlockedIPs) > 0 {
 			blockedIPs = user.IPList(req.BlockedIPs) // Convert slice to IPList
-			utils.Logger.Debug("Setting blocked IPs", "blocked_ips", blockedIPs)
+			logger.Logger.Debug("Setting blocked IPs", "blocked_ips", blockedIPs)
 		}
 
 		// 3. Create the new API key with explicit timestamp handling
@@ -121,7 +123,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 
 		// Create using GORM with explicit handling
 		if err := tx.Create(&apiKey).Error; err != nil {
-			utils.Logger.Error("Failed to create API key in database",
+			logger.Logger.Error("Failed to create API key in database",
 				"user_id", userID,
 				"key_name", req.Name,
 				"error", err.Error(),
@@ -129,10 +131,10 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 				"blocked_ips", req.BlockedIPs,
 				"allowed_ips", req.AllowedIPs,
 			)
-			return utils.ErrAPIKeyCreateFailed
+			return apperrors.ErrAPIKeyCreateFailed
 		}
 
-		utils.Logger.Info("API key created successfully in transaction",
+		logger.Logger.Info("API key created successfully in transaction",
 			"user_id", userID,
 			"key_id", apiKey.ID,
 			"key_name", req.Name,
@@ -148,7 +150,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 	}
 
 	// Log final success
-	utils.Logger.Info("API key creation completed successfully",
+	logger.Logger.Info("API key creation completed successfully",
 		"user_id", userID,
 		"key_id", apiKey.ID,
 		"key_name", req.Name,
@@ -176,7 +178,7 @@ func (r *APIKeyRepository) GetAPIKeysByUserID(userID string) ([]user.APIKey, err
 	// Check if the user exists
 	if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
 		tx.Rollback()
-		return nil, utils.ErrUserNotFound
+		return nil, apperrors.ErrUserNotFound
 	}
 
 	// Build the query for fetching API keys
@@ -188,12 +190,12 @@ func (r *APIKeyRepository) GetAPIKeysByUserID(userID string) ([]user.APIKey, err
 	// Fetch the API keys
 	if err := q.Find(&apiKeys).Error; err != nil {
 		tx.Rollback()
-		return nil, utils.ErrAPIKeyNotFound
+		return nil, apperrors.ErrAPIKeyNotFound
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		return nil, utils.ErrAPIKeyFailedFetching
+		return nil, apperrors.ErrAPIKeyFailedFetching
 	}
 
 	return apiKeys, nil
@@ -215,7 +217,7 @@ func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) 
 	// Check if the user exists
 	if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
 		tx.Rollback()
-		return dto.APIKeyResponse{}, utils.ErrUserNotFound
+		return dto.APIKeyResponse{}, apperrors.ErrUserNotFound
 	}
 
 	// Build the query for fetching API keys
@@ -227,18 +229,18 @@ func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) 
 	// Fetch the API keys
 	if err := q.First(&apiKey).Error; err != nil {
 		tx.Rollback()
-		return dto.APIKeyResponse{}, utils.ErrAPIKeyNotFound
+		return dto.APIKeyResponse{}, apperrors.ErrAPIKeyNotFound
 	}
 
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		return dto.APIKeyResponse{}, utils.ErrAPIKeyFailedFetching
+		return dto.APIKeyResponse{}, apperrors.ErrAPIKeyFailedFetching
 	}
 
 	return dto.APIKeyResponse{
 		ID:          apiKey.ID,
 		Name:        apiKey.Name,
-		KeyPreview:  utils.GetKeyPreview(apiKey.Key),
+		KeyPreview:  auth.GetKeyPreview(apiKey.Key),
 		LastUsedAt:  apiKey.LastUsedAt,
 		ExpiresAt:   apiKey.ExpiresAt,
 		IsActive:    apiKey.IsActive,
@@ -249,22 +251,22 @@ func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) 
 
 // ValidateAPIKey validates an API key and returns the associated user
 func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.User, *user.APIKey, error) {
-	utils.Logger.Info("Validating API key", "key_preview", utils.GetKeyPreview(fullAPIKey))
+	logger.Logger.Info("Validating API key", "key_preview", auth.GetKeyPreview(fullAPIKey))
 
 	// Parse the full API key (format: keyID.secretKey)
-	keyParts := utils.SplitAPIKey(fullAPIKey)
+	keyParts := auth.SplitAPIKey(fullAPIKey)
 	if len(keyParts) != 2 {
-		utils.Logger.Warn("Invalid API key format - missing separator", "key_preview", utils.GetKeyPreview(fullAPIKey))
-		return nil, nil, utils.ErrAPIKeyInvalidFormat
+		logger.Logger.Warn("Invalid API key format - missing separator", "key_preview", auth.GetKeyPreview(fullAPIKey))
+		return nil, nil, apperrors.ErrAPIKeyInvalidFormat
 	}
 
 	keyID := keyParts[0]
 	secretKey := keyParts[1]
 
 	// Validate key ID format
-	if !utils.ValidateAPIKeyIDFormat(keyID) {
-		utils.Logger.Warn("Invalid API key ID format", "key_id", keyID)
-		return nil, nil, utils.ErrAPIKeyIDFailedFormat
+	if !auth.ValidateAPIKeyIDFormat(keyID) {
+		logger.Logger.Warn("Invalid API key ID format", "key_id", keyID)
+		return nil, nil, apperrors.ErrAPIKeyIDFailedFormat
 	}
 
 	// Find API key by key ID
@@ -272,45 +274,45 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 	if err := r.db.Where("`key` = ? AND is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
 		keyID, true, time.Now()).First(&apiKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			utils.Logger.Warn("API key not found", "key_id", keyID)
-			return nil, nil, utils.ErrAPIKeyNotFound
+			logger.Logger.Warn("API key not found", "key_id", keyID)
+			return nil, nil, apperrors.ErrAPIKeyNotFound
 		}
-		utils.Logger.Error("Database error while validating API key", "error", err.Error())
+		logger.Logger.Error("Database error while validating API key", "error", err.Error())
 		return nil, nil, fmt.Errorf("failed to validate API key: %w", err)
 	}
 
 	// validate usage limit
 	if apiKey.LimitUsage != nil && apiKey.UsageCount >= *apiKey.LimitUsage {
-		utils.Logger.Warn("API key usage limit reached", "key_id", keyID)
-		return nil, nil, utils.ErrAPIKeyRateLimitExceeded
+		logger.Logger.Warn("API key usage limit reached", "key_id", keyID)
+		return nil, nil, apperrors.ErrAPIKeyRateLimitExceeded
 	}
 
 	// validate IP restrictions
 	if len(apiKey.AllowedIPs) > 0 {
 		allowed := slices.Contains(apiKey.AllowedIPs, ip)
 		if !allowed {
-			utils.Logger.Warn("API key access from disallowed IP", "key_id", keyID, "ip", ip)
-			return nil, nil, utils.ErrAPIKeyIPNotAllowed
+			logger.Logger.Warn("API key access from disallowed IP", "key_id", keyID, "ip", ip)
+			return nil, nil, apperrors.ErrAPIKeyIPNotAllowed
 		}
 	}
 
 	// check blocked IPs
 	if slices.Contains(apiKey.BlockedIPs, ip) {
-		utils.Logger.Warn("API key access from blocked IP", "key_id", keyID, "ip", ip)
-		return nil, nil, utils.ErrAPIKeyIPNotAllowed
+		logger.Logger.Warn("API key access from blocked IP", "key_id", keyID, "ip", ip)
+		return nil, nil, apperrors.ErrAPIKeyIPNotAllowed
 	}
 
 	// Validate the secret key against stored hash
-	if !utils.ValidateAPISecretKey(secretKey, apiKey.KeyHash) {
-		utils.Logger.Warn("Invalid secret key for API key", "key_id", keyID, "user_id", apiKey.UserID)
-		return nil, nil, utils.ErrAPIKeyInvalidFormat
+	if !auth.ValidateAPISecretKey(secretKey, apiKey.KeyHash) {
+		logger.Logger.Warn("Invalid secret key for API key", "key_id", keyID, "user_id", apiKey.UserID)
+		return nil, nil, apperrors.ErrAPIKeyInvalidFormat
 	}
 
 	// Get the associated user
 	var user user.User
 	if err := r.db.First(&user, "id = ?", apiKey.UserID).Error; err != nil {
-		utils.Logger.Error("User not found for valid API key", "user_id", apiKey.UserID, "key_id", keyID)
-		return nil, nil, utils.ErrUserNotFound
+		logger.Logger.Error("User not found for valid API key", "user_id", apiKey.UserID, "key_id", keyID)
+		return nil, nil, apperrors.ErrUserNotFound
 	}
 
 	// Update last used timestamp and increment usage count asynchronously and get last IP Used
@@ -320,11 +322,11 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 			"usage_count":  gorm.Expr("usage_count + ?", 1),
 			"last_ip_used": ip,
 		}).Error; err != nil {
-			utils.Logger.Error("Failed to update usage stats for API key", "key_id", keyID, "error", err.Error())
+			logger.Logger.Error("Failed to update usage stats for API key", "key_id", keyID, "error", err.Error())
 		}
 	}()
 
-	utils.Logger.Info("API key validated successfully",
+	logger.Logger.Info("API key validated successfully",
 		"user_id", user.ID,
 		"key_id", keyID,
 		"key_name", apiKey.Name,
@@ -343,10 +345,10 @@ func (r *APIKeyRepository) APIKeyCheckPermissions(apiKeyID string, requiredPermi
 	if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
 		First(&apiKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
-			return false, utils.ErrAPIKeyNotFound
+			logger.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
+			return false, apperrors.ErrAPIKeyNotFound
 		}
-		utils.Logger.Error("Database error while checking API key permissions",
+		logger.Logger.Error("Database error while checking API key permissions",
 			"key_id", apiKeyID, "error", err.Error())
 		return false, fmt.Errorf("failed to check API key permissions: %w", err)
 	}
@@ -356,7 +358,7 @@ func (r *APIKeyRepository) APIKeyCheckPermissions(apiKeyID string, requiredPermi
 	for _, requiredPerm := range requiredPermissions {
 		for _, perm := range keyPermissions {
 			if perm == requiredPerm || perm == "*" {
-				utils.Logger.Info("API key has required permission (ANY match)",
+				logger.Logger.Info("API key has required permission (ANY match)",
 					"key_id", apiKeyID,
 					"key_name", apiKey.Name,
 					"required_permissions", requiredPermissions,
@@ -367,7 +369,7 @@ func (r *APIKeyRepository) APIKeyCheckPermissions(apiKeyID string, requiredPermi
 		}
 	}
 
-	utils.Logger.Warn("API key lacks required permissions (ANY match)",
+	logger.Logger.Warn("API key lacks required permissions (ANY match)",
 		"key_id", apiKeyID,
 		"key_name", apiKey.Name,
 		"required_permissions", requiredPermissions,
@@ -384,10 +386,10 @@ func (r *APIKeyRepository) APIKeyCheckAllPermissions(apiKeyID string, requiredPe
 	if err := r.db.Where("id = ? AND is_active = ? AND deleted_at IS NULL", apiKeyID, true).
 		First(&apiKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			utils.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
-			return false, utils.ErrAPIKeyNotFound
+			logger.Logger.Warn("API key not found during permission check", "key_id", apiKeyID)
+			return false, apperrors.ErrAPIKeyNotFound
 		}
-		utils.Logger.Error("Database error while checking API key permissions",
+		logger.Logger.Error("Database error while checking API key permissions",
 			"key_id", apiKeyID, "error", err.Error())
 		return false, fmt.Errorf("failed to check API key permissions: %w", err)
 	}
@@ -404,7 +406,7 @@ func (r *APIKeyRepository) APIKeyCheckAllPermissions(apiKeyID string, requiredPe
 			}
 		}
 		if !hasPermission {
-			utils.Logger.Warn("API key missing required permission (ALL match)",
+			logger.Logger.Warn("API key missing required permission (ALL match)",
 				"key_id", apiKeyID,
 				"key_name", apiKey.Name,
 				"missing_permission", requiredPerm,
@@ -415,7 +417,7 @@ func (r *APIKeyRepository) APIKeyCheckAllPermissions(apiKeyID string, requiredPe
 		}
 	}
 
-	utils.Logger.Info("API key has all required permissions",
+	logger.Logger.Info("API key has all required permissions",
 		"key_id", apiKeyID,
 		"key_name", apiKey.Name,
 		"required_permissions", requiredPermissions,
@@ -429,8 +431,8 @@ func (r *APIKeyRepository) ValidateAPIKeyWithPermissions(fullAPIKey string, requ
 	// First validate the API key and get user/key info
 	user, apiKeyRecord, err := r.ValidateAPIKey(fullAPIKey, "")
 	if err != nil {
-		utils.Logger.Warn("Invalid API key during permission check",
-			"key_preview", utils.GetKeyPreview(fullAPIKey),
+		logger.Logger.Warn("Invalid API key during permission check",
+			"key_preview", auth.GetKeyPreview(fullAPIKey),
 			"error", err.Error())
 		return nil, nil, false, fmt.Errorf("invalid API key: %w", err)
 	}
@@ -458,7 +460,7 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 		// 1. Check if API key exists and belongs to user (or user is admin)
 		var userModel user.User
 		if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&userModel).Error; err != nil {
-			return utils.ErrUserNotFound
+			return apperrors.ErrUserNotFound
 		}
 
 		// Build query based on user role
@@ -469,7 +471,7 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 
 		if err := query.First(&apiKey).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return utils.ErrAPIKeyNotFound
+				return apperrors.ErrAPIKeyNotFound
 			}
 			return fmt.Errorf("failed to fetch API key: %w", err)
 		}
@@ -482,7 +484,7 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 			var existingKey user.APIKey
 			if err := tx.Where("user_id = ? AND name = ? AND id != ? AND deleted_at IS NULL",
 				apiKey.UserID, *req.Name, keyID.ID).First(&existingKey).Error; err == nil {
-				return utils.ErrAPIKeyNameExists
+				return apperrors.ErrAPIKeyNameExists
 			}
 			updates["name"] = *req.Name
 		}
@@ -547,7 +549,7 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 		return nil, err
 	}
 
-	utils.Logger.Info("API key updated successfully",
+	logger.Logger.Info("API key updated successfully",
 		"user_id", userID,
 		"key_id", keyID,
 		"key_name", apiKey.Name,
@@ -572,7 +574,7 @@ func (r *APIKeyRepository) RevokeAPIKey(id dto.APIKeyIDRequest, UserID string) e
 	// Check if the user exists
 	if err := tx.Where("id = ? AND deleted_at IS NULL", UserID).First(&user).Error; err != nil {
 		tx.Rollback()
-		return utils.ErrUserNotFound
+		return apperrors.ErrUserNotFound
 	}
 
 	// Build the query for fetching API keys
@@ -584,7 +586,7 @@ func (r *APIKeyRepository) RevokeAPIKey(id dto.APIKeyIDRequest, UserID string) e
 	// Fetch the API key
 	if err := q.First(&apiKey).Error; err != nil {
 		tx.Rollback()
-		return utils.ErrAPIKeyNotFound
+		return apperrors.ErrAPIKeyNotFound
 	}
 
 	// Update the API key to set is_active to false and mark as deleted
@@ -597,9 +599,9 @@ func (r *APIKeyRepository) RevokeAPIKey(id dto.APIKeyIDRequest, UserID string) e
 	}
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		return utils.ErrAPIKeyFailedFetching
+		return apperrors.ErrAPIKeyFailedFetching
 	}
-	utils.Logger.Info("API key revoked successfully",
+	logger.Logger.Info("API key revoked successfully",
 		"user_id", UserID,
 		"key_id", id,
 		"key_name", apiKey.Name,
@@ -648,12 +650,12 @@ func (r *APIKeyRepository) GetAPIKeyStats(userID string) (map[string]interface{}
 // CreateAPIKeyWithCustomPrefix creates a new API key with custom prefix
 func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix string, expiresAt *time.Time, permissions []string) (*user.APIKey, string, error) {
 	// Generate API key pair with custom prefix
-	keyID, secretKey, secretKeyHash, keyPreview, err := utils.GenerateAPIKeyPair(prefix)
+	keyID, secretKey, secretKeyHash, keyPreview, err := auth.GenerateAPIKeyPair(prefix)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate API key pair: %w", err)
 	}
 
-	utils.Logger.Info("Creating custom prefix API key",
+	logger.Logger.Info("Creating custom prefix API key",
 		"user_id", userID,
 		"key_name", name,
 		"key_preview", keyPreview,
@@ -672,7 +674,7 @@ func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix str
 	}
 
 	if err := r.db.Create(apiKey).Error; err != nil {
-		utils.Logger.Error("Failed to create custom prefix API key",
+		logger.Logger.Error("Failed to create custom prefix API key",
 			"user_id", userID,
 			"key_name", name,
 			"prefix", prefix,
@@ -681,7 +683,7 @@ func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix str
 		return nil, "", fmt.Errorf("failed to create API key: %w", err)
 	}
 
-	utils.Logger.Info("Custom prefix API key created successfully",
+	logger.Logger.Info("Custom prefix API key created successfully",
 		"user_id", userID,
 		"key_id", apiKey.ID,
 		"key_name", name,
@@ -701,18 +703,18 @@ func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.
 
 	if err := r.db.Where("id = ? AND user_id = ? AND is_active = ? AND deleted_at IS NULL", keyID, userID, true).First(&existingKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, "", utils.ErrAPIKeyNotFound
+			return nil, "", apperrors.ErrAPIKeyNotFound
 		}
-		return nil, "", utils.ErrAPIKeyInactive
+		return nil, "", apperrors.ErrAPIKeyInactive
 	}
 
 	// Generate new API key pair with same prefix
-	newKeyID, newSecretKey, newSecretKeyHash, newKeyPreview, err := utils.GenerateAPIKeyPair("")
+	newKeyID, newSecretKey, newSecretKeyHash, newKeyPreview, err := auth.GenerateAPIKeyPair("")
 	if err != nil {
-		return nil, "", utils.ErrAPIKeyCreateFailed
+		return nil, "", apperrors.ErrAPIKeyCreateFailed
 	}
 
-	utils.Logger.Info("Regenerating API key",
+	logger.Logger.Info("Regenerating API key",
 		"user_id", userID,
 		"old_key_id", existingKey.ID,
 		"new_key_preview", newKeyPreview,
@@ -728,21 +730,21 @@ func (r *APIKeyRepository) RegenerateAPIKey(keyID string, userID string) (*user.
 	}
 
 	if err := r.db.Model(&existingKey).Where("id = ?", keyID).Updates(updates).Error; err != nil {
-		utils.Logger.Error("Failed to update API key with new values",
+		logger.Logger.Error("Failed to update API key with new values",
 			"key_id", keyID,
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		return nil, "", utils.ErrAPIKeyUpdateFailed
+		return nil, "", apperrors.ErrAPIKeyUpdateFailed
 	}
 
 	// Get updated API key
 	var updatedKey user.APIKey
 	if err := r.db.Where("id = ?", keyID).First(&updatedKey).Error; err != nil {
-		return nil, "", utils.ErrAPIKeyFailedFetching
+		return nil, "", apperrors.ErrAPIKeyFailedFetching
 	}
 
-	utils.Logger.Info("API key regenerated successfully",
+	logger.Logger.Info("API key regenerated successfully",
 		"user_id", userID,
 		"key_id", keyID,
 		"new_key_preview", newKeyPreview,
@@ -776,7 +778,7 @@ func (r *APIKeyRepository) ActivateAPIKey(keyID dto.APIKeyIDRequest, userID stri
 	// Fetch the API key
 	if err := q.First(&apiKey).Error; err != nil {
 		tx.Rollback()
-		return nil, utils.ErrAPIKeyNotFound
+		return nil, apperrors.ErrAPIKeyNotFound
 	}
 
 	// Update the API key to set is_active to true
@@ -789,9 +791,9 @@ func (r *APIKeyRepository) ActivateAPIKey(keyID dto.APIKeyIDRequest, userID stri
 	}
 	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
-		return nil, utils.ErrAPIKeyFailedFetching
+		return nil, apperrors.ErrAPIKeyFailedFetching
 	}
-	utils.Logger.Info("API key activated successfully",
+	logger.Logger.Info("API key activated successfully",
 		"user_id", userID,
 		"key_id", keyID,
 		"key_name", apiKey.Name,
@@ -809,19 +811,19 @@ func (r *APIKeyRepository) DeactivateAPIKey(keyID dto.APIKeyIDRequest, userID st
 	if userRole != "admin" {
 		// Ensure the user owns the key if not admin
 		if err := r.db.Where("id = ? AND user_id = ? AND deleted_at IS NULL", keyID.ID, userID).First(&apiKey).Error; err != nil {
-			return nil, utils.ErrAPIKeyNotFound
+			return nil, apperrors.ErrAPIKeyNotFound
 		}
 	} else {
 		// Admin can access any key
 		if err := r.db.Where("id = ? AND deleted_at IS NULL", keyID.ID).First(&apiKey).Error; err != nil {
-			return nil, utils.ErrAPIKeyNotFound
+			return nil, apperrors.ErrAPIKeyNotFound
 		}
 	}
 	if !apiKey.IsActive {
-		return nil, utils.ErrAPIKeyInactive
+		return nil, apperrors.ErrAPIKeyInactive
 	}
 	if userRole != "admin" && apiKey.UserID != userID {
-		return nil, utils.ErrAPIKeyUnauthorized
+		return nil, apperrors.ErrAPIKeyUnauthorized
 	}
 	// Update the API key to set is_active to false
 	if err := r.db.Model(&apiKey).Updates(map[string]any{
@@ -831,7 +833,7 @@ func (r *APIKeyRepository) DeactivateAPIKey(keyID dto.APIKeyIDRequest, userID st
 		return nil, fmt.Errorf("failed to deactivate API key: %w", err)
 	}
 
-	utils.Logger.Info("API key deactivated successfully",
+	logger.Logger.Info("API key deactivated successfully",
 		"user_id", userID,
 		"key_id", keyID,
 		"key_name", apiKey.Name,
@@ -864,12 +866,12 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 		}
 		if err := query.First(&apiKeys).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				return utils.ErrAPIKeyNotFound
+				return apperrors.ErrAPIKeyNotFound
 			}
-			return utils.ErrAPIKeyFailedFetching
+			return apperrors.ErrAPIKeyFailedFetching
 		}
 
-		utils.Logger.Info("Fetching API key usage history",
+		logger.Logger.Info("Fetching API key usage history",
 			"user_id", userID,
 			"key_id", keyID,
 			"key", apiKeys.Key,
@@ -882,10 +884,10 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 		if err := tx.Model(&logging.ActivityLog{}).
 			Where("api_key = ?", apiKeys.Key).
 			Count(&totalCount).Error; err != nil {
-			return utils.ErrActivityLogNotFound
+			return apperrors.ErrActivityLogNotFound
 		}
 
-		utils.Logger.Info("Total activity logs found",
+		logger.Logger.Info("Total activity logs found",
 			"user_id", userID,
 			"key_id", keyID,
 			"key", apiKeys.Key,
@@ -898,7 +900,7 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 			Limit(limit).
 			Order(orderClause).
 			Find(&activityLogs).Error; err != nil {
-			return utils.ErrActivityLogNotFound
+			return apperrors.ErrActivityLogNotFound
 		}
 
 		return nil
@@ -908,7 +910,7 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 		return nil, nil, 0, err
 	}
 
-	utils.Logger.Info("Fetched API key usage history",
+	logger.Logger.Info("Fetched API key usage history",
 		"user_id", userID,
 		"key_id", keyID,
 		"key_name", apiKeys.Name,
@@ -935,7 +937,7 @@ func extractPrefixFromKey(keyID string) string {
 	}
 
 	if lastUnderscore == -1 {
-		return utils.DefaultKeyPrefix // Fallback to default prefix
+		return auth.DefaultKeyPrefix // Fallback to default prefix
 	}
 
 	return keyID[:lastUnderscore]

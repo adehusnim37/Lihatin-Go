@@ -5,7 +5,8 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +15,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	// 1. Bind URI parameter untuk code (required)
 	var codeData dto.CodeRequest
 	if err := ctx.ShouldBindUri(&codeData); err != nil {
-		utils.SendValidationError(ctx, err, &codeData)
+		validator.SendValidationError(ctx, err, &codeData)
 		return
 	}
 
@@ -22,7 +23,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	var passcodeData dto.PasscodeRequest
 	if err := ctx.ShouldBindQuery(&passcodeData); err != nil {
 		passcodeData.Passcode = 0
-		utils.SendValidationError(ctx, err, &passcodeData)
+		validator.SendValidationError(ctx, err, &passcodeData)
 		return
 	}
 
@@ -37,63 +38,63 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	link, err := c.repo.RedirectByShortCode(codeData.Code, ipAddress, userAgent, referer, passcodeData.Passcode)
 	if err != nil {
 		switch err {
-		case utils.ErrShortLinkNotFound:
+		case errors.ErrShortLinkNotFound:
 			ctx.JSON(http.StatusNotFound, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Short link not found",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrPasscodeRequired:
+		case errors.ErrPasscodeRequired:
 			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Passcode required",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrInvalidPasscode:
+		case errors.ErrInvalidPasscode:
 			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Invalid passcode",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrShortLinkUnauthorized:
+		case errors.ErrShortLinkUnauthorized:
 			ctx.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Unauthorized access",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrShortLinkInactive:
+		case errors.ErrShortLinkInactive:
 			ctx.JSON(http.StatusGone, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Short link is inactive",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrShortLinkExpired:
+		case errors.ErrShortLinkExpired:
 			ctx.JSON(http.StatusGone, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Short link has expired",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrLinkIsBanned:
+		case errors.ErrLinkIsBanned:
 			ctx.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "The original URL is banned",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrShortLinkAlreadyDeleted:
+		case errors.ErrShortLinkAlreadyDeleted:
 			ctx.JSON(http.StatusGone, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Short link has already been deleted",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case utils.ErrClickLimitReached:
+		case errors.ErrClickLimitReached:
 			ctx.JSON(http.StatusTooManyRequests, common.APIResponse{
 				Success: false,
 				Data:    nil,

@@ -5,26 +5,27 @@ import (
 	
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
 // GetUserByID retrieves a single user by ID (admin only)
 func (c *Controller) GetUserByID(ctx *gin.Context) {
-	utils.Logger.Info("Admin GetUserByID called")
+	logger.Logger.Info("Admin GetUserByID called")
 	// Bind URI parameters
 	var userID dto.UserIDGenericRequest
 	if err := ctx.ShouldBindUri(&userID); err != nil {
-		utils.SendErrorResponse(ctx, http.StatusBadRequest, "USER_ID_REQUIRED", "User ID is required", "user_id", userID)
+		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "USER_ID_REQUIRED", "User ID is required", "user_id", userID)
 		return
 	}
 
-	utils.Logger.Info("Fetching user by ID", "user_id", userID)
+	logger.Logger.Info("Fetching user by ID", "user_id", userID)
 
 	// Get user from repository
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.ID)
 	if err != nil {
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 

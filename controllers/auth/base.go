@@ -9,8 +9,11 @@ import (
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/utils"
-	"github.com/adehusnim37/lihatin-go/utils/mail"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
 	"github.com/gin-gonic/gin"
 )
 
@@ -101,13 +104,13 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 
 	var req dto.AdminLockUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Validate request
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
@@ -175,7 +178,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	// Validate request if reason is provided
 	if req.Reason != "" {
 		if err := ctx.ShouldBindUri(&req); err != nil {
-			utils.SendValidationError(ctx, err, &req)
+			validator.SendValidationError(ctx, err, &req)
 			return
 		}
 	}
@@ -243,10 +246,10 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	redisClient := sessionManager.GetRedisClient()
 
 	// Validate refresh token from Redis
-	refreshTokenManager := utils.NewRefreshTokenManager(redisClient)
+	refreshTokenManager := auth.NewRefreshTokenManager(redisClient)
 	tokenData, err := refreshTokenManager.GetRefreshToken(context.Background(), refreshTokenCookie)
 	if err != nil {
-		utils.Logger.Warn("Invalid refresh token",
+		logger.Logger.Warn("Invalid refresh token",
 			"error", err.Error(),
 		)
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
@@ -261,7 +264,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	// Get user details
 	user, err := c.repo.GetUserRepository().GetUserByID(tokenData.UserID)
 	if err != nil {
-		utils.Logger.Error("Failed to get user for refresh token",
+		logger.Logger.Error("Failed to get user for refresh token",
 			"user_id", tokenData.UserID,
 			"error", err.Error(),
 		)
@@ -288,7 +291,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 
 	// Generate new JWT token with same session
 	role := user.Role
-	newToken, err := utils.GenerateJWT(
+	newToken, err := auth.GenerateJWT(
 		user.ID,
 		tokenData.SessionID,
 		tokenData.DeviceID,
@@ -312,14 +315,14 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	// Rotate refresh token (delete old, create new) - security best practice
 	err = refreshTokenManager.DeleteRefreshToken(context.Background(), refreshTokenCookie)
 	if err != nil {
-		utils.Logger.Warn("Failed to delete old refresh token",
+		logger.Logger.Warn("Failed to delete old refresh token",
 			"user_id", tokenData.UserID,
 			"error", err.Error(),
 		)
 	}
 
 	// Generate new refresh token
-	newRefreshToken, err := utils.GenerateRefreshToken(
+	newRefreshToken, err := auth.GenerateRefreshToken(
 		context.Background(),
 		redisClient,
 		user.ID,
@@ -328,7 +331,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		tokenData.LastIP,
 	)
 	if err != nil {
-		utils.Logger.Error("Failed to generate new refresh token",
+		logger.Logger.Error("Failed to generate new refresh token",
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
@@ -341,9 +344,9 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Token refreshed successfully",
+	logger.Logger.Info("Token refreshed successfully",
 		"user_id", user.ID,
-		"session_id", utils.GetKeyPreview(tokenData.SessionID),
+		"session_id", auth.GetKeyPreview(tokenData.SessionID),
 	)
 
 	// ✅ Set tokens as HTTP-Only cookies (XSS protection)
@@ -358,7 +361,7 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		newToken,       // value
 		48*60*60,       // maxAge in seconds (48 hours)
 		"/",            // path
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
 		isSecure, // secure (HTTPS only in production)
 		true,     // httpOnly (prevent JavaScript access)
 	)
@@ -369,12 +372,12 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		newRefreshToken, // value
 		168*60*60,       // maxAge in seconds (168 hours = 7 days)
 		"/",             // path
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
 		isSecure, // secure
 		true,     // httpOnly
 	)
 
-	utils.Logger.Info("Tokens rotated and set as HTTP-Only cookies",
+	logger.Logger.Info("Tokens rotated and set as HTTP-Only cookies",
 		"user_id", user.ID,
 		"is_secure", isSecure,
 	)
@@ -406,7 +409,7 @@ func (c *Controller) GetCurrentUser(ctx *gin.Context) {
 	// Get user details
 	user, err := c.repo.GetUserRepository().GetUserByID(userID.(string))
 	if err != nil {
-		utils.Logger.Error("Failed to get user for /me endpoint",
+		logger.Logger.Error("Failed to get user for /me endpoint",
 			"user_id", userID,
 			"error", err.Error(),
 		)
@@ -502,7 +505,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	}
 
 	// Verify current password
-	if err := utils.CheckPassword(userAuth.PasswordHash, req.CurrentPassword); err != nil {
+	if err := auth.CheckPassword(userAuth.PasswordHash, req.CurrentPassword); err != nil {
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -513,7 +516,7 @@ func (c *Controller) ChangePassword(ctx *gin.Context) {
 	}
 
 	// Hash new password
-	hashedPassword, err := utils.HashPassword(req.NewPassword)
+	hashedPassword, err := auth.HashPassword(req.NewPassword)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,

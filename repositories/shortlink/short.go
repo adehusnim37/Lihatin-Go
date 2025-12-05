@@ -9,7 +9,10 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	shortlink "github.com/adehusnim37/lihatin-go/models/shortlink"
-	"github.com/adehusnim37/lihatin-go/utils"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/helpers"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -44,12 +47,12 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	var userIDPtr *string
 	if link.UserID != "" {
 		userIDPtr = &link.UserID
-		utils.Logger.Info("Creating short link for authenticated user",
+		logger.Logger.Info("Creating short link for authenticated user",
 			"user_id", link.UserID,
 			"short_code", link.CustomCode,
 		)
 	} else {
-		utils.Logger.Info("Creating short link for anonymous user",
+		logger.Logger.Info("Creating short link for anonymous user",
 			"short_code", link.CustomCode,
 		)
 	}
@@ -65,22 +68,22 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	}
 
 	if err := r.db.Create(&shortLink).Error; err != nil {
-		utils.Logger.Error("Failed to create short link", "error", err.Error())
+		logger.Logger.Error("Failed to create short link", "error", err.Error())
 		return nil, nil, err
 	}
 
 	shortLinkDetail := shortlink.ShortLinkDetail{
 		ID:          uuid.New().String(),
 		ShortLinkID: shortLink.ID,
-		Passcode:    utils.StringToInt(link.Passcode),
+		Passcode:    helpers.StringToInt(link.Passcode),
 	}
 
 	if err := r.db.Create(&shortLinkDetail).Error; err != nil {
-		utils.Logger.Error("Failed to create short link detail", "error", err.Error())
+		logger.Logger.Error("Failed to create short link detail", "error", err.Error())
 		return nil, nil, err
 	}
 
-	utils.Logger.Info("Short link created successfully",
+	logger.Logger.Info("Short link created successfully",
 		"id", shortLink.ID,
 		"short_code", shortLink.ShortCode,
 		"user_id", link.UserID,
@@ -93,11 +96,11 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 // CreateBulkShortLinks creates multiple short links in a single transaction
 func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRequest) ([]shortlink.ShortLink, []shortlink.ShortLinkDetail, error) {
     if len(links) == 0 {
-        return nil, nil, utils.ErrEmptyBulkLinksList
+        return nil, nil, apperrors.ErrEmptyBulkLinksList
 	}
     
     if len(links) > 15 { // Set reasonable limit
-        return nil, nil, utils.ErrBulkCreateLimitExceeded
+        return nil, nil, apperrors.ErrBulkCreateLimitExceeded
     }
 
     var createdLinks []shortlink.ShortLink
@@ -114,14 +117,14 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
             // Check for duplicate codes within batch
             for j := range i {
                 if links[j].CustomCode == linkReq.CustomCode {
-                    return utils.ErrDuplicateShortCodeInBatch
+                    return apperrors.ErrDuplicateShortCodeInBatch
                 }
             }
 
             // Check existing codes in database
             var existingLink shortlink.ShortLink
             if err := tx.Where("short_code = ?", linkReq.CustomCode).First(&existingLink).Error; err == nil {
-                return utils.ErrDuplicateShortCode
+                return apperrors.ErrDuplicateShortCode
             }
 
             // Handle nullable UserID
@@ -142,7 +145,7 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
             }
 
             if err := tx.Create(&shortLink).Error; err != nil {
-                return utils.ErrShortCreatedFailed
+                return apperrors.ErrShortCreatedFailed
             }
             createdLinks = append(createdLinks, shortLink)
 
@@ -150,11 +153,11 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
             shortLinkDetail := shortlink.ShortLinkDetail{
                 ID:          uuid.New().String(),
                 ShortLinkID: shortLink.ID,
-                Passcode:    utils.StringToInt(linkReq.Passcode),
+                Passcode:    helpers.StringToInt(linkReq.Passcode),
             }
 
             if err := tx.Create(&shortLinkDetail).Error; err != nil {
-                return utils.ErrShortDetailCreatedFailed
+                return apperrors.ErrShortDetailCreatedFailed
             }
             createdDetails = append(createdDetails, shortLinkDetail)
         }
@@ -163,11 +166,11 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
     })
 
     if err != nil {
-        utils.Logger.Error("Failed to create bulk short links", "error", err.Error())
+        logger.Logger.Error("Failed to create bulk short links", "error", err.Error())
         return nil, nil, err
     }
 
-    utils.Logger.Info("Bulk short links created successfully",
+    logger.Logger.Info("Bulk short links created successfully",
         "count", len(createdLinks),
         "user_id", links[0].UserID,
     )
@@ -191,7 +194,7 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 	code := make([]byte, 4)
 	for i := range code {
 		code[i] = encodedString[localRng.Intn(len(encodedString))]
-		utils.Logger.Info("Generated character", "char", string(code[i]))
+		logger.Logger.Info("Generated character", "char", string(code[i]))
 	}
 	return string(code)
 }
@@ -223,12 +226,12 @@ func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, pag
 
 	for _, link := range links {
 		if link.UserID == nil || *link.UserID != userID {
-			utils.Logger.Warn("Unauthorized access attempt to short link",
+			logger.Logger.Warn("Unauthorized access attempt to short link",
 				"short_code", link.ShortCode,
 				"requesting_user", userID,
 				"owner_user", link.UserID,
 			)
-			return nil, utils.ErrShortLinkUnauthorized
+			return nil, apperrors.ErrShortLinkUnauthorized
 		}
 	}
 
@@ -276,14 +279,14 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 	err := r.db.Where("short_code = ?", code).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			utils.Logger.Warn("Short link not found",
+			logger.Logger.Warn("Short link not found",
 				"short_code", code,
 				"ip_address", ipAddress,
 			)
-			return nil, utils.ErrShortLinkNotFound
+			return nil, apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link",
+		logger.Logger.Error("Database error while fetching short link",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -291,36 +294,36 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 	}
 
 	if link.DeletedAt.Valid {
-		utils.Logger.Warn("Deleted short link accessed",
+		logger.Logger.Warn("Deleted short link accessed",
 			"short_code", code,
 			"ip_address", ipAddress,
 		)
-		return nil, utils.ErrShortLinkAlreadyDeleted
+		return nil, apperrors.ErrShortLinkAlreadyDeleted
 	}
 
 	// Check if short link is active
 	if !link.IsActive {
-		utils.Logger.Warn("Inactive short link accessed",
+		logger.Logger.Warn("Inactive short link accessed",
 			"short_code", code,
 			"ip_address", ipAddress,
 		)
-		return nil, utils.ErrShortLinkInactive
+		return nil, apperrors.ErrShortLinkInactive
 	}
 
 	// Check if short link is expired
 	if link.ExpiresAt != nil && link.ExpiresAt.Before(time.Now()) {
-		utils.Logger.Warn("Expired short link accessed",
+		logger.Logger.Warn("Expired short link accessed",
 			"short_code", code,
 			"expires_at", *link.ExpiresAt,
 			"ip_address", ipAddress,
 		)
-		return nil, utils.ErrShortLinkExpired
+		return nil, apperrors.ErrShortLinkExpired
 	}
 
 	// Check passcode if provided
 	var detail shortlink.ShortLinkDetail
 	if err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error; err != nil {
-		utils.Logger.Error("Failed to fetch short link detail",
+		logger.Logger.Error("Failed to fetch short link detail",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -329,43 +332,43 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 
 	// Passcode checks
 	if detail.Passcode != 0 && passcode == 0 {
-		utils.Logger.Warn("Passcode required but not provided",
+		logger.Logger.Warn("Passcode required but not provided",
 			"short_code", code,
 			"ip_address", ipAddress,
 		)
-		return nil, utils.ErrPasscodeRequired
+		return nil, apperrors.ErrPasscodeRequired
 	}
 
 	if detail.Passcode != 0 && passcode != detail.Passcode {
-		utils.Logger.Warn("Invalid passcode attempt",
+		logger.Logger.Warn("Invalid passcode attempt",
 			"short_code", code,
 			"ip_address", ipAddress,
 		)
-		return nil, utils.ErrPasscodeIncorrect
+		return nil, apperrors.ErrPasscodeIncorrect
 	}
 
 	if detail.IsBanned {
-		utils.Logger.Warn("Banned short link accessed",
+		logger.Logger.Warn("Banned short link accessed",
 			"short_code", code,
 			"ip_address", ipAddress,
 			"banned_reason", detail.BannedReason,
 		)
 
-		return nil, fmt.Errorf("%w: %s", utils.ErrLinkIsBanned, detail.BannedReason)
+		return nil, fmt.Errorf("%w: %s", apperrors.ErrLinkIsBanned, detail.BannedReason)
 	}
 
 	if detail.ClickLimit > 0 && detail.CurrentClicks >= detail.ClickLimit {
-		utils.Logger.Warn("Click limit reached",
+		logger.Logger.Warn("Click limit reached",
 			"short_code", code,
 			"ip_address", ipAddress,
 		)
-		return nil, utils.ErrClickLimitReached
+		return nil, apperrors.ErrClickLimitReached
 	}
 
 	detail.CurrentClicks++
 	detail.UpdatedAt = time.Now()
 	if err := r.db.Save(&detail).Error; err != nil {
-		utils.Logger.Error("Failed to update short link detail",
+		logger.Logger.Error("Failed to update short link detail",
 			"short_code", code,
 			"ip_address", ipAddress,
 			"error", err.Error(),
@@ -381,13 +384,13 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 			IPAddress:   ipAddress,
 			UserAgent:   userAgent,
 			Referer:     referer,
-			Country:     utils.GetCountryName(ipAddress), // Placeholder function
-			City:        utils.GetCityName(ipAddress),    // Placeholder function
+			Country:     ip.GetCountryName(ipAddress), // Placeholder function
+			City:        ip.GetCityName(ipAddress),    // Placeholder function
 			ClickedAt:   time.Now(),
 		}
 
 		if err := r.db.Create(&viewDetail).Error; err != nil {
-			utils.Logger.Error("Failed to track click",
+			logger.Logger.Error("Failed to track click",
 				"short_code", code,
 				"ip_address", ipAddress,
 				"error", err.Error(),
@@ -409,9 +412,9 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 		err = r.db.Where("short_code = ? AND user_id = ?", code, userID).First(&link).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -419,20 +422,20 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 		}
 		// Check ownership
 		if link.UserID == nil || *link.UserID != userID {
-			utils.Logger.Warn("Unauthorized access attempt to short link",
+			logger.Logger.Warn("Unauthorized access attempt to short link",
 				"short_code", code,
 				"requesting_user", userID,
 				"owner_user", link.UserID,
 			)
-			return nil, utils.ErrShortLinkUnauthorized
+			return nil, apperrors.ErrShortLinkUnauthorized
 		}
 	} else {
 		err = r.db.Where("short_code = ?", code).First(&link).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -444,13 +447,13 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 	err = r.db.Where("short_link_id = ?", link.ID).First(&detail).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			utils.Logger.Error("Short link detail not found",
+			logger.Logger.Error("Short link detail not found",
 				"short_code", code,
 				"short_link_id", link.ID,
 			)
-			return nil, utils.ErrShortLinkNotFound
+			return nil, apperrors.ErrShortLinkNotFound
 		}
-		utils.Logger.Error("Database error while fetching short link detail",
+		logger.Logger.Error("Database error while fetching short link detail",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -464,7 +467,7 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 			Limit(10).
 			Find(&recentViews).Error
 		if err != nil {
-			utils.Logger.Error("Database error while fetching recent views",
+			logger.Logger.Error("Database error while fetching recent views",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -538,9 +541,9 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		err := r.db.Where("short_code = ? AND user_id = ?", code, userId).First(&link).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -550,9 +553,9 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		err := r.db.Where("short_code = ?", code).First(&link).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -643,9 +646,9 @@ func (r *ShortLinkRepository) GetStatsAllShortLinks(userId string, userRole stri
 		err := r.db.Where("user_id = ?", userId).Order(orderClause).Offset(offset).Limit(limit).Find(&links).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short links",
+			logger.Logger.Error("Database error while fetching short links",
 				"user_id", userId,
 				"error", err.Error(),
 			)
@@ -655,9 +658,9 @@ func (r *ShortLinkRepository) GetStatsAllShortLinks(userId string, userRole stri
 		err := r.db.Order(orderClause).Offset(offset).Limit(limit).Find(&links).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short links",
+			logger.Logger.Error("Database error while fetching short links",
 				"error", err.Error(),
 			)
 			return nil, err
@@ -730,9 +733,9 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 		err := r.db.Where("short_code = ? AND user_id = ?", code, userID).First(&link).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -742,9 +745,9 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 		err := r.db.Where("short_code = ?", code).First(&link).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, utils.ErrShortLinkNotFound
+				return nil, apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -756,13 +759,13 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 	err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			utils.Logger.Error("Short link detail not found",
+			logger.Logger.Error("Short link detail not found",
 				"short_code", code,
 				"short_link_id", link.ID,
 			)
-			return nil, utils.ErrShortLinkNotFound
+			return nil, apperrors.ErrShortLinkNotFound
 		}
-		utils.Logger.Error("Database error while fetching short link detail",
+		logger.Logger.Error("Database error while fetching short link detail",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -793,7 +796,7 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 		Limit(limit).
 		Find(&viewDetails).Error
 	if err != nil {
-		utils.Logger.Error("Database error while fetching paginated views",
+		logger.Logger.Error("Database error while fetching paginated views",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -876,7 +879,7 @@ func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (bool, error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil // Code does not exist
 		}
-		utils.Logger.Error("Database error while checking short code",
+		logger.Logger.Error("Database error while checking short code",
 			"short_code", code.Code,
 			"error", err.Error(),
 		)
@@ -903,7 +906,7 @@ func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in 
 	if err := q.First(&link).Error; err != nil {
 		tx.Rollback()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 		return err
 	}
@@ -934,7 +937,7 @@ func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in 
 
 	detailUpd := map[string]any{}
 	if in.Passcode != nil {
-		detailUpd["passcode"] = utils.StringToInt(*in.Passcode)
+		detailUpd["passcode"] = helpers.StringToInt(*in.Passcode)
 	}
 	if in.ClickLimit != nil {
 		detailUpd["click_limit"] = *in.ClickLimit
@@ -969,10 +972,10 @@ func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passco
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return utils.ErrShortLinkNotFound
+				return apperrors.ErrShortLinkNotFound
 			}
 
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -981,7 +984,7 @@ func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passco
 
 		// Validate passcode if set
 		if link.Detail.Passcode != 0 && link.Detail.Passcode != passcode {
-			return utils.ErrPasscodeIncorrect
+			return apperrors.ErrPasscodeIncorrect
 		}
 	} else {
 		err := r.db.Where("short_code = ?", code).
@@ -989,10 +992,10 @@ func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passco
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return utils.ErrShortLinkNotFound
+				return apperrors.ErrShortLinkNotFound
 			}
 
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1001,11 +1004,11 @@ func (r *ShortLinkRepository) DeleteShortLink(code string, userID string, passco
 	}
 
 	if link.DeletedAt.Valid {
-		return utils.ErrShortLinkAlreadyDeleted
+		return apperrors.ErrShortLinkAlreadyDeleted
 	}
 
 	if err := r.db.Where("short_code = ?", link.ShortCode).Delete(&link).Error; err != nil {
-		utils.Logger.Error("Failed to delete short link",
+		logger.Logger.Error("Failed to delete short link",
 			"short_code", link.ShortCode,
 			"error", err.Error(),
 		)
@@ -1019,12 +1022,12 @@ func (r *ShortLinkRepository) DeleteShortsLink(req *dto.BulkDeleteRequest) error
 	var links []shortlink.ShortLink
 
 	if len(req.Codes) == 0 {
-		return utils.ErrEmptyCodesList
+		return apperrors.ErrEmptyCodesList
 	}
 
 	// perform a check to see if all codes exist
 	if err := r.db.Where("short_code IN ?", req.Codes).Find(&links).Error; err != nil {
-		utils.Logger.Error("Failed to fetch short links for bulk delete",
+		logger.Logger.Error("Failed to fetch short links for bulk delete",
 			"short_codes", req.Codes,
 			"error", err.Error(),
 		)
@@ -1032,11 +1035,11 @@ func (r *ShortLinkRepository) DeleteShortsLink(req *dto.BulkDeleteRequest) error
 	}
 
 	if len(req.Codes) != len(links) {
-		return utils.ErrSomeShortLinksNotFound
+		return apperrors.ErrSomeShortLinksNotFound
 	}
 	// Perform bulk delete
 	if err := r.db.Where("short_code IN ?", req.Codes).Delete(&shortlink.ShortLink{}).Error; err != nil {
-		utils.Logger.Error("Failed to delete short links",
+		logger.Logger.Error("Failed to delete short links",
 			"short_codes", req.Codes,
 			"error", err.Error(),
 		)
@@ -1050,7 +1053,7 @@ func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy s
 	var shortLinks []shortlink.ShortLink
 	var totalCount int64
 
-	utils.Logger.Info("Fetching all short links for admin",
+	logger.Logger.Info("Fetching all short links for admin",
 		"page", page,
 		"limit", limit,
 		"sort", sort,
@@ -1059,7 +1062,7 @@ func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy s
 
 	// Get total count (without joins for better performance)
 	if err := r.db.Model(&shortlink.ShortLink{}).Count(&totalCount).Error; err != nil {
-		utils.Logger.Error("Failed to count short links", "error", err.Error())
+		logger.Logger.Error("Failed to count short links", "error", err.Error())
 		return nil, err
 	}
 
@@ -1075,7 +1078,7 @@ func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy s
 		Limit(limit).
 		Offset(offset).
 		Find(&shortLinks).Error; err != nil {
-		utils.Logger.Error("Failed to fetch short links", "error", err.Error())
+		logger.Logger.Error("Failed to fetch short links", "error", err.Error())
 		return nil, err
 	}
 
@@ -1127,7 +1130,7 @@ func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy s
 	// Calculate total pages
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	utils.Logger.Info("Successfully fetched short links for admin",
+	logger.Logger.Info("Successfully fetched short links for admin",
 		"total_count", totalCount,
 		"returned_count", len(shortLinkResponses),
 		"total_pages", totalPages,
@@ -1151,10 +1154,10 @@ func (r *ShortLinkRepository) BannedShortByAdmin(request *dto.BannedRequest, use
 	err := r.db.Where("short_code = ?", code.Code).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link",
+		logger.Logger.Error("Database error while fetching short link",
 			"short_code", code.Code,
 			"error", err.Error(),
 		)
@@ -1166,10 +1169,10 @@ func (r *ShortLinkRepository) BannedShortByAdmin(request *dto.BannedRequest, use
 	err = r.db.Where("short_link_id = ?", link.ID).First(&detail).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link detail",
+		logger.Logger.Error("Database error while fetching short link detail",
 			"short_link_id", link.ID,
 			"error", err.Error(),
 		)
@@ -1182,7 +1185,7 @@ func (r *ShortLinkRepository) BannedShortByAdmin(request *dto.BannedRequest, use
 	detail.BannedReason = request.Reason
 
 	if err := r.db.Save(&link).Error; err != nil {
-		utils.Logger.Error("Failed to update short link",
+		logger.Logger.Error("Failed to update short link",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -1190,7 +1193,7 @@ func (r *ShortLinkRepository) BannedShortByAdmin(request *dto.BannedRequest, use
 	}
 
 	if err := r.db.Save(&detail).Error; err != nil {
-		utils.Logger.Error("Failed to update short link detail",
+		logger.Logger.Error("Failed to update short link detail",
 			"short_link_id", link.ID,
 			"error", err.Error(),
 		)
@@ -1207,10 +1210,10 @@ func (r *ShortLinkRepository) RestoreShortByAdmin(code string) error {
 	err := r.db.Where("short_code = ?", code).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link",
+		logger.Logger.Error("Database error while fetching short link",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -1223,10 +1226,10 @@ func (r *ShortLinkRepository) RestoreShortByAdmin(code string) error {
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link detail",
+		logger.Logger.Error("Database error while fetching short link detail",
 			"short_link_id", link.ID,
 			"error", err.Error(),
 		)
@@ -1238,7 +1241,7 @@ func (r *ShortLinkRepository) RestoreShortByAdmin(code string) error {
 	detail.BannedReason = ""
 
 	if err := r.db.Save(&link).Error; err != nil {
-		utils.Logger.Error("Failed to update short link",
+		logger.Logger.Error("Failed to update short link",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -1246,7 +1249,7 @@ func (r *ShortLinkRepository) RestoreShortByAdmin(code string) error {
 	}
 
 	if err := r.db.Save(&detail).Error; err != nil {
-		utils.Logger.Error("Failed to update short link detail",
+		logger.Logger.Error("Failed to update short link detail",
 			"short_link_id", link.ID,
 			"error", err.Error(),
 		)
@@ -1262,10 +1265,10 @@ func (r *ShortLinkRepository) RestoreDeletedShortByAdmin(code string) error {
 	err := r.db.Unscoped().Where("short_code = ?", code).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link",
+		logger.Logger.Error("Database error while fetching short link",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -1273,13 +1276,13 @@ func (r *ShortLinkRepository) RestoreDeletedShortByAdmin(code string) error {
 	}
 
 	if !link.DeletedAt.Valid {
-		return utils.ErrShortIsNotDeleted
+		return apperrors.ErrShortIsNotDeleted
 	}
 
 	link.DeletedAt = gorm.DeletedAt{Valid: false}
 
 	if err := r.db.Unscoped().Save(&link).Error; err != nil {
-		utils.Logger.Error("Failed to restore deleted short link",
+		logger.Logger.Error("Failed to restore deleted short link",
 			"short_code", code,
 			"error", err.Error(),
 		)
@@ -1300,9 +1303,9 @@ func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, n
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return utils.ErrShortLinkNotFound
+				return apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1311,7 +1314,7 @@ func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, n
 
 		// Validate old passcode
 		if link.Detail.Passcode != oldPasscode {
-			return utils.ErrPasscodeIncorrect
+			return apperrors.ErrPasscodeIncorrect
 		}
 
 		link.Detail.Passcode = newPasscode
@@ -1319,7 +1322,7 @@ func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, n
 		// Update the detail record
 		err = r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", link.Detail.ID).Update("passcode", newPasscode).Error
 		if err != nil {
-			utils.Logger.Error("Failed to update passcode",
+			logger.Logger.Error("Failed to update passcode",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1334,9 +1337,9 @@ func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, n
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return utils.ErrShortLinkNotFound
+				return apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1348,7 +1351,7 @@ func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, n
 		// Update the detail record
 		err = r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", link.Detail.ID).Update("passcode", newPasscode).Error
 		if err != nil {
-			utils.Logger.Error("Failed to update passcode",
+			logger.Logger.Error("Failed to update passcode",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1369,9 +1372,9 @@ func (r *ShortLinkRepository) ForgotPasscodeShortLink(code string, newPasscode i
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return utils.ErrShortLinkNotFound
+				return apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1386,9 +1389,9 @@ func (r *ShortLinkRepository) ForgotPasscodeShortLink(code string, newPasscode i
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return utils.ErrShortLinkNotFound
+				return apperrors.ErrShortLinkNotFound
 			}
-			utils.Logger.Error("Database error while fetching short link",
+			logger.Logger.Error("Database error while fetching short link",
 				"short_code", code,
 				"error", err.Error(),
 			)
@@ -1406,7 +1409,7 @@ func (r *ShortLinkRepository) ValidatePasscodeToken(token string) (*shortlink.Sh
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil // Token not found
 		}
-		utils.Logger.Error("Database error while validating passcode token",
+		logger.Logger.Error("Database error while validating passcode token",
 			"token", token,
 			"error", err.Error(),
 		)
@@ -1425,10 +1428,10 @@ func (r *ShortLinkRepository) setPasscodeToken(userID string, linkID uint, token
 	err := r.db.Where("short_link_id = ?", linkID).First(&detail).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return utils.ErrShortLinkNotFound
+			return apperrors.ErrShortLinkNotFound
 		}
 
-		utils.Logger.Error("Database error while fetching short link detail",
+		logger.Logger.Error("Database error while fetching short link detail",
 			"short_link_id", linkID,
 			"error", err.Error(),
 		)
@@ -1437,7 +1440,7 @@ func (r *ShortLinkRepository) setPasscodeToken(userID string, linkID uint, token
 	detail.PasscodeTokenExpiresAt = expiresAt
 
 	if err := r.db.Save(&detail).Error; err != nil {
-		utils.Logger.Error("Failed to set passcode token",
+		logger.Logger.Error("Failed to set passcode token",
 			"short_link_id", linkID,
 			"error", err.Error(),
 		)

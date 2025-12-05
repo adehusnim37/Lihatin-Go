@@ -3,7 +3,7 @@ package admin
 import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/utils/mail"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
 )
 
 // Controller handles email-related authentication operations

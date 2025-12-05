@@ -7,8 +7,12 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/utils"
-	clientip "github.com/adehusnim37/lihatin-go/utils/clientip"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,14 +21,14 @@ import (
 func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	var req dto.VerifyTOTPLoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.SendValidationError(ctx, err, &req)
+		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
 	// Validate pending auth token and get userID
-	userID, err := utils.ValidatePendingAuthToken(context.Background(), req.PendingAuthToken)
+	userID, err := auth.ValidatePendingAuthToken(context.Background(), req.PendingAuthToken)
 	if err != nil {
-		utils.Logger.Warn("Invalid pending auth token for TOTP login",
+		logger.Logger.Warn("Invalid pending auth token for TOTP login",
 			"error", err.Error(),
 		)
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
@@ -39,56 +43,56 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	// Get user and auth info
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
-		utils.Logger.Error("Failed to get user for TOTP login",
+		logger.Logger.Error("Failed to get user for TOTP login",
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
 	if err != nil {
-		utils.Logger.Error("Failed to get user auth for TOTP login",
+		logger.Logger.Error("Failed to get user auth for TOTP login",
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
 	// Get TOTP secret
 	encryptedSecret, err := c.repo.GetAuthMethodRepository().GetTOTPSecret(userAuth.ID)
 	if err != nil {
-		utils.Logger.Error("Failed to get TOTP secret for login",
+		logger.Logger.Error("Failed to get TOTP secret for login",
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	secret, err := utils.DecryptTOTPSecret(encryptedSecret)
+	secret, err := auth.DecryptTOTPSecret(encryptedSecret)
 	if err != nil {
-		utils.Logger.Error("Failed to decrypt TOTP secret for login",
+		logger.Logger.Error("Failed to decrypt TOTP secret for login",
 			"user_id", userID,
 			"error", err.Error(),
 		)
-		utils.HandleError(ctx, err, userID)
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
 	// Validate TOTP code
-	if !utils.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1) {
-		utils.Logger.Warn("Invalid TOTP code during login",
+	if !auth.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1) {
+		logger.Logger.Warn("Invalid TOTP code during login",
 			"user_id", userID,
 		)
-		utils.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_TOTP", "Invalid verification code", "totp")
+		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_TOTP", "Invalid verification code", "totp")
 		return
 	}
 
 	// TOTP verified! Now issue JWT tokens (same as normal login)
-	deviceID, lastIP := clientip.GetDeviceAndIPInfo(ctx)
+	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
 
 	// Create session in Redis
 	sessionID, err := middleware.CreateSession(
@@ -100,7 +104,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		*deviceID,
 	)
 	if err != nil {
-		utils.Logger.Error("Failed to create session after TOTP verification",
+		logger.Logger.Error("Failed to create session after TOTP verification",
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
@@ -112,14 +116,14 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
-	utils.Logger.Info("Session created after TOTP verification",
+	logger.Logger.Info("Session created after TOTP verification",
 		"user_id", user.ID,
-		"session_preview", utils.GetKeyPreview(sessionID),
+		"session_preview", auth.GetKeyPreview(sessionID),
 		"device_id", *deviceID,
 	)
 
 	// Generate JWT token
-	token, err := utils.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, user.Role, user.IsPremium, userAuth.IsEmailVerified)
+	token, err := auth.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, user.Role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -132,7 +136,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 
 	// Generate refresh token
 	sessionManager := middleware.GetSessionManager()
-	refreshToken, err := utils.GenerateRefreshToken(
+	refreshToken, err := auth.GenerateRefreshToken(
 		context.Background(),
 		sessionManager.GetRedisClient(),
 		user.ID,
@@ -141,7 +145,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		*lastIP,
 	)
 	if err != nil {
-		utils.Logger.Error("Failed to generate refresh token after TOTP",
+		logger.Logger.Error("Failed to generate refresh token after TOTP",
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
@@ -167,7 +171,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 
 	// Update TOTP auth method last_used_at
 	if err := c.repo.GetAuthMethodRepository().UpdateTOTPLastUsed(userAuth.ID); err != nil {
-		utils.Logger.Warn("Failed to update TOTP last_used_at",
+		logger.Logger.Warn("Failed to update TOTP last_used_at",
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
@@ -187,9 +191,9 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	ctx.SetCookie(
 		"access_token",
 		token,
-		utils.GetEnvAsInt(utils.EnvJWTExpired, 24)*3600,
+		config.GetEnvAsInt(config.EnvJWTExpired, 24)*3600,
 		"/",
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"),
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"),
 		isSecure,
 		true,
 	)
@@ -197,14 +201,14 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	ctx.SetCookie(
 		"refresh_token",
 		refreshToken,
-		utils.GetEnvAsInt(utils.EnvRefreshTokenExpired, 168)*3600,
+		config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168)*3600,
 		"/",
-		utils.GetEnvOrDefault(utils.EnvDomain, "localhost"),
+		config.GetEnvOrDefault(config.EnvDomain, "localhost"),
 		isSecure,
 		true,
 	)
 
-	utils.Logger.Info("TOTP login successful, tokens issued",
+	logger.Logger.Info("TOTP login successful, tokens issued",
 		"user_id", user.ID,
 		"secure", isSecure,
 	)
@@ -230,5 +234,5 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		},
 	}
 
-	utils.SendOKResponse(ctx, responseData, "Two-factor authentication successful. Welcome back!")
+	httputil.SendOKResponse(ctx, responseData, "Two-factor authentication successful. Welcome back!")
 }
