@@ -2,7 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
@@ -10,63 +9,36 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
 	"github.com/adehusnim37/lihatin-go/controllers/logger"
 	"github.com/adehusnim37/lihatin-go/controllers/shortlink"
+	pkgauth "github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/csrf"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
-// CORS middleware
-func CORSMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Get allowed origins from environment or use default
-		allowedOrigins := config.GetEnvOrDefault(config.EnvAllowedOrigins, "http://localhost:3000,http://localhost:3001")
-		origins := strings.Split(allowedOrigins, ",")
-
-		origin := c.Request.Header.Get("Origin")
-
-		// Check if origin is allowed
-		originAllowed := false
-		for _, allowedOrigin := range origins {
-			if strings.TrimSpace(allowedOrigin) == origin {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-				originAllowed = true
-				break
-			}
-		}
-
-		// If no specific origin matched but we have origins configured, still allow for development
-		if !originAllowed && origin != "" {
-			// For development, allow localhost origins
-			if strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1") {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			}
-		}
-
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-API-Key")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	}
-}
-
 func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Inisialisasi router Gin default (sudah include logger & recovery middleware)
 	r := gin.Default()
 
 	// Apply CORS middleware first
-	r.Use(CORSMiddleware())
+	r.Use(pkgauth.CORSMiddleware())
+
+	// Apply CSRF middleware (only in production)
+	env := config.GetEnvOrDefault("ENV", "development")
+	if env == "production" {
+		csrfOpts := csrf.DefaultOptions()
+		// Skip CSRF untuk webhook dan API key authenticated routes
+		csrfOpts.SkipPaths = []string{
+			"/v1/webhook",
+			"/v1/public",
+		}
+		r.Use(csrf.Middleware(csrfOpts))
+	}
 
 	// Initialize GORM for new auth repositories
 	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
@@ -94,13 +66,22 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Apply global middleware for activity logging
 	r.Use(middleware.ActivityLogger(loggerRepo))
 
-	// Initialize login attempts cleanup scheduler
-	// log.Println("Starting login attempts cleanup scheduler...")
-	// go jobs.RunCleanupScheduler(context.Background(), loginAttemptRepo, 24*time.Hour, 0)
-	// log.Println("✅ Login attempts cleanup scheduler succeeded.")
-
 	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")
+
+	// CSRF Token endpoint (untuk SPA fetch token)
+	v1.GET("/csrf-token", func(c *gin.Context) {
+		token := csrf.GetMaskedToken(c)
+		c.JSON(http.StatusOK, common.APIResponse{
+			Success: true,
+			Data: gin.H{
+				"csrfToken": token,
+			},
+			Message: "CSRF token generated",
+			Error:   nil,
+		})
+	})
+
 	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, emailController, totpController, baseController)
 	RegisterLoggerRoutes(v1, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, authRepo)

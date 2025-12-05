@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -80,7 +80,7 @@ func (r *UserAuthRepository) SetEmailVerificationToken(userID, token string, sou
 	if len(expiry) > 0 {
 		expiresAt = expiry[0]
 	} else {
-		expiresAt = time.Now().Add(time.Duration(config.GetEnvAsInt("EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS", 2)) * time.Hour)
+		expiresAt = time.Now().Add(time.Duration(config.GetEnvAsInt(config.EnvEmailVerificationExpiry, 2)) * time.Hour)
 	}
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
@@ -515,7 +515,7 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 // UpdateLastLogin updates last login timestamp
 func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) error {
 	now := time.Now()
-	
+
 	// Update user auth fields
 	if err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
@@ -529,7 +529,7 @@ func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) er
 		}).Error; err != nil {
 		return apperrors.ErrUserAuthUpdateFailed
 	}
-	
+
 	return nil
 }
 
@@ -728,7 +728,6 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 	}
 
 	result = ur.db.Model(&userAuth).Updates(map[string]any{
-		"session_id":     nil,
 		"device_id":      nil,
 		"last_logout_at": time.Now(),
 	})

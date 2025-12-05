@@ -3,19 +3,18 @@ package auth
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
+	"github.com/adehusnim37/lihatin-go/middleware"
+	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -93,18 +92,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 
-	jwtExpiredHours, err := strconv.Atoi(config.GetRequiredEnv("JWT_EXPIRED"))
-	if err != nil {
-		httputil.SendErrorResponse(
-			ctx,
-			http.StatusInternalServerError,
-			"Registration failed",
-			"Failed to parse JWT_EXPIRED",
-			"JWT_EXPIRED_PARSING_FAILED",
-			map[string]string{"server": "Failed to parse JWT_EXPIRED"},
-		)
-		return
-	}
+	jwtExpiredHours := config.GetEnvAsInt(config.EnvJWTExpired, 24)
 	expirationTime := time.Now().Add(time.Duration(jwtExpiredHours) * time.Hour)
 
 	// Get device and IP info

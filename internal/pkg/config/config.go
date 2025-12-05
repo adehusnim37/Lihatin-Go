@@ -107,4 +107,12 @@ const (
 	EnvSessionTTL          = "SESSION_TTL_HOURS"
 	EnvAllowedOrigins      = "ALLOWED_ORIGINS"
 	EnvDomain              = "DOMAIN"
+	Env                    = "ENV"
+
+	// Security
+	EnvCSRFSecret = "CSRF_SECRET"
+	EnvRateLimit  = "RATE_LIMIT"
+
+	// Email
+	EnvEmailVerificationExpiry = "EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS"
 )

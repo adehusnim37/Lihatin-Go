@@ -40,7 +40,7 @@ type LocationResponse struct {
 }
 
 func IPGeolocation(ip string) (*LocationResponse, error) {
-	APIKey := config.GetRequiredEnv("IP_GEOLOCATION_API_KEY")
+	APIKey := config.GetRequiredEnv(config.EnvIPGeoAPIKey)
 	url := `https://api.ipgeolocation.io/v2/ipgeo?apiKey=` + APIKey + `&ip=` + ip
 	method := "GET"
 
