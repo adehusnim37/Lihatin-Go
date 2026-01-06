@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -52,7 +52,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 				Message: "Passcode required",
 				Error:   map[string]string{"details": err.Error()},
 			})
-		case errors.ErrInvalidPasscode:
+		case errors.ErrInvalidPasscode, errors.ErrPasscodeIncorrect:
 			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
