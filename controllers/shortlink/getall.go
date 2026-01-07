@@ -49,7 +49,7 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	)
 
 	// ✅ SMART FILTERING: Choose repository method based on role
-	var paginatedResponse interface{}
+	var paginatedResponse any
 	var repositoryErr error
 
 	if userRoleStr == "admin" {

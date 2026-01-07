@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/adehusnim37/lihatin-go/internal/jobs"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/migrations"
 	appvalidator "github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/routes"
@@ -15,10 +17,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/migrations"
 )
-
-
 
 func main() {
 
@@ -59,6 +58,16 @@ func main() {
 	} else {
 		log.Println("✅ Session manager initialized successfully!")
 	}
+
+	log.Println("🔁 Initializing scheduler...")
+	scheduler := jobs.NewScheduler(gormDB)
+	log.Println("⬇️ Registering jobs...")
+	scheduler.Register(jobs.NewDeactivateExpiredLinksJob(gormDB))
+	scheduler.Register(jobs.NewCleanupLoginAttemptsJob(gormDB))
+	log.Println("⬇ Starting scheduler...")
+	scheduler.Start()
+	log.Println("✅ Scheduler started successfully!")
+	defer scheduler.Stop()
 
 	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()
