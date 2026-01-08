@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	httpPkg "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
@@ -35,12 +35,7 @@ func (c *Controller) DeleteShortLink(ctx *gin.Context) {
 				"passcode", deleteData.Passcode,
 				"error", err.Error(),
 			)
-			ctx.JSON(http.StatusBadRequest, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Invalid passcode format",
-				Error:   map[string]string{"passcode": "Passcode harus berupa angka"},
-			})
+			httpPkg.SendErrorResponse(ctx, http.StatusBadRequest, "Invalid passcode format", "passcode", "Passcode harus berupa angka")
 			return
 		}
 	}
@@ -50,43 +45,18 @@ func (c *Controller) DeleteShortLink(ctx *gin.Context) {
 			"short_code", shortCode,
 			"error", err.Error(),
 		)
-		switch {
-		case err == errors.ErrShortLinkNotFound:
-			ctx.JSON(http.StatusNotFound, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to delete short link",
-				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
-			})
-		case err == errors.ErrShortLinkUnauthorized:
-			ctx.JSON(http.StatusForbidden, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to delete short linkq",
-				Error:   map[string]string{"code": "Anda tidak memiliki akses ke link ini"},
-			})
-		case err == errors.ErrShortLinkAlreadyDeleted:
-			ctx.JSON(http.StatusGone, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to delete short link",
-				Error:   map[string]string{"code": "Link dengan kode tersebut sudah dihapus/tidak ditemukan."},
-			})
+		switch err {
+		case errors.ErrShortLinkNotFound:
+			httpPkg.SendErrorResponse(ctx, http.StatusNotFound, "Failed to delete short link", "code", "Link dengan kode tersebut tidak ditemukan")
+		case errors.ErrShortLinkUnauthorized:
+			httpPkg.SendErrorResponse(ctx, http.StatusForbidden, "Failed to delete short link", "code", "Anda tidak memiliki akses ke link ini")
+		case errors.ErrShortLinkAlreadyDeleted:
+			httpPkg.SendErrorResponse(ctx, http.StatusGone, "Failed to delete short link", "code", "Link dengan kode tersebut sudah dihapus/tidak ditemukan")
 		default:
-			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to retrieve short link stats",
-				Error:   map[string]string{"code": "Terjadi kesalahan pada server"},
-			})
+			httpPkg.SendErrorResponse(ctx, http.StatusInternalServerError, "Failed to delete short link", "code", "Terjadi kesalahan pada server")
 		}
 		return
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    deleteData,
-		Message: "Short link updated successfully",
-		Error:   nil,
-	})
+	httpPkg.SendOKResponse(ctx, nil, "Short link deleted successfully")
 }

@@ -5,7 +5,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/models/common"
+	httpPkg "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,30 +18,15 @@ func (c *Controller) CheckShortLink(ctx *gin.Context) {
 
 	exists, err := c.repo.CheckShortCode(&codeData)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to check short link",
-			Error:   map[string]string{"details": "Internal server error"},
-		})
+		httpPkg.SendErrorResponse(ctx, http.StatusInternalServerError, "Failed to check short link", "Connection", "There's an error on our end. Please try again later.")
 		return
 	}
 
 	// Check the boolean return value - if exists is false, the code doesn't exist
 	if !exists {
-		ctx.JSON(http.StatusNotFound, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Short code does not exist.",
-			Error:   map[string]string{"details": "short link not found"},
-		})
+		httpPkg.SendErrorResponse(ctx, http.StatusNotFound, "Short code does not exist.", "code", "Short code does not exist.")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    nil,
-		Message: "Short code exists.",
-		Error:   nil,
-	})
+	httpPkg.SendOKResponse(ctx, nil, "Short code exists.")
 }

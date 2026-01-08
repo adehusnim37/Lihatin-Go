@@ -221,6 +221,7 @@ func formatIndonesianMessage(err validator.FieldError, fieldLabel string) string
 }
 
 // SendValidationError sends formatted validation error response
+// Uses common.APIResponse format for consistency with other API responses
 func SendValidationError(c *gin.Context, err error, structPtr interface{}) {
 	var result ValidationResponse
 
@@ -245,11 +246,12 @@ func SendValidationError(c *gin.Context, err error, structPtr interface{}) {
 		}
 	}
 
+	// Use common.APIResponse format for consistency
 	c.JSON(result.Status, gin.H{
 		"success": result.Success,
+		"data":    nil,
 		"message": result.Message,
-		"errors":  result.ErrorMap,
-		"details": result.Details,
+		"error":   result.ErrorMap, // Use 'error' instead of 'errors' to match common.APIResponse
 	})
 }
 
