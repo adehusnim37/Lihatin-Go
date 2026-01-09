@@ -275,7 +275,7 @@ func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, pag
 	return response, nil
 }
 
-func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAgent, referer string, passcode int) (*shortlink.ShortLink, error) {
+func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAgent, referer, device, browser, os string, passcode int) (*shortlink.ShortLink, error) {
 	var link shortlink.ShortLink
 	// Find the short link by code with proper validation
 	err := r.db.Where("short_code = ?", code).First(&link).Error
@@ -367,9 +367,13 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		return nil, apperrors.ErrClickLimitReached
 	}
 
-	detail.CurrentClicks++
-	detail.UpdatedAt = time.Now()
-	if err := r.db.Save(&detail).Error; err != nil {
+	// Atomic increment for click count using GORM expression
+	if err := r.db.Model(&shortlink.ShortLinkDetail{}).
+		Where("id = ?", detail.ID).
+		Updates(map[string]interface{}{
+			"current_clicks": gorm.Expr("current_clicks + ?", 1),
+			"updated_at":     time.Now(),
+		}).Error; err != nil {
 		logger.Logger.Error("Failed to update short link detail",
 			"short_code", code,
 			"ip_address", ipAddress,
@@ -378,16 +382,24 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		return nil, apperrors.ErrShortDetailUpdateFailed.WithError(err)
 	}
 
-	// Track the click with basic info
+	link.Detail = &detail // Attach detail to link so it's fresh if needed
+
+	// Track the click with basic info in background
 	go func() {
+		// Use GetLocation once to avoid double API calls and potential blocking
+		country, city := ip.GetLocation(ipAddress)
+
 		viewDetail := shortlink.ViewLinkDetail{
 			ID:          uuid.New().String(),
 			ShortLinkID: link.ID,
 			IPAddress:   ipAddress,
 			UserAgent:   userAgent,
 			Referer:     referer,
-			Country:     ip.GetCountryName(ipAddress), // Placeholder function
-			City:        ip.GetCityName(ipAddress),    // Placeholder function
+			Country:     country,
+			City:        city,
+			Device:      device,
+			Browser:     browser,
+			OS:          os,
 			ClickedAt:   time.Now(),
 		}
 
@@ -398,6 +410,11 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 				"error", err.Error(),
 			)
 		}
+
+		logger.Logger.Info("Click tracked successfully",
+			"short_code", code,
+			"ip_address", ipAddress,
+		)
 	}()
 
 	return &link, nil

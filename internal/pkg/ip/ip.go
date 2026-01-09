@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/gin-gonic/gin"
@@ -40,11 +41,17 @@ type LocationResponse struct {
 }
 
 func IPGeolocation(ip string) (*LocationResponse, error) {
-	APIKey := config.GetRequiredEnv(config.EnvIPGeoAPIKey)
+	APIKey := config.GetEnvOrDefault(config.EnvIPGeoAPIKey, "")
+	if APIKey == "" {
+		// Return specific error so caller knows to skip
+		return nil, fmt.Errorf("IP_GEOLOCATION_API_KEY not set")
+	}
 	url := `https://api.ipgeolocation.io/v2/ipgeo?apiKey=` + APIKey + `&ip=` + ip
 	method := "GET"
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 5 * time.Second, // Timeout is critical
+	}
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -55,6 +62,10 @@ func IPGeolocation(ip string) (*LocationResponse, error) {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status: %d", res.StatusCode)
+	}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -70,73 +81,57 @@ func IPGeolocation(ip string) (*LocationResponse, error) {
 }
 
 func GetLocationString(ip string) string {
-	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
+	country, city := GetLocation(ip)
+	if country == "Unknown Country" && city == "Unknown City" {
+		return "Unknown Location"
+	}
+
+	if country == "Local Machine" {
 		return "Local Machine"
+	}
+
+	var parts []string
+	if city != "Unknown City" {
+		parts = append(parts, city)
+	}
+	if country != "Unknown Country" {
+		parts = append(parts, country)
+	}
+
+	return joinWithComma(parts)
+}
+
+func GetLocation(ip string) (country, city string) {
+	if ip == "" || ip == "127.0.0.1" || ip == "::1" || ip == "localhost" {
+		return "Local Machine", "Local Machine"
 	}
 
 	locationResponse, err := IPGeolocation(ip)
 	if err != nil {
-		return "Unknown Location"
+		return "Unknown Country", "Unknown City"
 	}
 
-	var parts []string
-
-	// Add city if available
-	if locationResponse.Location.City != "" {
-		parts = append(parts, locationResponse.Location.City)
+	c := locationResponse.Location.CountryName
+	if c == "" {
+		c = "Unknown Country"
 	}
 
-	// Add country name
-	if locationResponse.Location.CountryName != "" {
-		countryInfo := locationResponse.Location.CountryName
-
-		// Add capital in parentheses if available
-		if locationResponse.Location.CountryCapital != "" {
-			countryInfo += " (" + locationResponse.Location.CountryCapital + ")"
-		}
-
-		parts = append(parts, countryInfo)
+	cy := locationResponse.Location.City
+	if cy == "" {
+		cy = "Unknown City"
 	}
 
-	if len(parts) > 0 {
-		return joinWithComma(parts)
-	}
-
-	return "Unknown Location"
+	return c, cy
 }
 
 func GetCountryName(ip string) string {
-	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
-		return "Local Machine"
-	}
-
-	resultCh := make(chan string, 1)
-	go func() {
-		locationResponse, err := IPGeolocation(ip)
-		if err != nil || locationResponse.Location.CountryName == "" {
-			resultCh <- "Unknown Country"
-			return
-		}
-		resultCh <- locationResponse.Location.CountryName
-	}()
-	return <-resultCh
+	c, _ := GetLocation(ip)
+	return c
 }
 
 func GetCityName(ip string) string {
-	if ip == "" || ip == "127.0.0.1" || ip == "::1" {
-		return "Local Machine"
-	}
-
-	resultCh := make(chan string, 1)
-	go func() {
-		locationResponse, err := IPGeolocation(ip)
-		if err != nil || locationResponse.Location.City == "" {
-			resultCh <- "Unknown City"
-			return
-		}
-		resultCh <- locationResponse.Location.City
-	}()
-	return <-resultCh
+	_, cy := GetLocation(ip)
+	return cy
 }
 
 // Helper function to join strings with comma

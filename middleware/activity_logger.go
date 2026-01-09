@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/logging"
-	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/logging"
+	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 	"github.com/mssola/useragent"
 )
@@ -285,6 +285,50 @@ func parseUserAgent(userAgent string) string {
 	os := ua.OS()
 
 	return fmt.Sprintf("%s %s on %s", name, version, os)
+}
+
+func GetBrowser(userAgent string) string {
+	ua := useragent.New(userAgent)
+	name, version := ua.Browser()
+
+	return fmt.Sprintf("%s %s", name, version)
+}
+
+func GetOS(userAgent string) string {
+	ua := useragent.New(userAgent)
+	os := ua.OS()
+
+	return fmt.Sprintf("%s", os)
+}
+
+func GetDevice(userAgent string) string {
+	ua := useragent.New(userAgent)
+	uaLower := strings.ToLower(userAgent)
+
+	// Check for specific API clients / HTTP tools
+	if strings.Contains(uaLower, "postman") ||
+		strings.Contains(uaLower, "insomnia") ||
+		strings.Contains(uaLower, "curl") ||
+		strings.Contains(uaLower, "httpie") ||
+		strings.Contains(uaLower, "axios") ||
+		strings.Contains(uaLower, "go-http-client") {
+		return "API"
+	}
+
+	// Check for iPad specifically (OS or UA string)
+	if ua.OS() == "iPadOS" || strings.Contains(uaLower, "ipad") {
+		return "iPad"
+	}
+
+	if ua.Mobile() {
+		return "Mobile"
+	}
+
+	if ua.Bot() {
+		return "Bot"
+	}
+
+	return "Desktop"
 }
 
 // extract HeadersInfo extracts relevant headers information

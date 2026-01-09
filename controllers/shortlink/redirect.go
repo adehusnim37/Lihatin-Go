@@ -6,6 +6,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,9 +33,12 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	if referer == "" {
 		referer = ctx.Request.Header.Get("URL")
 	}
+	device := middleware.GetDevice(userAgent)
+	browser := middleware.GetBrowser(userAgent)
+	os := middleware.GetOS(userAgent)
 
 	// Get short link and track the view
-	link, err := c.repo.RedirectByShortCode(codeData.Code, ipAddress, userAgent, referer, passcodeData.Passcode)
+	link, err := c.repo.RedirectByShortCode(codeData.Code, ipAddress, userAgent, referer, device, browser, os, passcodeData.Passcode)
 	if err != nil {
 		httputil.HandleError(ctx, err, nil)
 		return
@@ -42,5 +46,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 
 	// This should only be reached if no error occurred
 	// Redirect to original URL
-	ctx.Redirect(http.StatusMovedPermanently, link.OriginalURL)
+	// Use StatusTemporaryRedirect (307) or StatusFound (302) to prevent browser caching
+	// StatusMovedPermanently (301) causes the browser to skip the server on subsequent clicks!
+	ctx.Redirect(http.StatusTemporaryRedirect, link.OriginalURL)
 }
