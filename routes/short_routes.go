@@ -15,6 +15,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)
 		shortGroup.GET("check/:code", shortController.CheckShortLink)
+		shortGroup.GET("check/:code/:passcode", shortController.CheckShortLink)
 	}
 
 	// ✅ API ROUTES: Accessible by API key authentication (service-to-service)

@@ -181,13 +181,14 @@ type DeleteRequest struct {
 }
 
 type CodeRequest struct {
-	Code string `json:"code" label:"Kode Short Link" binding:"required,min=1,max=100,no_space,saveurlshort" uri:"code"`
+	Code     string `json:"code" label:"Kode Short Link" binding:"required,min=1,max=100,no_space,saveurlshort" uri:"code"`
+	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric" uri:"passcode"`
 }
 
 type IsActiveRequest struct {
 	IsActive bool `json:"is_active" label:"Status Aktif" binding:"required"`
 }
-
+	
 type BannedRequest struct {
 	Reason string `json:"reason" label:"Alasan Pemblokiran" binding:"required,min=3,max=255,no_special"`
 }
