@@ -1,8 +1,6 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
@@ -13,7 +11,7 @@ import (
 func (c *Controller) GetAPIKey(ctx *gin.Context) {
 	var req dto.APIKeyIDRequest
 	// Get user ID from JWT token context
-	userID, _ := ctx.Get("user_id")
+	userID := ctx.GetString("user_id")
 
 	// Bind and validate request
 	if err := ctx.ShouldBindUri(&req); err != nil {
@@ -22,9 +20,9 @@ func (c *Controller) GetAPIKey(ctx *gin.Context) {
 	}
 
 	// Get the API key
-	apiKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(req, userID.(string))
+	apiKey, err := c.repo.GetAPIKeyRepository().GetAPIKeyByID(req, userID)
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "API key not found", "error_code_not_found", "API key retrieval failed", map[string]string{"key_id": "API key with this ID does not exist"})
+		httputil.HandleError(ctx, err, userID)
 		return
 	}
 

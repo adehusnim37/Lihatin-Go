@@ -18,7 +18,7 @@ func (c *Controller) CheckShortLink(ctx *gin.Context) {
 
 	exists, err := c.repo.CheckShortCode(&codeData)
 	if err != nil {
-		httpPkg.SendErrorResponse(ctx, http.StatusInternalServerError, "Failed to check short link", "Connection", "There's an error on our end. Please try again later.")
+		httpPkg.HandleError(ctx, err, nil)
 		return
 	}
 

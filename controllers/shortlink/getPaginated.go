@@ -4,11 +4,10 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -70,36 +69,9 @@ func (c *Controller) GetShortLinkViewsPaginated(ctx *gin.Context) {
 	// Get paginated views with complete data
 	paginatedData, err := c.repo.GetShortLinkViewsPaginated(req.Code, userIDStr, page, limit, sort, orderBy, userRoleStr)
 	if err != nil {
-		switch {
-		case err == errors.ErrShortLinkNotFound:
-			ctx.JSON(http.StatusNotFound, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to retrieve short link views",
-				Error:   map[string]string{"code": "Link dengan kode tersebut tidak ditemukan"},
-			})
-		case err == errors.ErrShortLinkUnauthorized:
-			ctx.JSON(http.StatusForbidden, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to retrieve short link views",
-				Error:   map[string]string{"code": "Anda tidak memiliki akses ke link ini"},
-			})
-		default:
-			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to retrieve short link views",
-				Error:   map[string]string{"code": "Terjadi kesalahan pada server"},
-			})
-		}
+		httputil.HandleError(ctx, err, userIDStr)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    paginatedData,
-		Message: "Short link views with pagination retrieved successfully",
-		Error:   nil,
-	})
+	httputil.SendOKResponse(ctx, paginatedData, "Short link views with pagination retrieved successfully")
 }

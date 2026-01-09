@@ -3,9 +3,9 @@ package shortlink
 import (
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models/common"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -63,44 +63,11 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	}
 
 	if repositoryErr != nil {
-		logger.Logger.Error("Failed to retrieve short links",
-			"user_id", userIDStr,
-			"user_role", userRoleStr,
-			"page", page,
-			"limit", limit,
-			"sort", sort,
-			"order_by", orderBy,
-			"error", repositoryErr.Error(),
-		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve short links",
-			Error:   map[string]string{"database": "Database error occurred"},
-		})
+		httputil.HandleError(ctx, repositoryErr, userIDStr)
 		return
 	}
 
-	// ✅ SUCCESS: Log different messages based on role
-	if userRoleStr == "admin" {
-		logger.Logger.Info("Admin retrieved all short links successfully",
-			"admin_user", userIDStr,
-			"page", page,
-		)
-	} else {
-		logger.Logger.Info("User retrieved own short links successfully",
-			"user_id", userIDStr,
-			"page", page,
-		)
-	}
-
-	// ✅ Return unified response
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    paginatedResponse,
-		Message: "Short links retrieved successfully",
-		Error:   nil,
-	})
+	httputil.SendOKResponse(ctx, paginatedResponse, "Short links retrieved successfully")
 }
 
 // ✅ DEPRECATED: Keep for backward compatibility (optional)

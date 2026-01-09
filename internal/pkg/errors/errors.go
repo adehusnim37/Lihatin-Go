@@ -297,10 +297,98 @@ var (
 		http.StatusBadRequest,
 		"short_link",
 	)
+)
+
+// Short Link Detail Errors
+var (
+	ErrShortDetailNotFound = NewAppError(
+		"SHORT_DETAIL_NOT_FOUND",
+		"Short link detail not found",
+		http.StatusNotFound,
+		"short_detail",
+	)
+	ErrShortDetailFindFailed = NewAppError(
+		"SHORT_DETAIL_FIND_FAILED",
+		"Failed to find short link detail",
+		http.StatusBadRequest,
+		"short_detail",
+	)
+	ErrShortDetailUpdateFailed = NewAppError(
+		"SHORT_DETAIL_UPDATE_FAILED",
+		"Failed to update short link detail",
+		http.StatusBadRequest,
+		"short_detail",
+	)
 	ErrShortDetailCreatedFailed = NewAppError(
 		"SHORT_DETAIL_CREATE_FAILED",
 		"Failed to create short link detail",
 		http.StatusBadRequest,
+		"short_detail",
+	)
+	ErrShortUpdateFailed = NewAppError(
+		"SHORT_UPDATE_FAILED",
+		"Failed to update short link",
+		http.StatusBadRequest,
+		"short_link",
+	)
+	ErrShortDeleteFailed = NewAppError(
+		"SHORT_DELETE_FAILED",
+		"Failed to delete short link",
+		http.StatusBadRequest,
+		"short_link",
+	)
+	ErrShortCheckFailed = NewAppError(
+		"SHORT_CHECK_FAILED",
+		"Failed to check short link",
+		http.StatusInternalServerError,
+		"short_link",
+	)
+	ErrShortListFailed = NewAppError(
+		"SHORT_LIST_FAILED",
+		"Failed to list short links",
+		http.StatusInternalServerError,
+		"short_link",
+	)
+	ErrShortBanFailed = NewAppError(
+		"SHORT_BAN_FAILED",
+		"Failed to ban short link",
+		http.StatusBadRequest,
+		"short_link",
+	)
+	ErrShortRestoreFailed = NewAppError(
+		"SHORT_RESTORE_FAILED",
+		"Failed to restore short link",
+		http.StatusBadRequest,
+		"short_link",
+	)
+	ErrShortResetPasscodeFailed = NewAppError(
+		"SHORT_RESET_PASSCODE_FAILED",
+		"Failed to reset passcode",
+		http.StatusBadRequest,
+		"short_link",
+	)
+	ErrShortValidateTokenFailed = NewAppError(
+		"SHORT_VALIDATE_TOKEN_FAILED",
+		"Failed to validate token",
+		http.StatusBadRequest,
+		"token",
+	)
+	ErrShortStatsFailed = NewAppError(
+		"SHORT_STATS_FAILED",
+		"Failed to get short link stats",
+		http.StatusInternalServerError,
+		"short_link",
+	)
+	ErrShortBulkCreateFailed = NewAppError(
+		"SHORT_BULK_CREATE_FAILED",
+		"Failed to create bulk short links",
+		http.StatusBadRequest,
+		"short_link",
+	)
+	ErrShortViewTrackFailed = NewAppError(
+		"SHORT_VIEW_TRACK_FAILED",
+		"Failed to track short link view",
+		http.StatusInternalServerError,
 		"short_link",
 	)
 	ErrShortGetFailed = NewAppError(

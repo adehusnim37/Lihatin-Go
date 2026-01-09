@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
+	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
 
@@ -281,27 +281,46 @@ func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
 }
 
 // RateLimitMiddleware provides basic rate limiting
-func RateLimitMiddleware(count int) gin.HandlerFunc {
-	// Simple in-memory rate limiting
-	// In production, use Redis or similar
-	requestCounts := make(map[string]int)
-
+// RateLimitMiddleware provides basic rate limiting using Redis
+func RateLimitMiddleware(limit int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
+		key := fmt.Sprintf("rate_limit:%s", clientIP)
 
-		// Reset counter every minute (simplified)
-		if requestCounts[clientIP] > count { // 100 requests per minute
+		// Get Redis via SessionManager
+		redisClient := GetSessionManager().GetRedisClient()
+
+		// 1. Increment counter atomically
+		// INCR key
+		count, err := redisClient.Incr(c.Request.Context(), key).Result()
+		if err != nil {
+			// Fail-open strategy: If Redis is down, allow request but log error
+			// This prevents blocking users during cache outages
+			logger.Logger.Error("Rate limit Redis error", "error", err)
+			c.Next()
+			return
+		}
+
+		// 2. Set expiration on first request (start of window)
+		// If count is 1, it means the key was just created or expired.
+		// We set the TTL to 1 minute.
+		if count == 1 {
+			redisClient.Expire(c.Request.Context(), key, 1*time.Minute)
+		}
+
+		// 3. Check limit
+		if count > int64(limit) {
+			logger.Logger.Warn("Rate limit exceeded", "ip", clientIP, "count", count)
 			c.JSON(http.StatusTooManyRequests, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "Rate limit exceeded",
-				Error:   map[string]string{"rate_limit": "Too many requests, please try again later"},
+				Error:   map[string]string{"rate_limit": "Too many requests, please try again in a minute"},
 			})
 			c.Abort()
 			return
 		}
 
-		requestCounts[clientIP]++
 		c.Next()
 	}
 }

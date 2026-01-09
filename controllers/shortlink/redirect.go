@@ -4,9 +4,8 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,78 +36,7 @@ func (c *Controller) Redirect(ctx *gin.Context) {
 	// Get short link and track the view
 	link, err := c.repo.RedirectByShortCode(codeData.Code, ipAddress, userAgent, referer, passcodeData.Passcode)
 	if err != nil {
-		switch err {
-		case errors.ErrShortLinkNotFound:
-			ctx.JSON(http.StatusNotFound, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Short link not found",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrPasscodeRequired:
-			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Passcode required",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrInvalidPasscode, errors.ErrPasscodeIncorrect:
-			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Invalid passcode",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrShortLinkUnauthorized:
-			ctx.JSON(http.StatusForbidden, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Unauthorized access",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrShortLinkInactive:
-			ctx.JSON(http.StatusGone, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Short link is inactive",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrShortLinkExpired:
-			ctx.JSON(http.StatusGone, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Short link has expired",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrLinkIsBanned:
-			ctx.JSON(http.StatusForbidden, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "The original URL is banned",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrShortLinkAlreadyDeleted:
-			ctx.JSON(http.StatusGone, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Short link has already been deleted",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		case errors.ErrClickLimitReached:
-			ctx.JSON(http.StatusTooManyRequests, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Click limit reached",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		default:
-			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Failed to retrieve short link",
-				Error:   map[string]string{"details": err.Error()},
-			})
-		}
+		httputil.HandleError(ctx, err, nil)
 		return
 	}
 

@@ -3,9 +3,8 @@ package shortlink
 import (
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models/common"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,22 +29,9 @@ func (c *Controller) GetAllStatsShorts(ctx *gin.Context) {
 	}
 	stats, err := c.repo.GetStatsAllShortLinks(userId.(string), userRoleStr, page, limit, sort, orderBy)
 	if err != nil {
-		logger.Logger.Error("Failed to get all stats",
-			"error", err.Error(),
-		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to get all stats",
-			Error:   map[string]string{"error": "Terjadi kesalahan pada server"},
-		})
+		httputil.HandleError(ctx, err, userId)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    stats,
-		Message: "All stats retrieved successfully",
-		Error:   nil,
-	})
+	httputil.SendOKResponse(ctx, stats, "All stats retrieved successfully")
 }

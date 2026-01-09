@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	httpPkg "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
@@ -41,20 +40,7 @@ func (c *Controller) DeleteShortLink(ctx *gin.Context) {
 	}
 
 	if err := c.repo.DeleteShortLink(shortCode, ctx.GetString("user_id"), passcode, ctx.GetString("role")); err != nil {
-		logger.Logger.Error("Failed to delete short link",
-			"short_code", shortCode,
-			"error", err.Error(),
-		)
-		switch err {
-		case errors.ErrShortLinkNotFound:
-			httpPkg.SendErrorResponse(ctx, http.StatusNotFound, "Failed to delete short link", "code", "Link dengan kode tersebut tidak ditemukan")
-		case errors.ErrShortLinkUnauthorized:
-			httpPkg.SendErrorResponse(ctx, http.StatusForbidden, "Failed to delete short link", "code", "Anda tidak memiliki akses ke link ini")
-		case errors.ErrShortLinkAlreadyDeleted:
-			httpPkg.SendErrorResponse(ctx, http.StatusGone, "Failed to delete short link", "code", "Link dengan kode tersebut sudah dihapus/tidak ditemukan")
-		default:
-			httpPkg.SendErrorResponse(ctx, http.StatusInternalServerError, "Failed to delete short link", "code", "Terjadi kesalahan pada server")
-		}
+		httpPkg.HandleError(ctx, err, ctx.GetString("user_id"))
 		return
 	}
 
