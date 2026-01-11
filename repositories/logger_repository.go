@@ -51,3 +51,30 @@ func (r *LoggerRepository) GetAllLogs() ([]logging.ActivityLog, error) {
 
 	return logs, err
 }
+
+func (r *LoggerRepository) GetLogsByShortLink(code string, page, limit int) ([]logging.ActivityLog, int64, error) {
+	var logs []logging.ActivityLog
+	var totalCount int64
+
+	// Hitung total data
+	query := r.DB.Model(&logging.ActivityLog{}).Where("route LIKE ?", "%/"+code)
+	if err := query.Count(&totalCount).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+
+	// Fetch data dengan pagination
+	err := query.
+		Select([]string{
+			"id", "status_code", "method", "route", "ip_address",
+			"user_agent", "browser_info", "timestamp", "response_time",
+			"request_headers", "response_body", "route_params",
+		}).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&logs).Error
+
+	return logs, totalCount, err
+}

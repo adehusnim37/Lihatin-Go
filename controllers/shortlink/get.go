@@ -37,5 +37,5 @@ func (c *Controller) GetShortLink(ctx *gin.Context) {
 		return
 	}
 
-	http.SendOKResponse(ctx, paginatedData, "Short link views with pagination retrieved successfully")
+	http.SendOKResponse(ctx, paginatedData, "Short link retrieved successfully")
 }

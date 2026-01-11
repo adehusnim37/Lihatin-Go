@@ -56,20 +56,22 @@ type ShortLinkResponse struct {
 	CreatedAt       time.Time                 `json:"created_at"`
 	UpdatedAt       time.Time                 `json:"updated_at,omitempty"`
 	ShortLinkDetail *ShortLinkDetailsResponse `json:"detail,omitempty"`
-	RecentViews     []ViewLinkDetailResponse  `json:"recent_views,omitempty"`
 }
 type ShortLinkDetailsResponse struct {
-	ID            string `json:"id"`
-	Passcode      int    `json:"passcode,omitempty"`
-	ClickLimit    int    `json:"click_limit,omitempty"`
-	CurrentClicks int    `json:"current_clicks,omitempty"`
-	EnableStats   bool   `json:"enable_stats,omitempty"`
-	CustomDomain  string `json:"custom_domain,omitempty"`
-	UTMSource     string `json:"utm_source,omitempty"`
-	UTMMedium     string `json:"utm_medium,omitempty"`
-	UTMCampaign   string `json:"utm_campaign,omitempty"`
-	UTMTerm       string `json:"utm_term,omitempty"`
-	UTMContent    string `json:"utm_content,omitempty"`
+	ID            string  `json:"id"`
+	Passcode      int     `json:"passcode,omitempty"`
+	ClickLimit    int     `json:"click_limit,omitempty"`
+	CurrentClicks int     `json:"current_clicks,omitempty"`
+	EnableStats   bool    `json:"enable_stats,omitempty"`
+	CustomDomain  string  `json:"custom_domain,omitempty"`
+	UTMSource     string  `json:"utm_source,omitempty"`
+	UTMMedium     string  `json:"utm_medium,omitempty"`
+	UTMCampaign   string  `json:"utm_campaign,omitempty"`
+	UTMTerm       string  `json:"utm_term,omitempty"`
+	UTMContent    string  `json:"utm_content,omitempty"`
+	IsBanned      bool    `json:"is_banned,omitempty"`
+	BannedReason  string  `json:"banned_reason,omitempty"`
+	BannedBy      *string `json:"banned_by,omitempty"`
 }
 
 type ViewLinkDetailResponse struct {
@@ -111,15 +113,24 @@ type Country struct {
 }
 
 type ShortLinkWithStatsResponse struct {
-	ShortCode      string        `json:"short"`
-	TotalClicks    int           `json:"total_clicks"`
-	UniqueVisitors int           `json:"unique_visitors"`
-	Last24h        int           `json:"last_24h"`
-	Last7d         int           `json:"last_7d"`
-	Last30d        int           `json:"last_30d"`
-	TopReferrers   []TopReferrer `json:"top_referrers"`
-	TopDevices     []TopDevice   `json:"top_devices"`
-	TopCountries   []Country     `json:"top_countries"`
+	ShortCode          string             `json:"short"`
+	TotalClicks        int                `json:"total_clicks"`
+	UniqueVisitors     int                `json:"unique_visitors"`
+	Last24h            int                `json:"last_24h"`
+	Last7d             int                `json:"last_7d"`
+	Last30d            int                `json:"last_30d"`
+	Last60d            int                `json:"last_60d"`
+	Last90d            int                `json:"last_90d"`
+	TopReferrers       []TopReferrer      `json:"top_referrers"`
+	TopDevices         []TopDevice        `json:"top_devices"`
+	TopCountries       []Country          `json:"top_countries"`
+	ClickHistory       []ClickHistoryItem `json:"click_history"`
+	ClickHistoryHourly []ClickHistoryItem `json:"click_history_hourly"`
+}
+
+type ClickHistoryItem struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
 }
 
 type PaginatedShortLinkWithStatsResponse struct {
@@ -133,21 +144,25 @@ type PaginatedShortLinkWithStatsResponse struct {
 }
 
 type PaginatedShortLinkDetailWithStatsResponse struct {
-	ShortLinks      []ShortLinkResponse             `json:"short_links"`
-	ShortLinkDetail ShortLinkDetailsResponse        `json:"short_link_detail"`
-	Views           PaginatedViewLinkDetailResponse `json:"views"`
+	Views PaginatedViewLinkDetailResponse `json:"views"`
 }
 
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {
-	Title        *string    `json:"title" label:"Judul" binding:"omitempty,max=255,min=3"`
-	Description  *string    `json:"description" label:"Deskripsi" binding:"omitempty,max=500,min=3"`
-	IsActive     *bool      `json:"is_active" label:"Status Aktif" binding:"omitempty"`
-	ExpiresAt    *time.Time `json:"expires_at" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
-	Passcode     *string    `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
-	ClickLimit   *int       `json:"click_limit" label:"Batas Klik" binding:"omitempty,min=0"` // 0 means unlimited
-	EnableStats  *bool      `json:"enable_stats" label:"Aktifkan Statistik" binding:"omitempty"`
-	CustomDomain *string    `json:"custom_domain" label:"Domain Kustom" binding:"omitempty,url"`
+	Title        *string    `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255,min=3"`
+	Description  *string    `json:"description,omitempty" label:"Deskripsi" binding:"omitempty,max=500,min=3"`
+	ShortCode    *string    `json:"short_code,omitempty" label:"Kode Pendek" binding:"omitempty"`
+	IsActive     *bool      `json:"is_active,omitempty" label:"Status Aktif" binding:"omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
+	Passcode     *string    `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
+	ClickLimit   *int       `json:"click_limit,omitempty" label:"Batas Klik" binding:"omitempty,min=0"` // 0 means unlimited
+	EnableStats  *bool      `json:"enable_stats,omitempty" label:"Aktifkan Statistik" binding:"omitempty"`
+	CustomDomain *string    `json:"custom_domain,omitempty" label:"Domain Kustom" binding:"omitempty,url"`
+	UTMSource    *string    `json:"utm_source,omitempty" label:"UTM Source" binding:"omitempty"`
+	UTMMedium    *string    `json:"utm_medium,omitempty" label:"UTM Medium" binding:"omitempty"`
+	UTMCampaign  *string    `json:"utm_campaign,omitempty" label:"UTM Campaign" binding:"omitempty"`
+	UTMTerm      *string    `json:"utm_term,omitempty" label:"UTM Term" binding:"omitempty"`
+	UTMContent   *string    `json:"utm_content,omitempty" label:"UTM Content" binding:"omitempty"`
 }
 
 // PaginatedShortLinksResponse represents paginated short links
@@ -188,7 +203,7 @@ type CodeRequest struct {
 type IsActiveRequest struct {
 	IsActive bool `json:"is_active" label:"Status Aktif" binding:"required"`
 }
-	
+
 type BannedRequest struct {
 	Reason string `json:"reason" label:"Alasan Pemblokiran" binding:"required,min=3,max=255,no_special"`
 }

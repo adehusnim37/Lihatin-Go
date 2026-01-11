@@ -27,3 +27,22 @@ func (c *Controller) UpdateShortLink(ctx *gin.Context) {
 
 	httputil.SendOKResponse(ctx, updateData, "Short link updated successfully")
 }
+
+func (c *Controller) RemovePasscode(ctx *gin.Context) {
+	shortCode := ctx.Param("code")
+	userID := ctx.GetString("user_id")
+	userRole := ctx.GetString("user_role")
+
+	// Construct request to set passcode to empty string (which repo converts to 0)
+	passcode := ""
+	updateReq := dto.UpdateShortLinkRequest{
+		Passcode: &passcode,
+	}
+
+	if err := c.repo.UpdateShortLink(shortCode, userID, userRole, &updateReq); err != nil {
+		httputil.HandleError(ctx, err, userID)
+		return
+	}
+
+	httputil.SendOKResponse(ctx, nil, "Passcode removed successfully")
+}

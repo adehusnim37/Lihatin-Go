@@ -42,13 +42,15 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedShort.Use(middleware.RateLimitMiddleware(100))
 		protectedShort.POST("", shortController.Create)
 		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
+		protectedShort.GET("/stats", shortController.GetAllStatsShorts)
 		protectedShort.GET("/:code/stats", shortController.GetShortLinkStats)
 		protectedShort.GET("/:code", shortController.GetShortLink)
 		protectedShort.PUT("/:code", shortController.UpdateShortLink)
 		protectedShort.DELETE("/:code", shortController.DeleteShortLink)
 		protectedShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated) // New route for paginated views
-		protectedShort.GET("/short/stats", shortController.GetAllStatsShorts)
 		protectedShort.POST("/:code/toggle-active-inactive", shortController.SwitchActiveInActiveShort)
+		protectedShort.DELETE("/:code/passcode", shortController.RemovePasscode)
+
 	}
 
 	// ✅ ADMIN ROUTES: Only accessible by admin users

@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -495,23 +498,6 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 		}
 	}
 
-	// Convert views to response format
-	viewsResponse := make([]dto.ViewLinkDetailResponse, 0, len(recentViews))
-	for _, view := range recentViews {
-		viewsResponse = append(viewsResponse, dto.ViewLinkDetailResponse{
-			ID:        view.ID,
-			IPAddress: view.IPAddress,
-			UserAgent: view.UserAgent,
-			Referer:   view.Referer,
-			Country:   view.Country,
-			City:      view.City,
-			Device:    view.Device,
-			Browser:   view.Browser,
-			OS:        view.OS,
-			ClickedAt: view.ClickedAt,
-		})
-	}
-
 	// Build detail response
 	detailResponse := &dto.ShortLinkDetailsResponse{
 		ID:            detail.ID,
@@ -525,6 +511,9 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 		UTMCampaign:   detail.UTMCampaign,
 		UTMTerm:       detail.UTMTerm,
 		UTMContent:    detail.UTMContent,
+		IsBanned:      detail.IsBanned,
+		BannedReason:  detail.BannedReason,
+		BannedBy:      detail.BannedBy,
 	}
 
 	// Build main response
@@ -540,7 +529,6 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 		CreatedAt:       link.CreatedAt,
 		UpdatedAt:       link.UpdatedAt,
 		ShortLinkDetail: detailResponse,
-		RecentViews:     viewsResponse,
 	}
 
 	return shortLinkResponse, nil
@@ -595,34 +583,126 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 
 	// Get top Countries by views
 	// This is a simplified example; in a real scenario, you might want to limit the number of results
+	// This is a simplified example; in a real scenario, you might want to limit the number of results
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
 		Select("country, COUNT(*) as count").
 		Where("short_link_id = ?", link.ID).
 		Group("country").
-		Order("count DESC").
-		Limit(5).
 		Scan(&countries).Error; err != nil {
 		return nil, apperrors.ErrShortStatsFailed.WithError(err)
 	}
 
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Select("device, COUNT(*) as count").
-		Where("short_link_id = ?", link.ID).
-		Group("device").
-		Order("count DESC").
-		Limit(5).
-		Scan(&devices).Error; err != nil {
-		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	// Sort countries DESC
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i].Count > countries[j].Count
+	})
+
+	// Add "Other" if > 5
+	if len(countries) > 5 {
+		var otherCount int
+		for i := 5; i < len(countries); i++ {
+			otherCount += countries[i].Count
+		}
+		countries = countries[:5]
+		if otherCount > 0 {
+			countries = append(countries, dto.Country{Country: "Other", Count: otherCount})
+		}
 	}
 
+	// Parse and Aggregate Referrers (Host-based)
+	var rawReferrers []struct {
+		Referer string
+		Count   int
+	}
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
 		Select("referer, COUNT(*) as count").
 		Where("short_link_id = ?", link.ID).
 		Group("referer").
-		Order("count DESC").
-		Limit(5).
-		Scan(&referrers).Error; err != nil {
+		Scan(&rawReferrers).Error; err != nil {
 		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+
+	referrerMap := make(map[string]int)
+	for _, ref := range rawReferrers {
+		host := "Direct / None"
+		if ref.Referer != "" {
+			if u, err := url.Parse(ref.Referer); err == nil && u.Host != "" {
+				host = u.Host
+			} else {
+				host = ref.Referer // Fallback
+			}
+		}
+		referrerMap[host] += ref.Count
+	}
+
+	for host, count := range referrerMap {
+		referrers = append(referrers, dto.TopReferrer{Host: host, Count: count})
+	}
+	// Sort referrers DESC
+	sort.Slice(referrers, func(i, j int) bool {
+		return referrers[i].Count > referrers[j].Count
+	})
+	if len(referrers) > 5 {
+		var otherCount int
+		for i := 5; i < len(referrers); i++ {
+			otherCount += referrers[i].Count
+		}
+		referrers = referrers[:5]
+		if otherCount > 0 {
+			referrers = append(referrers, dto.TopReferrer{Host: "Other", Count: otherCount})
+		}
+	}
+
+	// Parse and Aggregate Devices (UserAgent-based)
+	var rawDevices []struct {
+		UserAgent string
+		Count     int
+	}
+	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+		Select("user_agent, COUNT(*) as count").
+		Where("short_link_id = ?", link.ID).
+		Group("user_agent").
+		Scan(&rawDevices).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+
+	deviceMap := make(map[string]int)
+	for _, raw := range rawDevices {
+		device := "Unknown"
+		uaLower := strings.ToLower(raw.UserAgent)
+
+		// Simple parsing logic (replicating basic middleware logic)
+		if strings.Contains(uaLower, "mobile") || strings.Contains(uaLower, "android") || strings.Contains(uaLower, "iphone") {
+			device = "Mobile"
+		} else if strings.Contains(uaLower, "tablet") || strings.Contains(uaLower, "ipad") {
+			device = "Tablet"
+		} else if strings.Contains(uaLower, "bot") || strings.Contains(uaLower, "crawler") {
+			device = "Bot"
+		} else if strings.Contains(uaLower, "postman") || strings.Contains(uaLower, "axios") || strings.Contains(uaLower, "curl") {
+			device = "API"
+		} else {
+			device = "Desktop"
+		}
+
+		deviceMap[device] += raw.Count
+	}
+
+	for dev, count := range deviceMap {
+		devices = append(devices, dto.TopDevice{Device: dev, Count: count})
+	}
+	// Sort devices DESC
+	sort.Slice(devices, func(i, j int) bool {
+		return devices[i].Count > devices[j].Count
+	})
+	if len(devices) > 5 {
+		var otherCount int
+		for i := 5; i < len(devices); i++ {
+			otherCount += devices[i].Count
+		}
+		devices = devices[:5]
+		if otherCount > 0 {
+			devices = append(devices, dto.TopDevice{Device: "Other", Count: otherCount})
+		}
 	}
 
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
@@ -643,16 +723,56 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		return nil, apperrors.ErrShortStatsFailed.WithError(err)
 	}
 
+	var last60dCount int64
+	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-60*24*time.Hour)).
+		Count(&last60dCount).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+
+	var last90dCount int64
+	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-90*24*time.Hour)).
+		Count(&last90dCount).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+
+	// Get Click History (Daily for last 90 days)
+	var history []dto.ClickHistoryItem
+	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+		Select("DATE_FORMAT(clicked_at, '%Y-%m-%d') as date, COUNT(*) as count").
+		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-90*24*time.Hour)).
+		Group("DATE_FORMAT(clicked_at, '%Y-%m-%d')").
+		Order("date ASC").
+		Scan(&history).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+
+	// Get Click History Hourly (Last 24 Hours)
+	var historyHourly []dto.ClickHistoryItem
+	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+		Select("DATE_FORMAT(clicked_at, '%Y-%m-%d %H:00') as date, COUNT(*) as count").
+		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-24*time.Hour)).
+		Group("DATE_FORMAT(clicked_at, '%Y-%m-%d %H:00')").
+		Order("date ASC").
+		Scan(&historyHourly).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+
 	return &dto.ShortLinkWithStatsResponse{
-		ShortCode:      link.ShortCode,
-		TotalClicks:    int(totalCount),
-		UniqueVisitors: int(uniqueVisitors),
-		Last24h:        int(last24hCount),
-		Last7d:         int(last7dCount),
-		Last30d:        int(last30dCount),
-		TopReferrers:   referrers,
-		TopDevices:     devices,
-		TopCountries:   countries,
+		ShortCode:          link.ShortCode,
+		TotalClicks:        int(totalCount),
+		UniqueVisitors:     int(uniqueVisitors),
+		Last24h:            int(last24hCount),
+		Last7d:             int(last7dCount),
+		Last30d:            int(last30dCount),
+		Last60d:            int(last60dCount),
+		Last90d:            int(last90dCount),
+		TopReferrers:       referrers,
+		TopDevices:         devices,
+		TopCountries:       countries,
+		ClickHistory:       history,
+		ClickHistoryHourly: historyHourly,
 	}, nil
 }
 
@@ -697,15 +817,19 @@ func (r *ShortLinkRepository) GetStatsAllShortLinks(userId string, userRole stri
 		var last24hCount int64
 		var last7dCount int64
 		var last30dCount int64
+		var last90dCount int64
+		var last60dCount int64
 
 		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Count(&totalCount)
 		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Distinct("ip_address").Count(&uniqueVisitors)
-		r.db.Model(&shortlink.ViewLinkDetail{}).Select("country, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("country").Order("count DESC").Limit(5).Scan(&countries)
-		r.db.Model(&shortlink.ViewLinkDetail{}).Select("device, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("device").Order("count DESC").Limit(5).Scan(&devices)
-		r.db.Model(&shortlink.ViewLinkDetail{}).Select("referer, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("referer").Order("count DESC").Limit(5).Scan(&referrers)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Select("country, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("country").Order("count DESC").Limit(10).Scan(&countries)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Select("device, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("device").Order("count DESC").Limit(10).Scan(&devices)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Select("referer, COUNT(*) as count").Where("short_link_id = ?", link.ID).Group("referer").Order("count DESC").Limit(10).Scan(&referrers)
 		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-24*time.Hour)).Count(&last24hCount)
 		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-7*24*time.Hour)).Count(&last7dCount)
 		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-30*24*time.Hour)).Count(&last30dCount)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-60*24*time.Hour)).Count(&last60dCount)
+		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-90*24*time.Hour)).Count(&last90dCount)
 
 		shortLinksStats = append(shortLinksStats, dto.ShortLinkWithStatsResponse{
 			ShortCode:      link.ShortCode,
@@ -714,6 +838,8 @@ func (r *ShortLinkRepository) GetStatsAllShortLinks(userId string, userRole stri
 			Last24h:        int(last24hCount),
 			Last7d:         int(last7dCount),
 			Last30d:        int(last30dCount),
+			Last60d:        int(last60dCount),
+			Last90d:        int(last90dCount),
 			TopReferrers:   referrers,
 			TopDevices:     devices,
 			TopCountries:   countries,
@@ -843,35 +969,6 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 	// Calculate total pages
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	// Build the short link response
-	shortLinkResponse := dto.ShortLinkResponse{
-		ID:          link.ID,
-		UserID:      link.UserID,
-		ShortCode:   link.ShortCode,
-		OriginalURL: link.OriginalURL,
-		Title:       link.Title,
-		Description: link.Description,
-		IsActive:    link.IsActive,
-		ExpiresAt:   link.ExpiresAt,
-		CreatedAt:   link.CreatedAt,
-		UpdatedAt:   link.UpdatedAt,
-	}
-
-	// Build the detail response
-	detailResponse := dto.ShortLinkDetailsResponse{
-		ID:            detail.ID,
-		Passcode:      detail.Passcode,
-		ClickLimit:    detail.ClickLimit,
-		CurrentClicks: detail.CurrentClicks,
-		EnableStats:   detail.EnableStats,
-		CustomDomain:  detail.CustomDomain,
-		UTMSource:     detail.UTMSource,
-		UTMMedium:     detail.UTMMedium,
-		UTMCampaign:   detail.UTMCampaign,
-		UTMTerm:       detail.UTMTerm,
-		UTMContent:    detail.UTMContent,
-	}
-
 	// Build the paginated views response
 	paginatedViews := dto.PaginatedViewLinkDetailResponse{
 		Views:      viewsResponse,
@@ -885,9 +982,7 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 
 	// Build the complete response
 	return &dto.PaginatedShortLinkDetailWithStatsResponse{
-		ShortLinks:      []dto.ShortLinkResponse{shortLinkResponse},
-		ShortLinkDetail: detailResponse,
-		Views:           paginatedViews,
+		Views: paginatedViews,
 	}, nil
 }
 
@@ -963,6 +1058,9 @@ func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in 
 	if in.ExpiresAt != nil {
 		linkUpd["expires_at"] = in.ExpiresAt
 	}
+	if in.ShortCode != nil {
+		linkUpd["short_code"] = *in.ShortCode
+	}
 
 	if len(linkUpd) > 0 {
 		if err := tx.Model(&shortlink.ShortLink{}).
@@ -985,6 +1083,21 @@ func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in 
 	}
 	if in.CustomDomain != nil {
 		detailUpd["custom_domain"] = *in.CustomDomain
+	} 
+	if in.UTMSource != nil {
+		detailUpd["utm_source"] = *in.UTMSource
+	}
+	if in.UTMMedium != nil {
+		detailUpd["utm_medium"] = *in.UTMMedium
+	}
+	if in.UTMCampaign != nil {
+		detailUpd["utm_campaign"] = *in.UTMCampaign
+	}
+	if in.UTMTerm != nil {
+		detailUpd["utm_term"] = *in.UTMTerm
+	}
+	if in.UTMContent != nil {
+		detailUpd["utm_content"] = *in.UTMContent
 	}
 
 	if len(detailUpd) > 0 {
