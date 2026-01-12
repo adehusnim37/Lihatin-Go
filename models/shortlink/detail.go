@@ -14,8 +14,6 @@ type ShortLinkDetail struct {
 	ClickLimit             int            `json:"click_limit" gorm:"default:0"`                 // 0 means unlimited
 	CurrentClicks          int            `json:"current_clicks" gorm:"default:0"`
 	EnableStats            bool           `json:"enable_stats" gorm:"default:true"`
-	PasscodeToken          *string        `json:"passcode_token,omitempty" gorm:"size:191;uniqueIndex"`
-	PasscodeTokenExpiresAt time.Time      `json:"passcode_token_expires_at,omitempty"`
 	IsBanned               bool           `json:"is_banned" gorm:"default:false"`
 	BannedReason           string         `json:"banned_reason,omitempty" gorm:"size:255"`
 	BannedBy               *string        `json:"banned_by,omitempty" gorm:"size:191"` // Admin user ID who banned the link

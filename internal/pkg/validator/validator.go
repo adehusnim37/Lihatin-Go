@@ -28,9 +28,9 @@ type DetailError struct {
 // Indonesian error messages mapping
 var indonesianMessages = map[string]string{
 	"required":     "%s wajib diisi",
-	"min":          "%s minimal %s karakter/item",
-	"max":          "%s maksimal %s karakter/item",
-	"len":          "%s harus %s karakter/item",
+	"min":          "%s minimal %s",
+	"max":          "%s maksimal %s",
+	"len":          "%s harus %s",
 	"email":        "%s harus berupa email yang valid",
 	"url":          "%s harus berupa URL yang valid",
 	"alphanum":     "%s hanya boleh berisi huruf dan angka",
@@ -207,6 +207,17 @@ func formatIndonesianMessage(err validator.FieldError, fieldLabel string) string
 				if strings.Contains(template, "%s") {
 					template = strings.Replace(template, "%s", fieldLabel, 1)
 					template = strings.Replace(template, "%s", param, 1)
+
+					// Add dynamic suffix based on tag and type
+					switch tag {
+					case "min", "max", "len":
+						switch err.Kind() {
+						case reflect.String:
+							template += " karakter"
+						case reflect.Slice, reflect.Map, reflect.Array:
+							template += " item"
+						}
+					}
 				}
 				return template
 			}

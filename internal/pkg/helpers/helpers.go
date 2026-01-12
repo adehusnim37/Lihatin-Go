@@ -20,3 +20,11 @@ func PtrToString(s *string) string {
 	}
 	return *s
 }
+
+// PtrToValue returns the value of the pointer if not nil, otherwise returns defaultVal
+func PtrToValue[T any](ptr *T, defaultVal T) T {
+	if ptr != nil {
+		return *ptr
+	}
+	return defaultVal
+}

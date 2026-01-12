@@ -11,6 +11,18 @@ type CreateShortLinkRequest struct {
 	Description string     `json:"description,omitempty" label:"Deskripsi"`
 	CustomCode  string     `json:"custom_code,omitempty" label:"Kode Kustom" binding:"omitempty,min=3,max=100,saveurlshort,no_space"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa"`
+	Limit       *int       `json:"limit,omitempty" label:"Limit" binding:"omitempty,numeric,min=1,max=1000000"`
+	EnableStats *bool      `json:"enable_stats,omitempty" label:"Aktifkan Statistik" binding:"omitempty"`
+	Tags        *Tags      `json:"tags,omitempty" label:"Tags" binding:"omitempty"`
+}
+
+// Tags represents tags for short link
+type Tags struct {
+	UTMSource   *string `json:"utm_source,omitempty" label:"UTM Source" binding:"omitempty"`
+	UTMMedium   *string `json:"utm_medium,omitempty" label:"UTM Medium" binding:"omitempty"`
+	UTMCampaign *string `json:"utm_campaign,omitempty" label:"UTM Campaign" binding:"omitempty"`
+	UTMTerm     *string `json:"utm_term,omitempty" label:"UTM Term" binding:"omitempty"`
+	UTMContent  *string `json:"utm_content,omitempty" label:"UTM Content" binding:"omitempty"`
 }
 
 // ShortLinkRequest represents request to create single or multiple short links
@@ -151,7 +163,7 @@ type PaginatedShortLinkDetailWithStatsResponse struct {
 type UpdateShortLinkRequest struct {
 	Title        *string    `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255,min=3"`
 	Description  *string    `json:"description,omitempty" label:"Deskripsi" binding:"omitempty,max=500,min=3"`
-	ShortCode    *string    `json:"short_code,omitempty" label:"Kode Pendek" binding:"omitempty"`
+	ShortCode    *string    `json:"short_code,omitempty" label:"Kode Pendek" binding:"omitempty,min=3,max=100,no_space,saveurlshort"`
 	IsActive     *bool      `json:"is_active,omitempty" label:"Status Aktif" binding:"omitempty"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
 	Passcode     *string    `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric"`

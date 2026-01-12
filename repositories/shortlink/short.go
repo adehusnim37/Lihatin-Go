@@ -78,10 +78,26 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 		return nil, nil, apperrors.ErrShortCreatedFailed.WithError(err)
 	}
 
+	var utmSource, utmMedium, utmCampaign, utmTerm, utmContent string
+	if link.Tags != nil {
+		utmSource = helpers.PtrToString(link.Tags.UTMSource)
+		utmMedium = helpers.PtrToString(link.Tags.UTMMedium)
+		utmCampaign = helpers.PtrToString(link.Tags.UTMCampaign)
+		utmTerm = helpers.PtrToString(link.Tags.UTMTerm)
+		utmContent = helpers.PtrToString(link.Tags.UTMContent)
+	}
+
 	shortLinkDetail := shortlink.ShortLinkDetail{
 		ID:          uuid.New().String(),
 		ShortLinkID: shortLink.ID,
 		Passcode:    helpers.StringToInt(link.Passcode),
+		ClickLimit:  helpers.PtrToValue(link.Limit, 0),
+		EnableStats: helpers.PtrToValue(link.EnableStats, true),
+		UTMSource:   utmSource,
+		UTMMedium:   utmMedium,
+		UTMCampaign: utmCampaign,
+		UTMTerm:     utmTerm,
+		UTMContent:  utmContent,
 	}
 
 	if err := r.db.Create(&shortLinkDetail).Error; err != nil {
@@ -184,22 +200,12 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 }
 
 func (r *ShortLinkRepository) generateCustomCode(url string) string {
-	if len(url) == 0 {
-		// Generate a random code if URL is empty
-		const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		code := make([]byte, 6)
-		for i := range code {
-			code[i] = charset[localRng.Intn(len(charset))]
-		}
-		return string(code)
-	}
-
 	// Encode the URL to base64 and take 4 random characters from the encoded string
 	encodedString := base64.RawURLEncoding.EncodeToString([]byte(url))
 	code := make([]byte, 4)
 	for i := range code {
 		code[i] = encodedString[localRng.Intn(len(encodedString))]
-		logger.Logger.Info("Generated character", "char", string(code[i]))
+		logger.Logger.Info("Generated character for short code", "char", string(code[i]))
 	}
 	return string(code)
 }
@@ -1083,7 +1089,7 @@ func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in 
 	}
 	if in.CustomDomain != nil {
 		detailUpd["custom_domain"] = *in.CustomDomain
-	} 
+	}
 	if in.UTMSource != nil {
 		detailUpd["utm_source"] = *in.UTMSource
 	}
@@ -1478,160 +1484,160 @@ func (r *ShortLinkRepository) RestoreDeletedShortByAdmin(code string) error {
 	return nil
 }
 
-func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, newPasscode int, userID, roleUser string) error {
-	var link shortlink.ShortLink
+// func (r *ShortLinkRepository) ResetPasscodeShortLink(code string, oldPasscode, newPasscode int, userID, roleUser string) error {
+// 	var link shortlink.ShortLink
 
-	if roleUser != "admin" {
-		err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
-			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
-			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
-			First(&link).Error
+// 	if roleUser != "admin" {
+// 		err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
+// 			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
+// 			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
+// 			First(&link).Error
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return apperrors.ErrShortLinkNotFound
-			}
-			logger.Logger.Error("Database error while fetching short link",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			return apperrors.ErrShortGetFailed.WithError(err)
-		}
+// 		if err != nil {
+// 			if errors.Is(err, gorm.ErrRecordNotFound) {
+// 				return apperrors.ErrShortLinkNotFound
+// 			}
+// 			logger.Logger.Error("Database error while fetching short link",
+// 				"short_code", code,
+// 				"error", err.Error(),
+// 			)
+// 			return apperrors.ErrShortGetFailed.WithError(err)
+// 		}
 
-		// Validate old passcode
-		if link.Detail.Passcode != oldPasscode {
-			return apperrors.ErrPasscodeIncorrect
-		}
+// 		// Validate old passcode
+// 		if link.Detail.Passcode != oldPasscode {
+// 			return apperrors.ErrPasscodeIncorrect
+// 		}
 
-		link.Detail.Passcode = newPasscode
+// 		link.Detail.Passcode = newPasscode
 
-		// Update the detail record
-		err = r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", link.Detail.ID).Update("passcode", newPasscode).Error
-		if err != nil {
-			logger.Logger.Error("Failed to update passcode",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			return apperrors.ErrShortResetPasscodeFailed.WithError(err)
-		}
+// 		// Update the detail record
+// 		err = r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", link.Detail.ID).Update("passcode", newPasscode).Error
+// 		if err != nil {
+// 			logger.Logger.Error("Failed to update passcode",
+// 				"short_code", code,
+// 				"error", err.Error(),
+// 			)
+// 			return apperrors.ErrShortResetPasscodeFailed.WithError(err)
+// 		}
 
-	} else {
-		err := r.db.Where("short_code = ?", code).
-			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
-			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
-			First(&link).Error
+// 	} else {
+// 		err := r.db.Where("short_code = ?", code).
+// 			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
+// 			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
+// 			First(&link).Error
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return apperrors.ErrShortLinkNotFound
-			}
-			logger.Logger.Error("Database error while fetching short link",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			return apperrors.ErrShortGetFailed.WithError(err)
-		}
+// 		if err != nil {
+// 			if errors.Is(err, gorm.ErrRecordNotFound) {
+// 				return apperrors.ErrShortLinkNotFound
+// 			}
+// 			logger.Logger.Error("Database error while fetching short link",
+// 				"short_code", code,
+// 				"error", err.Error(),
+// 			)
+// 			return apperrors.ErrShortGetFailed.WithError(err)
+// 		}
 
-		link.Detail.Passcode = newPasscode
+// 		link.Detail.Passcode = newPasscode
 
-		// Update the detail record
-		err = r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", link.Detail.ID).Update("passcode", newPasscode).Error
-		if err != nil {
-			logger.Logger.Error("Failed to update passcode",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			return apperrors.ErrShortResetPasscodeFailed.WithError(err)
-		}
-	}
-	return nil
-}
+// 		// Update the detail record
+// 		err = r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", link.Detail.ID).Update("passcode", newPasscode).Error
+// 		if err != nil {
+// 			logger.Logger.Error("Failed to update passcode",
+// 				"short_code", code,
+// 				"error", err.Error(),
+// 			)
+// 			return apperrors.ErrShortResetPasscodeFailed.WithError(err)
+// 		}
+// 	}
+// 	return nil
+// }
 
-func (r *ShortLinkRepository) ForgotPasscodeShortLink(code string, newPasscode int, userID string, roleUser string) error {
-	var link shortlink.ShortLink
+// func (r *ShortLinkRepository) ForgotPasscodeShortLink(code string, newPasscode int, userID string, roleUser string) error {
+// 	var link shortlink.ShortLink
 
-	if roleUser != "admin" {
-		err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
-			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
-			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
-			First(&link).Error
+// 	if roleUser != "admin" {
+// 		err := r.db.Where("short_links.short_code = ? AND short_links.user_id = ?", code, userID).
+// 			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
+// 			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
+// 			First(&link).Error
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return apperrors.ErrShortLinkNotFound
-			}
-			logger.Logger.Error("Database error while fetching short link",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			return apperrors.ErrShortGetFailed.WithError(err)
-		}
+// 		if err != nil {
+// 			if errors.Is(err, gorm.ErrRecordNotFound) {
+// 				return apperrors.ErrShortLinkNotFound
+// 			}
+// 			logger.Logger.Error("Database error while fetching short link",
+// 				"short_code", code,
+// 				"error", err.Error(),
+// 			)
+// 			return apperrors.ErrShortGetFailed.WithError(err)
+// 		}
 
-	} else {
-		err := r.db.Where("short_code = ?", code).
-			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
-			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
-			First(&link).Error
+// 	} else {
+// 		err := r.db.Where("short_code = ?", code).
+// 			Joins("LEFT JOIN short_link_details ON short_links.id = short_link_details.short_link_id").
+// 			Select("short_links.*, short_link_details.passcode, short_link_details.id as detail_id").
+// 			First(&link).Error
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return apperrors.ErrShortLinkNotFound
-			}
-			logger.Logger.Error("Database error while fetching short link",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			return apperrors.ErrShortGetFailed.WithError(err)
-		}
-	}
+// 		if err != nil {
+// 			if errors.Is(err, gorm.ErrRecordNotFound) {
+// 				return apperrors.ErrShortLinkNotFound
+// 			}
+// 			logger.Logger.Error("Database error while fetching short link",
+// 				"short_code", code,
+// 				"error", err.Error(),
+// 			)
+// 			return apperrors.ErrShortGetFailed.WithError(err)
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (r *ShortLinkRepository) ValidatePasscodeToken(token string) (*shortlink.ShortLinkDetail, error) {
-	var detail shortlink.ShortLinkDetail
-	err := r.db.Where("passcode_token = ?", token).First(&detail).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil // Token not found
-		}
-		logger.Logger.Error("Database error while validating passcode token",
-			"token", token,
-			"error", err.Error(),
-		)
-		return nil, apperrors.ErrShortValidateTokenFailed.WithError(err)
-	}
-	// Optionally, check expiry
-	if !detail.PasscodeTokenExpiresAt.IsZero() && detail.PasscodeTokenExpiresAt.Before(time.Now()) {
-		return nil, nil // Token expired
-	}
-	return &detail, nil // Token is valid
-}
+// func (r *ShortLinkRepository) ValidatePasscodeToken(token string) (*shortlink.ShortLinkDetail, error) {
+// 	var detail shortlink.ShortLinkDetail
+// 	err := r.db.Where("passcode_token = ?", token).First(&detail).Error
+// 	if err != nil {
+// 		if errors.Is(err, gorm.ErrRecordNotFound) {
+// 			return nil, nil // Token not found
+// 		}
+// 		logger.Logger.Error("Database error while validating passcode token",
+// 			"token", token,
+// 			"error", err.Error(),
+// 		)
+// 		return nil, apperrors.ErrShortValidateTokenFailed.WithError(err)
+// 	}
+// 	// Optionally, check expiry
+// 	if !detail.PasscodeTokenExpiresAt.IsZero() && detail.PasscodeTokenExpiresAt.Before(time.Now()) {
+// 		return nil, nil // Token expired
+// 	}
+// 	return &detail, nil // Token is valid
+// }
 
-func (r *ShortLinkRepository) setPasscodeToken(userID string, linkID uint, token string, expiresAt time.Time) error {
-	var detail shortlink.ShortLinkDetail
+// func (r *ShortLinkRepository) setPasscodeToken(userID string, linkID uint, token string, expiresAt time.Time) error {
+// 	var detail shortlink.ShortLinkDetail
 
-	err := r.db.Where("short_link_id = ?", linkID).First(&detail).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperrors.ErrShortLinkNotFound
-		}
+// 	err := r.db.Where("short_link_id = ?", linkID).First(&detail).Error
+// 	if err != nil {
+// 		if errors.Is(err, gorm.ErrRecordNotFound) {
+// 			return apperrors.ErrShortLinkNotFound
+// 		}
 
-		logger.Logger.Error("Database error while fetching short link detail",
-			"short_link_id", linkID,
-			"error", err.Error(),
-		)
-		return apperrors.ErrShortDetailFindFailed.WithError(err)
-	}
-	detail.PasscodeTokenExpiresAt = expiresAt
+// 		logger.Logger.Error("Database error while fetching short link detail",
+// 			"short_link_id", linkID,
+// 			"error", err.Error(),
+// 		)
+// 		return apperrors.ErrShortDetailFindFailed.WithError(err)
+// 	}
+// 	detail.PasscodeTokenExpiresAt = expiresAt
 
-	if err := r.db.Save(&detail).Error; err != nil {
-		logger.Logger.Error("Failed to set passcode token",
-			"short_link_id", linkID,
-			"error", err.Error(),
-		)
-		return apperrors.ErrShortUpdateFailed.WithError(err)
-	}
+// 	if err := r.db.Save(&detail).Error; err != nil {
+// 		logger.Logger.Error("Failed to set passcode token",
+// 			"short_link_id", linkID,
+// 			"error", err.Error(),
+// 		)
+// 		return apperrors.ErrShortUpdateFailed.WithError(err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

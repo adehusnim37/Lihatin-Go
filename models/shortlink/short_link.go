@@ -11,7 +11,7 @@ type ShortLink struct {
 	ID          string         `json:"id" gorm:"primaryKey"`                    // Changed to string for consistency
 	UserID      *string        `json:"user_id,omitempty" gorm:"size:191;index"` // Foreign key to users table (nullable for optional auth)
 	ShortCode   string         `json:"short_code" gorm:"uniqueIndex;size:100;not null"`
-	OriginalURL string         `json:"original_url,omitempty" gorm:"type:text;not null"`
+	OriginalURL string         `json:"original_url" gorm:"type:text;not null"`
 	Title       string         `json:"title,omitempty" gorm:"size:255"`
 	Description string         `json:"description,omitempty" gorm:"type:text"`
 	IsActive    bool           `json:"is_active" gorm:"default:true;index"`
