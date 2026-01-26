@@ -145,14 +145,27 @@ type ClickHistoryItem struct {
 	Count int    `json:"count"`
 }
 
-type PaginatedShortLinkWithStatsResponse struct {
-	ShortLinks []ShortLinkWithStatsResponse `json:"short_links"`
-	TotalCount int64                        `json:"total_count"`
-	Page       int                          `json:"page"`
-	Limit      int                          `json:"limit"`
-	TotalPages int                          `json:"total_pages"`
-	Sort       string                       `json:"sort"`
-	OrderBy    string                       `json:"order_by"`
+// DashboardSummary represents aggregate statistics across all short links
+type DashboardSummary struct {
+	TotalLinks          int64              `json:"total_links"`
+	ActiveLinks         int64              `json:"active_links"`
+	InactiveLinks       int64              `json:"inactive_links"`
+	TotalClicks         int64              `json:"total_clicks"`
+	TotalUniqueVisitors int64              `json:"total_unique_visitors"`
+	ClicksLast24h       int64              `json:"clicks_last_24h"`
+	ClicksLast7d        int64              `json:"clicks_last_7d"`
+	ClicksLast30d       int64              `json:"clicks_last_30d"`
+	ClicksLast60d       int64              `json:"clicks_last_60d"`
+	ClicksLast90d       int64              `json:"clicks_last_90d"`
+	TopCountries        []Country          `json:"top_countries"`
+	TopDevices          []TopDevice        `json:"top_devices"`
+	TopReferrers        []TopReferrer      `json:"top_referrers"`
+	ClickHistory        []ClickHistoryItem `json:"click_history"`
+}
+
+// DashboardStatsResponse is the simplified response for dashboard stats endpoint
+type DashboardStatsResponse struct {
+	Summary *DashboardSummary `json:"summary"`
 }
 
 type PaginatedShortLinkDetailWithStatsResponse struct {
