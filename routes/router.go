@@ -85,6 +85,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	RegisterAuthRoutes(v1, authController, userRepo, *loginAttemptRepo, emailController, totpController, baseController)
 	RegisterLoggerRoutes(v1, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, authRepo)
+	RegisterDocsRoutes(v1)
 
 	// Route health check
 	v1.GET("/health", func(c *gin.Context) {

@@ -1,0 +1,3681 @@
+openapi: 3.0.0
+info:
+  title: Lihat.in
+  version: 1.0.0
+servers:
+  - url: http://{{base_url}}v1
+  - url: http://localhost:8080
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    noauthAuth:
+      type: http
+      scheme: noauth
+tags:
+  - name: Auth
+  - name: Auth > Admin
+  - name: Auth > Admin > Login Attempts
+  - name: Auth > User
+  - name: Auth > API Key
+  - name: Short-Links
+  - name: Short-Links > User
+  - name: Short-Links > Admin
+  - name: Short-Links > API Key
+  - name: Log
+paths:
+  /auth/admin/login-attempts/stats/bakabans/30:
+    get:
+      tags:
+        - Auth > Admin > Login Attempts
+      summary: Login Attempts Stats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 22 Oct 2025 09:04:42 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "attempts": [
+                            {
+                                "id": "4dd8755e-2957-4349-8d3f-8a3c9ebbbda6",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-10-22T14:30:23.472+07:00",
+                                "created_at": "2025-10-22T14:30:23.472+07:00",
+                                "updated_at": "2025-10-22T14:30:23.472+07:00"
+                            },
+                            {
+                                "id": "7a2d16d1-5abe-49ef-9ea1-22d537bbef96",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-10-21T14:41:13.226+07:00",
+                                "created_at": "2025-10-21T14:41:13.227+07:00",
+                                "updated_at": "2025-10-21T14:41:13.227+07:00"
+                            },
+                            {
+                                "id": "4951606f-f65f-4337-ac08-c57c8e9fbca9",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.48.0",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-10-02T16:21:44.768+07:00",
+                                "created_at": "2025-10-02T16:21:44.769+07:00",
+                                "updated_at": "2025-10-02T16:21:44.769+07:00"
+                            },
+                            {
+                                "id": "2e4ce9fd-6eb3-4091-a005-86e0607d55c8",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.48.0",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-09-30T11:20:58.43+07:00",
+                                "created_at": "2025-09-30T11:20:58.431+07:00",
+                                "updated_at": "2025-09-30T11:20:58.431+07:00"
+                            },
+                            {
+                                "id": "177171cf-16a3-49bb-ad60-4647651d2573",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.48.0",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-09-29T09:47:08.619+07:00",
+                                "created_at": "2025-09-29T09:47:08.62+07:00",
+                                "updated_at": "2025-09-29T09:47:08.62+07:00"
+                            },
+                            {
+                                "id": "d083f0c6-df06-4f8d-b56d-11de35feb7b8",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.47.1",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-09-26T10:00:10.475+07:00",
+                                "created_at": "2025-09-26T10:00:10.475+07:00",
+                                "updated_at": "2025-09-26T10:00:10.475+07:00"
+                            },
+                            {
+                                "id": "5a7ca6e3-3b66-482b-b32e-f1be3011745e",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.47.1",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-09-24T15:12:49.76+07:00",
+                                "created_at": "2025-09-24T15:12:49.761+07:00",
+                                "updated_at": "2025-09-24T15:12:49.761+07:00"
+                            },
+                            {
+                                "id": "cd4b4415-ef07-4089-89a8-819fe9e689f3",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.47.1",
+                                "success": true,
+                                "fail_reason": "All good",
+                                "attempted_at": "2025-09-23T14:04:16.289+07:00",
+                                "created_at": "2025-09-23T14:04:16.289+07:00",
+                                "updated_at": "2025-09-23T14:04:16.289+07:00"
+                            },
+                            {
+                                "id": "926c849b-6593-4c5d-ae4a-e90c5dc849cd",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.47.1",
+                                "success": false,
+                                "attempted_at": "2025-09-23T14:04:11.244+07:00",
+                                "created_at": "2025-09-23T14:04:11.244+07:00",
+                                "updated_at": "2025-09-23T14:04:11.244+07:00"
+                            },
+                            {
+                                "id": "0872d5ba-eeb8-4448-8605-b47ae26a45ae",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.47.1",
+                                "success": false,
+                                "attempted_at": "2025-09-23T14:04:08.551+07:00",
+                                "created_at": "2025-09-23T14:04:08.553+07:00",
+                                "updated_at": "2025-09-23T14:04:08.553+07:00"
+                            }
+                        ],
+                        "limit": 10,
+                        "page": 1,
+                        "total_count": 22,
+                        "total_pages": 3
+                    },
+                    "message": "Login attempts retrieved successfully"
+                }
+  /auth/admin/login-attempts:
+    get:
+      tags:
+        - Auth > Admin > Login Attempts
+      summary: Get All Login Attempts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '1'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+        - name: username
+          in: query
+          schema:
+            type: string
+          example: bakabans
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Tue, 04 Nov 2025 15:22:10 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "attempts": [
+                            {
+                                "id": "3dd66509-cf9a-424f-9af5-78e617885ee0",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:40.817+07:00",
+                                "updated_at": "2025-10-30T12:24:40.817+07:00"
+                            },
+                            {
+                                "id": "a20556e7-52eb-49c9-9554-c528fb7dbbc5",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:24.653+07:00",
+                                "updated_at": "2025-10-30T12:24:24.653+07:00"
+                            },
+                            {
+                                "id": "8037fffe-05c7-4251-97ab-648686cbea59",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:23.912+07:00",
+                                "updated_at": "2025-10-30T12:24:23.912+07:00"
+                            },
+                            {
+                                "id": "27a5c0a2-05c0-475a-93b7-0ca2d4e06605",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:23.303+07:00",
+                                "updated_at": "2025-10-30T12:24:23.303+07:00"
+                            },
+                            {
+                                "id": "9d010418-5b0b-4f8b-9858-69bbe415de1e",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:22.693+07:00",
+                                "updated_at": "2025-10-30T12:24:22.693+07:00"
+                            },
+                            {
+                                "id": "09c79428-351e-418e-95ca-508ff93a5bc5",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:22.144+07:00",
+                                "updated_at": "2025-10-30T12:24:22.144+07:00"
+                            },
+                            {
+                                "id": "4aabc24d-d88f-484a-89bd-c18e5d9a72fe",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:21.52+07:00",
+                                "updated_at": "2025-10-30T12:24:21.52+07:00"
+                            },
+                            {
+                                "id": "058aafe5-eb33-4c10-af96-9b593f010f20",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:20.796+07:00",
+                                "updated_at": "2025-10-30T12:24:20.796+07:00"
+                            },
+                            {
+                                "id": "6d0cf975-3d58-410a-b727-9a3eea8dd62a",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:20.246+07:00",
+                                "updated_at": "2025-10-30T12:24:20.246+07:00"
+                            },
+                            {
+                                "id": "6d993dad-0bb1-4d12-8c65-fe132dfa7235",
+                                "email_or_username": "bakabans",
+                                "ip_address": "::1",
+                                "user_agent": "PostmanRuntime/7.49.0",
+                                "success": false,
+                                "fail_reason": "Your account has been locked. Please contact support.",
+                                "created_at": "2025-10-30T12:24:19.682+07:00",
+                                "updated_at": "2025-10-30T12:24:19.682+07:00"
+                            }
+                        ],
+                        "limit": 10,
+                        "page": 1,
+                        "total_count": 42,
+                        "total_pages": 5
+                    },
+                    "message": "Login attempts retrieved successfully"
+                }
+  /auth/admin/users:
+    get:
+      tags:
+        - Auth > Admin
+      summary: Get All
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '1'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 22 Oct 2025 08:43:09 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '719'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "users": [
+                            {
+                                "id": "2544eae4-8cdc-444e-93ab-4bcb624062de",
+                                "username": "testuser2",
+                                "first_name": "Ade Husni Mubarrok",
+                                "last_name": "Bakaban",
+                                "email": "testuser2@gmail.com",
+                                "created_at": "2025-09-18T16:10:45.089+07:00",
+                                "updated_at": "2025-09-18T16:10:45.089+07:00",
+                                "is_premium": false,
+                                "is_locked": false,
+                                "role": "user"
+                            },
+                            {
+                                "id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "username": "bakaban",
+                                "first_name": "Ade Husni Mubarrok",
+                                "last_name": "Bakaban",
+                                "email": "adehusni37@gmail.com",
+                                "created_at": "2025-08-31T22:12:42.141+07:00",
+                                "updated_at": "2025-08-31T22:12:42.141+07:00",
+                                "is_premium": true,
+                                "is_locked": false,
+                                "role": "admin"
+                            }
+                        ],
+                        "total_count": 2,
+                        "page": 1,
+                        "limit": 10,
+                        "total_pages": 1
+                    },
+                    "message": "Users retrieved successfully"
+                }
+  /auth/admin/users/92aabb21-3597-4f3f-9fa5-bb82868f7039:
+    get:
+      tags:
+        - Auth > Admin
+      summary: Get by user ID
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 22 Oct 2025 08:52:23 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '358'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                        "username": "bakaban",
+                        "first_name": "Ade Husni Mubarrok",
+                        "last_name": "Bakaban",
+                        "email": "adehusni37@gmail.com",
+                        "created_at": "2025-08-31T22:12:42.141+07:00",
+                        "updated_at": "2025-08-31T22:12:42.141+07:00",
+                        "is_premium": true,
+                        "is_locked": false,
+                        "role": "admin"
+                    },
+                    "message": "User retrieved successfully"
+                }
+  /auth/admin/users/019a3389-4064-7e30-acc9-bcba9a3f4a40/lock:
+    post:
+      tags:
+        - Auth > Admin
+      summary: Lock User
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                reason: Moohon maaf
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Thu, 30 Oct 2025 05:16:55 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '61'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "User account locked successfully"
+                }
+  /auth/register:
+    post:
+      tags:
+        - Auth > User
+      summary: Register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                first_name: Ade Husni Mubarrok
+                last_name: Bakaban
+                username: bakabans
+                email: thoushiroade@gmail.com
+                password: ryugamine123A$
+      responses:
+        '201':
+          description: Created
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sat, 30 Aug 2025 10:57:05 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '184'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "email": "adehusni37@gmail.com",
+                        "user_id": "6b55d626-c784-4817-8dd5-5d1e7aa7050b"
+                    },
+                    "message": "Registration successful. Please check your email for verification."
+                }
+        '409':
+          description: Conflict
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sat, 30 Aug 2025 10:51:18 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '105'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": false,
+                    "message": "Registration failed",
+                    "error": {
+                        "email": "User with this email already exists"
+                    }
+                }
+  /auth/login:
+    post:
+      tags:
+        - Auth > User
+      summary: Login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                email_or_username: bakaban
+                password: ryugamine123A$
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sat, 30 Aug 2025 10:51:27 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '1223'
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                example-0:
+                  summary: New Request
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "is_verified": false,
+                            "message": "Login successful",
+                            "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJsaWhhdGluLWdvIiwic3ViIjoiNzA0NjJlMmMtOTRhYi00ODFjLTg4NzEtNDU1NjlmYjFmN2U4IiwiZXhwIjoxNzU3MTU1ODg3LCJuYmYiOjE3NTY1NTEwODcsImlhdCI6MTc1NjU1MTA4N30.gf9uYlZTpBP8QoBEbHvDJ1h5l97fErv4dWH66jWViD4",
+                            "requires_2fa": false,
+                            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNzA0NjJlMmMtOTRhYi00ODFjLTg4NzEtNDU1NjlmYjFmN2U4IiwidXNlcm5hbWUiOiJiYWthYmFuIiwiZW1haWwiOiJhZGVodXNuaTM3QGdtYWlsLmNvbSIsInJvbGUiOiJyZWd1bGFyIiwiaXNfcHJlbWl1bSI6ZmFsc2UsImlzX3ZlcmlmaWVkIjpmYWxzZSwiaXNzIjoibGloYXRpbi1nbyIsInN1YiI6IjcwNDYyZTJjLTk0YWItNDgxYy04ODcxLTQ1NTY5ZmIxZjdlOCIsImV4cCI6MTc1NjYzNzQ4NywibmJmIjoxNzU2NTUxMDg3LCJpYXQiOjE3NTY1NTEwODd9.2qiqwYHFQBYeDJ8OBi5Ae0ObFnMgxxwh6-UfcuNrb4U",
+                            "user": {
+                                "id": "70462e2c-94ab-481c-8871-45569fb1f7e8",
+                                "username": "bakaban",
+                                "first_name": "Ade Husni Mubarrok",
+                                "last_name": "Bakaban",
+                                "email": "adehusni37@gmail.com",
+                                "password": "$2a$10$nruzcuaPFKfkcFIlMy/pEOLSxiArD76yyhoYGStFxDDDRlwsDaiB.",
+                                "created_at": "2025-08-29T16:59:46.546+07:00",
+                                "updated_at": "2025-08-29T16:59:46.546+07:00",
+                                "is_premium": false,
+                                "avatar": "",
+                                "is_locked": false,
+                                "role": "user"
+                            }
+                        },
+                        "message": "Login successful"
+                    }
+                example-1:
+                  summary: Login
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "token": {
+                                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMDE5OWMzNGYtNjE0Zi03YTVhLWJiMjctOTdiMTJhN2JiOWEyIiwic2Vzc2lvbl9pZCI6InNlc3NfZjc4NGRkN2Y3MzA1YjA5MjVmYjM1NTU3OGY1NzFjZmQ1ZTVlZTQ3ZjQzMzViNmM3NGI3MDVkZTg0NzM4MGM0ZSIsImRldmljZV9pZCI6ImZwXzcyNF8wXzVmYiIsImxhc3RfaXAiOiI6OjEiLCJ1c2VybmFtZSI6ImJha2FiYW4iLCJlbWFpbCI6ImFkZWh1c25pMzdAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpc19wcmVtaXVtIjpmYWxzZSwiaXNfdmVyaWZpZWQiOnRydWUsImlzcyI6ImxpaGF0aW4tZ28iLCJzdWIiOiIwMTk5YzM0Zi02MTRmLTdhNWEtYmIyNy05N2IxMmE3YmI5YTIiLCJleHAiOjE3NjAyNDMxMzYsIm5iZiI6MTc2MDA3MDMzNiwiaWF0IjoxNzYwMDcwMzM2LCJqdGkiOiJjNDdiY2I2Nzk0NzNmYzNiZDU3ZmZmODEzMjM5OTgzN2I4YzBiODFkYTI4OWFmMGUwZjhhMTUzNWZmZTAyY2UxIn0.RAi9oNn8qTA-IUTC1f5X7bW9b7ZmTYKMYLY8l741aaE",
+                                "refresh_token": "3bc17cf2b20c195213e0dc37dd1075e00a7ad2e06980bb76c08fa11b454971ce1def0542cc6c693cf019b21ac92f6cfb91e0fcf19f17808a8f4ba8b6f3093efa"
+                            },
+                            "user": {
+                                "id": "0199c34f-614f-7a5a-bb27-97b12a7bb9a2",
+                                "username": "bakaban",
+                                "first_name": "Ade Husni Mubarrok",
+                                "last_name": "Bakaban",
+                                "email": "adehusni37@gmail.com",
+                                "avatar": "",
+                                "is_premium": false,
+                                "created_at": "2025-10-08T17:13:03+07:00"
+                            },
+                            "auth": {
+                                "id": "0199c34f-615c-761d-9d5d-ba356b0ab9b8",
+                                "user_id": "0199c34f-614f-7a5a-bb27-97b12a7bb9a2",
+                                "is_email_verified": true,
+                                "is_totp_enabled": false,
+                                "last_login_at": "2025-10-09T13:18:01+07:00"
+                            }
+                        },
+                        "message": "Login successful"
+                    }
+        '403':
+          description: Forbidden
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Thu, 30 Oct 2025 05:24:40 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '117'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": false,
+                    "message": "Account locked",
+                    "error": {
+                        "auth": "Your account has been locked. Please contact support."
+                    }
+                }
+  /auth/send-verification-email:
+    post:
+      tags:
+        - Auth > User
+      summary: Resend Verification Email
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example: ''
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sat, 30 Aug 2025 15:11:51 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '107'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "sent_to": "adehusni37@gmail.com"
+                    },
+                    "message": "Verification email sent successfully"
+                }
+  /auth/forgot-password:
+    post:
+      tags:
+        - Auth > User
+      summary: Forgot Password
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                email: adehusni37@gmail.com
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 15 Oct 2025 07:24:24 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '102'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "If an account with that email exists, a password reset link has been sent"
+                }
+  /auth/reset-password:
+    post:
+      tags:
+        - Auth > User
+      summary: Reset Password
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                token: >-
+                  121f0c46113ae4df14fce9f1046c63d3d7efc70fbd7eef07f80f31051e53a6c0
+                new_password: ryugamine123A$
+                confirm_password: ryugamine123A$
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 15 Oct 2025 07:31:56 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '62'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "Successfully Changed The Password"
+                }
+  /auth/logout:
+    post:
+      tags:
+        - Auth > User
+      summary: Logout
+      requestBody:
+        content: {}
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Fri, 10 Oct 2025 04:17:34 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '46'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "Logout successful"
+                }
+  /auth/profile:
+    get:
+      tags:
+        - Auth > User
+      summary: Profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ''
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          headers:
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
+                example: 'true'
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: >-
+                  Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,
+                  Authorization, accept, origin, Cache-Control,
+                  X-Requested-With, X-API-Key
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: POST, OPTIONS, GET, PUT, DELETE, PATCH
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: '86400'
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Thu, 20 Nov 2025 03:35:36 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '676'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "user": {
+                            "id": "0199c34f-614f-7a5a-bb27-97b12a7bb9a2",
+                            "username": "bakaban",
+                            "first_name": "Ade Husni ",
+                            "last_name": "Mubarrok",
+                            "email": "adehusni37@gmail.com",
+                            "avatar": "",
+                            "is_premium": true,
+                            "created_at": "2025-10-08 17:13:03"
+                        },
+                        "auth": {
+                            "id": "0199c34f-615c-761d-9d5d-ba356b0ab9b8",
+                            "user_id": "0199c34f-614f-7a5a-bb27-97b12a7bb9a2",
+                            "is_email_verified": true,
+                            "device_id": "fp_1fa8_ef6_80c",
+                            "last_ip": "208.54.104.184",
+                            "last_login_at": "2025-11-20T10:35:28.566+07:00",
+                            "failed_login_attempts": 0,
+                            "is_active": true,
+                            "is_totp_enabled": false,
+                            "created_at": "2025-10-08T17:13:03.453+07:00",
+                            "updated_at": "2025-11-20T10:35:28.566+07:00"
+                        }
+                    },
+                    "message": "Profile retrieved successfully"
+                }
+  /auth/change-email:
+    post:
+      tags:
+        - Auth > User
+      summary: Change Email
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                new_email: thoushiroade@gmail.com
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sat, 11 Oct 2025 13:00:22 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '118'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "Change email request processed. Please verify your new email address as soon as possible."
+                }
+  /v1/auth/validate-reset:
+    get:
+      tags:
+        - Auth > User
+      summary: Validate Reset Token
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+          example: 4e73dfa64c19642cc470dfe18df8bfbc11843a1404eb6b9fe420eca6ddb6ad8a
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 15 Oct 2025 08:59:20 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '43'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "Token is valid"
+                }
+  /auth/check-verification-email:
+    get:
+      tags:
+        - Auth > User
+      summary: Check Verification Email Status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ''
+          in: header
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /api-keys:
+    post:
+      tags:
+        - Auth > API Key
+      summary: Gen Api Key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                name: Test Api Bro
+                permissions:
+                  - read
+                  - write
+                blocked_ips:
+                  - 120.100.10.20
+                  - 100.213.134.111
+                limit_usage: 10
+                is_active: true
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Created
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Mon, 15 Sep 2025 17:18:48 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '371'
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                example-0:
+                  summary: New Request
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "created_at": "2025-09-16T00:18:48.006+07:00",
+                            "expires_at": null,
+                            "id": "4baf400e-3e58-4c1d-ae53-9bececdc25f9",
+                            "key": "fbc9752665deff545be87f0fc2098ecc90dc9fffab7a773f",
+                            "name": "Test Api Key123124124",
+                            "permissions": null,
+                            "warning": "This is the only time the full API key will be shown. Please save it securely."
+                        },
+                        "message": "API key created successfully"
+                    }
+                example-1:
+                  summary: Gen Api Key
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "created_at": "2025-09-16T06:12:46.07+07:00",
+                            "expires_at": null,
+                            "id": "81a32975-f4b3-4da1-8a90-60aad0b69dc6",
+                            "key": "sk_lh_9je4CLWkotY6De6tHhItRo08oy927VyJ.crGt4am2db82bR3HlYGPhcs4uFb54Wn6eNAalAvzMrE",
+                            "name": "Test Api Key123124124",
+                            "permissions": null,
+                            "warning": "This is the only time the full API key will be shown. Please save it securely."
+                        },
+                        "message": "API key created successfully"
+                    }
+                example-2:
+                  summary: Gen Api Key
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "id": "0f40c7b6-8745-4d6e-a088-48d565eb8e50",
+                            "name": "Test Api Pm1",
+                            "created_at": "2025-09-23T14:41:15.909422+07:00",
+                            "permissions": [
+                                "read",
+                                "write",
+                                "delete",
+                                "update"
+                            ],
+                            "key": "sk_lh_K_CYhLPuYeSgfLkYLs7msFtGNV_nu48a.I33d0YIQQDqBlHW3z7ZSCHhyw_-u_EEgP55f53P_Wpo",
+                            "warning": "Please save this key as it will not be shown again."
+                        },
+                        "message": "API key created successfully"
+                    }
+                example-3:
+                  summary: Gen Api Key
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "id": "6cb1ce67-7593-4e48-bd9e-c645d47c49e1",
+                            "name": "Test Api Bro",
+                            "created_at": "2025-09-29T11:18:43.530237+07:00",
+                            "permissions": [
+                                "read",
+                                "write"
+                            ],
+                            "blocked_ips": [
+                                "120.100.10.20",
+                                "100.213.134.111"
+                            ],
+                            "limit_usage": 10,
+                            "usage_count": 0,
+                            "is_active": true,
+                            "key": "sk_lh_iOqbtyNq7C7r6PSZeFOkeXVy7ZD5NGW5.DGWYpgF9AsPU4R6LIFn21lo77a7gMWX95WlNTQkxzn8",
+                            "warning": "Please save this key as it will not be shown again."
+                        },
+                        "message": "API key created successfully"
+                    }
+    get:
+      tags:
+        - Auth > API Key
+      summary: Get All
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 24 Sep 2025 03:01:16 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '747'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": [
+                        {
+                            "id": "0700d412-301a-4998-bcc0-c51faac4fb85",
+                            "name": "Test Api Pm",
+                            "key_preview": "sk_lh_08...4Ez8",
+                            "is_active": true,
+                            "permissions": [
+                                "read",
+                                "write",
+                                "delete",
+                                "update"
+                            ],
+                            "created_at": "2025-09-23T14:30:31.491+07:00"
+                        },
+                        {
+                            "id": "0f40c7b6-8745-4d6e-a088-48d565eb8e50",
+                            "name": "Test Api Pm1",
+                            "key_preview": "sk_lh_K_...u48a",
+                            "last_used_at": "2025-09-24T10:00:32.109+07:00",
+                            "is_active": true,
+                            "permissions": [
+                                "read",
+                                "write",
+                                "delete",
+                                "update"
+                            ],
+                            "created_at": "2025-09-23T14:41:15.909+07:00"
+                        },
+                        {
+                            "id": "81a32975-f4b3-4da1-8a90-60aad0b69dc6",
+                            "name": "Test Api Key",
+                            "key_preview": "sk_lh_9j...7VyJ",
+                            "is_active": true,
+                            "permissions": [
+                                "read",
+                                "write",
+                                "delete",
+                                "update"
+                            ],
+                            "created_at": "2025-09-16T06:12:46.07+07:00"
+                        }
+                    ],
+                    "message": "API keys retrieved successfully"
+                }
+  /api-keys/0700d412-301a-4998-bcc0-c51faac4fb85:
+    get:
+      tags:
+        - Auth > API Key
+      summary: Get
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 24 Sep 2025 04:04:54 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '276'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "id": "0700d412-301a-4998-bcc0-c51faac4fb85",
+                        "name": "Test Api Pm",
+                        "key_preview": "sk_lh_08...4Ez8",
+                        "is_active": true,
+                        "permissions": [
+                            "read",
+                            "write",
+                            "delete",
+                            "update"
+                        ],
+                        "created_at": "2025-09-23T14:30:31.491+07:00"
+                    },
+                    "message": "API key retrieved successfully"
+                }
+    delete:
+      tags:
+        - Auth > API Key
+      summary: Revoke & Delete
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 24 Sep 2025 05:44:52 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '57'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "message": "API key revoked successfully"
+                }
+  /api-keys/0f40c7b6-8745-4d6e-a088-48d565eb8e50:
+    put:
+      tags:
+        - Auth > API Key
+      summary: Update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                name: Test Update Api Key BROOO
+                limit_usage: 60
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Fri, 26 Sep 2025 08:53:01 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '361'
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                example-0:
+                  summary: Update
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "id": "0f40c7b6-8745-4d6e-a088-48d565eb8e50",
+                            "name": "Test Update Api Key",
+                            "key_preview": "sk_lh_R3...MSpk",
+                            "last_used_at": "2025-09-26T15:21:49.647+07:00",
+                            "limit_usage": 4,
+                            "usage_count": 0,
+                            "is_active": true,
+                            "permissions": [
+                                "write",
+                                "delete",
+                                "update",
+                                "read"
+                            ],
+                            "created_at": "2025-09-23T14:41:15.909+07:00"
+                        },
+                        "message": "API key updated successfully"
+                    }
+                example-1:
+                  summary: Update
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "id": "0f40c7b6-8745-4d6e-a088-48d565eb8e50",
+                            "name": "Test Update Api Key BROOO",
+                            "key_preview": "sk_lh_R3...MSpk",
+                            "last_used_at": "2025-09-29T09:50:17.799+07:00",
+                            "limit_usage": 6,
+                            "usage_count": 5,
+                            "last_ip_used": "::1",
+                            "is_active": true,
+                            "permissions": [
+                                "write",
+                                "delete",
+                                "update",
+                                "read"
+                            ],
+                            "created_at": "2025-09-23T14:41:15.909+07:00"
+                        },
+                        "message": "API key updated successfully"
+                    }
+  /api-keys/0f40c7b6-8745-4d6e-a088-48d565eb8e50/refresh:
+    post:
+      tags:
+        - Auth > API Key
+      summary: Refresh
+      requestBody:
+        content: {}
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 24 Sep 2025 09:19:27 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '754'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "api_key": {
+                            "created_at": "2025-09-23T14:41:15.909+07:00",
+                            "expires_at": null,
+                            "id": "0f40c7b6-8745-4d6e-a088-48d565eb8e50",
+                            "is_active": true,
+                            "key_preview": "sk_lh_op...ccVZ",
+                            "name": "Test Api Pm1",
+                            "permissions": [
+                                "write",
+                                "delete",
+                                "update"
+                            ],
+                            "updated_at": "2025-09-24T16:19:27.902+07:00"
+                        },
+                        "secret": {
+                            "expires_in": "never",
+                            "format": "Use as: X-API-Key: sk_lh_opu5z8XEJbfWY1i5ItDYwFGR9wHHccVZ.df5rnSMKCcpXs0YU-0QLFCRGlxfifXY4mAkzN_Xx4HI",
+                            "full_api_key": "sk_lh_opu5z8XEJbfWY1i5ItDYwFGR9wHHccVZ.df5rnSMKCcpXs0YU-0QLFCRGlxfifXY4mAkzN_Xx4HI",
+                            "warning": "Save this key securely - it will not be shown again"
+                        },
+                        "usage": {
+                            "is_regenerated": true,
+                            "last_ip_used": null,
+                            "last_used_at": null,
+                            "previous_usage_reset": true
+                        }
+                    },
+                    "message": "API key refreshed successfully"
+                }
+  /api-keys/0f40c7b6-8745-4d6e-a088-48d565eb8e50/usage:
+    get:
+      tags:
+        - Auth > API Key
+      summary: GetAPIKeyActivityLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '5'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Tue, 30 Sep 2025 04:35:33 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "activity_logs": [
+                            {
+                                "id": "0199855c-c297-776a-b609-b8ca7637fdc3",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855c-c297-776a-b609-b8ca7637fdc3",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (3ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:31:12.915+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"8cdf4ac2-35ce-44a6-af25-099ca8efd844\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 3,
+                                    "created_at": "2025-09-26T16:31:12.921+07:00",
+                                    "updated_at": "2025-09-26T16:31:12.921+07:00"
+                                }
+                            },
+                            {
+                                "id": "0199855c-c553-74e2-8684-f8a377429ddf",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855c-c553-74e2-8684-f8a377429ddf",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (1ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:31:13.618+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"00894387-0564-4ab6-886d-ecaf4e88770a\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 1,
+                                    "created_at": "2025-09-26T16:31:13.619+07:00",
+                                    "updated_at": "2025-09-26T16:31:13.619+07:00"
+                                }
+                            },
+                            {
+                                "id": "0199855d-728a-7c96-87e2-9bc3dcd72c76",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855d-728a-7c96-87e2-9bc3dcd72c76",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (3ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:31:57.958+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"719e28bc-22eb-42b0-87d2-032027766f93\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 3,
+                                    "created_at": "2025-09-26T16:31:57.964+07:00",
+                                    "updated_at": "2025-09-26T16:31:57.964+07:00"
+                                }
+                            },
+                            {
+                                "id": "0199855e-0a72-738a-a333-9a1d0e36127f",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855e-0a72-738a-a333-9a1d0e36127f",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (1ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:32:36.848+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"b327cec8-14ef-4147-843b-2cbef3ea9441\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 1,
+                                    "created_at": "2025-09-26T16:32:36.851+07:00",
+                                    "updated_at": "2025-09-26T16:32:36.851+07:00"
+                                }
+                            },
+                            {
+                                "id": "0199855e-0c92-7484-9fae-4f1bc38e5120",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855e-0c92-7484-9fae-4f1bc38e5120",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (1ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:32:37.392+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"18c4da1c-903c-446e-8aff-69b4c817efc3\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 1,
+                                    "created_at": "2025-09-26T16:32:37.395+07:00",
+                                    "updated_at": "2025-09-26T16:32:37.395+07:00"
+                                }
+                            },
+                            {
+                                "id": "0199855e-8cd4-7f23-a5bf-af42d946e79a",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855e-8cd4-7f23-a5bf-af42d946e79a",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (3ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:33:10.225+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"73ff2be8-6fa9-4418-b8f2-c909dabc0a4b\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 3,
+                                    "created_at": "2025-09-26T16:33:10.229+07:00",
+                                    "updated_at": "2025-09-26T16:33:10.229+07:00"
+                                }
+                            },
+                            {
+                                "id": "0199855f-6e52-78ca-89a1-9e236790f385",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "0199855f-6e52-78ca-89a1-9e236790f385",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (2ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:34:07.952+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"586f07ef-ad0b-4591-8177-a41090d4878c\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 2,
+                                    "created_at": "2025-09-26T16:34:07.956+07:00",
+                                    "updated_at": "2025-09-26T16:34:07.956+07:00"
+                                }
+                            },
+                            {
+                                "id": "01998560-0f79-7631-b171-c67596fe5ca8",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "01998560-0f79-7631-b171-c67596fe5ca8",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (3ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:34:49.205+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"9d91f3b1-7af2-4c7d-bb01-6610df598368\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 3,
+                                    "created_at": "2025-09-26T16:34:49.21+07:00",
+                                    "updated_at": "2025-09-26T16:34:49.21+07:00"
+                                }
+                            },
+                            {
+                                "id": "01998560-5990-79ac-961d-69e4a21174f5",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "01998560-5990-79ac-961d-69e4a21174f5",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (1ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:35:08.174+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"b39b6e26-06fc-4ab7-96d9-bb03868faf5e\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 1,
+                                    "created_at": "2025-09-26T16:35:08.177+07:00",
+                                    "updated_at": "2025-09-26T16:35:08.177+07:00"
+                                }
+                            },
+                            {
+                                "id": "01998560-5abc-7cd5-8982-a19a8368bff1",
+                                "api_key": "sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "activity_log": {
+                                    "id": "01998560-5abc-7cd5-8982-a19a8368bff1",
+                                    "level": "WARNING",
+                                    "message": "GET /v1/api/short - 401 (1ms)",
+                                    "username": "anonymous user",
+                                    "timestamp": "2025-09-26T16:35:08.475+07:00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.48.0",
+                                    "browser_info": "PostmanRuntime 7.48.0 on ",
+                                    "action": "View",
+                                    "route": "/v1/api/short",
+                                    "method": "GET",
+                                    "status_code": 401,
+                                    "request_body": "{}",
+                                    "request_headers": "{\"Accept\":\"*/*\",\"Accept-Encoding\":\"gzip, deflate, br\",\"Cache-Control\":\"no-cache\",\"Connection\":\"keep-alive\",\"Postman-Token\":\"f849efa1-8dd9-43f1-b014-c3e0e2a85df6\",\"User-Agent\":\"PostmanRuntime/7.48.0\",\"X-Api-Key\":\"sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I\"}",
+                                    "query_params": "{}",
+                                    "route_params": "{}",
+                                    "response_body": "{\"success\":false,\"message\":\"Invalid API key\",\"error\":{\"api_key\":\"The provided API key is invalid or expired\"}}",
+                                    "response_time": 1,
+                                    "created_at": "2025-09-26T16:35:08.477+07:00",
+                                    "updated_at": "2025-09-26T16:35:08.477+07:00"
+                                }
+                            }
+                        ],
+                        "total_count": 70,
+                        "page": 5,
+                        "limit": 10,
+                        "total_pages": 7,
+                        "has_next": true,
+                        "has_prev": true,
+                        "api_key_info": {
+                            "id": "0f40c7b6-8745-4d6e-a088-48d565eb8e50",
+                            "name": "Test Update Api Key BROOO",
+                            "key_preview": "sk_lh_R3...MSpk",
+                            "is_active": true,
+                            "created_at": "2025-09-23T14:41:15.909+07:00"
+                        }
+                    },
+                    "message": "API key activity logs fetched successfully"
+                }
+        '404':
+          description: Not Found
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Tue, 30 Sep 2025 04:21:04 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '102'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": false,
+                    "message": "Activity log not found",
+                    "error": {
+                        "activity_log": "Activity log not found"
+                    }
+                }
+  /users/me/shorts/testuat/views:
+    get:
+      tags:
+        - Short-Links > User
+      summary: Get Short with Views
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '1'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+        - name: sort
+          in: query
+          schema:
+            type: string
+          example: created_at
+        - name: order_by
+          in: query
+          schema:
+            type: string
+          example: desc
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sun, 07 Sep 2025 22:11:42 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                example-0:
+                  summary: Get Short
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "short_links": [
+                                {
+                                    "id": "6dbd2436-07ca-44bb-aacf-cc0c2abafcfb",
+                                    "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                    "short_code": "bakass",
+                                    "original_url": "https://googles.com",
+                                    "is_active": true,
+                                    "expires_at": null,
+                                    "created_at": "2025-08-31T22:27:38.713+07:00",
+                                    "updated_at": "2025-08-31T22:27:38.713+07:00"
+                                }
+                            ],
+                            "short_link_detail": {
+                                "id": "0064bfd5-421f-410b-937e-23f5cad24e31",
+                                "current_clicks": 14,
+                                "enable_stats": true
+                            },
+                            "views": {
+                                "recent_views": [
+                                    {
+                                        "id": "010a5dcc-435f-4736-8545-011a7f26f6cb",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:35:30.386+07:00"
+                                    },
+                                    {
+                                        "id": "1b31e108-6971-4e21-97c0-56bcf2baa4fb",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:35:29.643+07:00"
+                                    },
+                                    {
+                                        "id": "995bc8d3-e758-4981-af30-e2c6b50857cb",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:35:29.042+07:00"
+                                    },
+                                    {
+                                        "id": "0dad15cc-ec5b-486e-8b7d-85fdce13e382",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:35:28.345+07:00"
+                                    },
+                                    {
+                                        "id": "776bb9da-6a3a-4176-ba7e-bf2f0d01222a",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:35:12.17+07:00"
+                                    },
+                                    {
+                                        "id": "60d8717f-c8a7-45c9-8997-0f595133bacc",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:35:09.873+07:00"
+                                    },
+                                    {
+                                        "id": "d98d456a-42c9-4e69-9ca8-74e328703596",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:34:58.99+07:00"
+                                    },
+                                    {
+                                        "id": "3053639b-ffca-410d-a60d-2710bc58a56b",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:28:21.963+07:00"
+                                    },
+                                    {
+                                        "id": "2126f65a-3e8c-4453-a0a5-01a2b8917b00",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:28:21.393+07:00"
+                                    },
+                                    {
+                                        "id": "2fb50255-8d39-47fd-9a21-6b88d0d6522c",
+                                        "ip_address": "::1",
+                                        "user_agent": "PostmanRuntime/7.45.0",
+                                        "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                        "device": "Desktop",
+                                        "browser": "Unknown",
+                                        "os": "Unknown",
+                                        "clicked_at": "2025-08-31T22:28:21.009+07:00"
+                                    }
+                                ],
+                                "total_count": 14,
+                                "page": 1,
+                                "limit": 10,
+                                "total_pages": 2,
+                                "sort": "clicked_at",
+                                "order_by": "desc"
+                            }
+                        },
+                        "message": "Short link views with pagination retrieved successfully"
+                    }
+                example-1:
+                  summary: Get Short
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "short_links": [
+                                {
+                                    "id": "5fa37ebe-4016-43b6-857f-1d82e9b0a87d",
+                                    "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                    "short_code": "testingredirect",
+                                    "original_url": "https://google.com",
+                                    "is_active": true,
+                                    "expires_at": null,
+                                    "created_at": "2025-09-16T14:35:21.627+07:00",
+                                    "updated_at": "2025-09-16T14:35:21.627+07:00"
+                                }
+                            ],
+                            "short_link_detail": {
+                                "id": "4982e421-3f02-4531-9d1b-09f276e5ec89",
+                                "passcode": 123456,
+                                "enable_stats": true
+                            },
+                            "views": {
+                                "recent_views": [],
+                                "total_count": 0,
+                                "page": 1,
+                                "limit": 10,
+                                "total_pages": 0,
+                                "sort": "created_at",
+                                "order_by": "desc"
+                            }
+                        },
+                        "message": "Short link views with pagination retrieved successfully"
+                    }
+  /users/me/shorts:
+    get:
+      tags:
+        - Short-Links > User
+      summary: Get All
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Tue, 02 Sep 2025 04:34:12 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "short_links": [
+                            {
+                                "id": "8ab81ad5-0f4a-43bb-8079-5750e590bd06",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing17",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-02T10:25:36.049+07:00",
+                                "updated_at": "2025-09-02T10:25:36.049+07:00"
+                            },
+                            {
+                                "id": "032a6999-43f4-46e7-b124-13287e24bfd6",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing16",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:45:06.374+07:00",
+                                "updated_at": "2025-09-01T21:45:06.374+07:00"
+                            },
+                            {
+                                "id": "db88275d-d463-4f1b-8081-21e8aad94491",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing15",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:44:59.679+07:00",
+                                "updated_at": "2025-09-01T21:44:59.679+07:00"
+                            },
+                            {
+                                "id": "7e8fb223-634f-4195-ba43-bba42800cb3f",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing14",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:44:28.367+07:00",
+                                "updated_at": "2025-09-01T21:44:28.367+07:00"
+                            },
+                            {
+                                "id": "4be9cc70-d193-4a5c-936d-e7c88fa2ab18",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing13",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:43:50.513+07:00",
+                                "updated_at": "2025-09-01T21:43:50.513+07:00"
+                            },
+                            {
+                                "id": "fa490a26-57ab-406a-a80e-54e7bcea94fa",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing12",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:39:42.989+07:00",
+                                "updated_at": "2025-09-01T21:39:42.989+07:00"
+                            },
+                            {
+                                "id": "cd699533-fcc5-4fe2-890f-98fd51c2d057",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing11",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:37:00.733+07:00",
+                                "updated_at": "2025-09-01T21:37:00.733+07:00"
+                            },
+                            {
+                                "id": "f30140cf-0de1-415a-b3da-e6b8e90968a5",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing0",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:34:15.073+07:00",
+                                "updated_at": "2025-09-01T21:34:15.073+07:00"
+                            },
+                            {
+                                "id": "7be8a377-022e-460d-8dad-3043eca05cad",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing6",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T00:59:32.895+07:00",
+                                "updated_at": "2025-09-01T00:59:32.895+07:00"
+                            },
+                            {
+                                "id": "37720cd7-ae8f-4337-892d-33e3eb6f76d3",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing5",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-08-31T22:51:40.981+07:00",
+                                "updated_at": "2025-08-31T22:51:40.981+07:00",
+                                "click_count": 17
+                            }
+                        ],
+                        "total_count": 21,
+                        "page": 1,
+                        "limit": 10,
+                        "total_pages": 3,
+                        "sort": "created_at",
+                        "order_by": "desc"
+                    },
+                    "message": "Short links retrieved successfully"
+                }
+  /users/me/shorts/testuatsl:
+    put:
+      tags:
+        - Short-Links > User
+      summary: Update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                title: GONGHSOWW
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
+                example: 'true'
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: >-
+                  Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,
+                  Authorization, accept, origin, Cache-Control,
+                  X-Requested-With, X-API-Key
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: '86400'
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Mon, 12 Jan 2026 08:54:49 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '89'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "title": "GONGHSOWW"
+                    },
+                    "message": "Short link updated successfully"
+                }
+    get:
+      tags:
+        - Short-Links > User
+      summary: Get
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
+                example: 'true'
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: >-
+                  Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,
+                  Authorization, accept, origin, Cache-Control,
+                  X-Requested-With, X-API-Key
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: '86400'
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Mon, 12 Jan 2026 08:49:32 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '828'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "id": "9c64fe90-b35b-4ce4-b3d8-d64fb6beb782",
+                        "user_id": "019a0fc1-a6cd-7aaa-b7c8-1862aa4cccd2",
+                        "short_code": "testuatsl",
+                        "original_url": "https://github.com/kompas-pay/settlement/pull/2/changes#diff-77224588ecf99beafdcc9a494697f46603d8c38bbcd97bec6428122394eb8033",
+                        "title": "GONGHSOWW",
+                        "description": "Tentang github",
+                        "is_active": true,
+                        "expires_at": null,
+                        "created_at": "2026-01-06T11:34:21.683+07:00",
+                        "updated_at": "2026-01-10T15:21:09.3+07:00",
+                        "detail": {
+                            "id": "9c51357c-e92b-4f91-99f2-d21521b66550",
+                            "passcode": 321134,
+                            "click_limit": 100,
+                            "current_clicks": 20,
+                            "enable_stats": true,
+                            "custom_domain": "testing",
+                            "utm_source": "testing1",
+                            "utm_medium": "testing",
+                            "utm_campaign": "testing",
+                            "utm_term": "testing",
+                            "utm_content": "testing",
+                            "banned_reason": "Berbahaya",
+                            "banned_by": "Admin"
+                        }
+                    },
+                    "message": "Short link retrieved successfully"
+                }
+  /users/me/shorts/testuat/stats:
+    get:
+      tags:
+        - Short-Links > User
+      summary: Stats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Tue, 02 Sep 2025 07:52:11 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                example-0:
+                  summary: 'True'
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "recent_views": [
+                                {
+                                    "id": "04c69be3-baf3-479c-be02-6dedfd1db7b6",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T13:03:46.401+07:00"
+                                },
+                                {
+                                    "id": "3b734c17-6952-437a-9396-8bd5daf38fb5",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T13:03:30.224+07:00"
+                                },
+                                {
+                                    "id": "c6c50e8f-a2d9-4382-a356-45c11f7e980d",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T13:03:29.401+07:00"
+                                },
+                                {
+                                    "id": "1e677cc3-ee13-41bd-b1ca-2c82e244e960",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:55:14.194+07:00"
+                                },
+                                {
+                                    "id": "71d65aa9-718d-4dfa-8483-f2536eebf468",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:55:13.54+07:00"
+                                },
+                                {
+                                    "id": "b4f7ffa5-b46a-423f-a3c5-b475675b47f5",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:55:12.885+07:00"
+                                },
+                                {
+                                    "id": "c01dddda-2932-491b-a4ad-b28fcb327c36",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:55:12.094+07:00"
+                                },
+                                {
+                                    "id": "6459ba48-6cb7-4642-afe7-ce559f616722",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:55:11.169+07:00"
+                                },
+                                {
+                                    "id": "89e7a976-38c0-4272-b5b8-84167e5d2655",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:30.068+07:00"
+                                },
+                                {
+                                    "id": "e87a148c-c76b-4f59-b74e-8d514f1c91c1",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:29.631+07:00"
+                                },
+                                {
+                                    "id": "4657163d-bf24-4ecd-acad-630c765c0004",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:29.022+07:00"
+                                },
+                                {
+                                    "id": "836aeca9-5244-4179-919d-beae0c7556bb",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:28.558+07:00"
+                                },
+                                {
+                                    "id": "8004ddfe-f8b2-4da4-94b1-e70776ad2159",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:27.969+07:00"
+                                },
+                                {
+                                    "id": "d2401f04-b66f-461e-93bc-28a5611ec27b",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:27.487+07:00"
+                                },
+                                {
+                                    "id": "1a8e87ed-c52c-4fd0-bc19-6384e4728dc4",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:26.877+07:00"
+                                },
+                                {
+                                    "id": "2a67e603-5fd1-42c4-a93a-a947fdefb41e",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:26.309+07:00"
+                                },
+                                {
+                                    "id": "cb3eedc1-dd86-4b33-b9ef-479ceb31e353",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "country": "Unknown",
+                                    "city": "Unknown",
+                                    "clicked_at": "2025-09-02T12:49:25.306+07:00"
+                                }
+                            ]
+                        },
+                        "message": "Short link stats retrieved successfully"
+                    }
+                example-1:
+                  summary: Stats
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "total_clicks": 14,
+                            "unique_visitors": 1,
+                            "last_24h": 0,
+                            "last_7d": 0,
+                            "last_30d": 14,
+                            "top_referrers": [
+                                {
+                                    "host": "",
+                                    "count": 9
+                                },
+                                {
+                                    "host": "",
+                                    "count": 4
+                                },
+                                {
+                                    "host": "",
+                                    "count": 1
+                                }
+                            ],
+                            "top_devices": [
+                                {
+                                    "device": "Desktop",
+                                    "count": 14
+                                }
+                            ],
+                            "top_countries": [
+                                {
+                                    "country": "",
+                                    "count": 14
+                                }
+                            ]
+                        },
+                        "message": "Short link stats retrieved successfully"
+                    }
+        '404':
+          description: Not Found
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Tue, 02 Sep 2025 07:29:58 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '126'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": false,
+                    "message": "Failed to retrieve short link stats",
+                    "error": {
+                        "code": "Link dengan kode tersebut tidak ditemukan"
+                    }
+                }
+  /users/me/shorts/"testing17":
+    delete:
+      tags:
+        - Short-Links > User
+      summary: Delete Short
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /users/me/shorts/testuatsl/views:
+    get:
+      tags:
+        - Short-Links > User
+      summary: Views
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '1'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+        - name: sort
+          in: query
+          schema:
+            type: string
+          example: created_at
+        - name: order_by
+          in: query
+          schema:
+            type: string
+          example: desc
+      responses:
+        '200':
+          description: OK
+          headers:
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
+                example: 'true'
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: >-
+                  Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,
+                  Authorization, accept, origin, Cache-Control,
+                  X-Requested-With, X-API-Key
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: '86400'
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Mon, 12 Jan 2026 08:53:20 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "views": {
+                            "recent_views": [
+                                {
+                                    "id": "b60e5855-93b6-4567-8c41-2940307c4768",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/enter-passcode",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "device": "Desktop",
+                                    "browser": "Chrome 143.0.0.0",
+                                    "os": "Intel Mac OS X 10_15_7",
+                                    "clicked_at": "2026-01-10T11:32:01.388+07:00"
+                                },
+                                {
+                                    "id": "2297cdbe-6281-4e31-91e6-f9abd9b59ea7",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/enter-passcode",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "device": "Desktop",
+                                    "browser": "Chrome 143.0.0.0",
+                                    "os": "Intel Mac OS X 10_15_7",
+                                    "clicked_at": "2026-01-10T11:32:00.881+07:00"
+                                },
+                                {
+                                    "id": "a9d976ff-7c99-46b1-9620-7757d037f9f4",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:09:08.152+07:00"
+                                },
+                                {
+                                    "id": "033c5c6d-dbd0-4844-a3fc-c668711598ed",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:09:07.729+07:00"
+                                },
+                                {
+                                    "id": "17cca95b-6af0-4b4a-951f-f814ec3c8646",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:09:07.709+07:00"
+                                },
+                                {
+                                    "id": "aec9e398-6330-4c08-812e-6f8efc2bcb59",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:08:20.567+07:00"
+                                },
+                                {
+                                    "id": "b8f4907f-df5a-4188-a39d-dd9006a2ea73",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:08:19.926+07:00"
+                                },
+                                {
+                                    "id": "dda76b77-14ec-40b2-96e4-e4507464b868",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:08:19.906+07:00"
+                                },
+                                {
+                                    "id": "bacb6c17-7189-4b7f-91fb-ea646a3dfa7a",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:06:55.151+07:00"
+                                },
+                                {
+                                    "id": "502ba81e-f88a-43c2-936c-d05f356824cf",
+                                    "ip_address": "::1",
+                                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                                    "referer": "http://localhost:3000/testuat/321134",
+                                    "country": "Local Machine",
+                                    "city": "Local Machine",
+                                    "clicked_at": "2026-01-09T20:06:54.793+07:00"
+                                }
+                            ],
+                            "total_count": 20,
+                            "page": 1,
+                            "limit": 10,
+                            "total_pages": 2,
+                            "sort": "created_at",
+                            "order_by": "desc"
+                        }
+                    },
+                    "message": "Short link views with pagination retrieved successfully"
+                }
+  /users/me/shorts/stats:
+    get:
+      tags:
+        - Short-Links > User
+      summary: Get All Stats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
+                example: 'true'
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: >-
+                  Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,
+                  Authorization, accept, origin, Cache-Control,
+                  X-Requested-With, X-API-Key
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: '86400'
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Mon, 12 Jan 2026 09:02:31 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '695'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "summary": {
+                            "total_links": 13,
+                            "active_links": 13,
+                            "inactive_links": 0,
+                            "total_clicks": 61,
+                            "total_unique_visitors": 1,
+                            "clicks_last_24h": 0,
+                            "clicks_last_7d": 59,
+                            "clicks_last_30d": 61,
+                            "clicks_last_60d": 61,
+                            "clicks_last_90d": 61,
+                            "top_countries": [
+                                {
+                                    "country": "Local Machine",
+                                    "count": 61
+                                }
+                            ],
+                            "top_devices": [
+                                {
+                                    "device": "Unknown",
+                                    "count": 49
+                                },
+                                {
+                                    "device": "Desktop",
+                                    "count": 12
+                                }
+                            ],
+                            "top_referrers": [
+                                {
+                                    "host": "localhost:3000",
+                                    "count": 59
+                                },
+                                {
+                                    "host": "Direct / None",
+                                    "count": 2
+                                }
+                            ],
+                            "click_history": [
+                                {
+                                    "date": "2025-12-16",
+                                    "count": 2
+                                },
+                                {
+                                    "date": "2026-01-06",
+                                    "count": 3
+                                },
+                                {
+                                    "date": "2026-01-08",
+                                    "count": 2
+                                },
+                                {
+                                    "date": "2026-01-09",
+                                    "count": 51
+                                },
+                                {
+                                    "date": "2026-01-10",
+                                    "count": 3
+                                }
+                            ]
+                        }
+                    },
+                    "message": "Dashboard stats retrieved successfully"
+                }
+  /admin/shorts:
+    get:
+      tags:
+        - Short-Links > Admin
+      summary: Get All
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '1'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+        - name: sort
+          in: query
+          schema:
+            type: string
+          example: created_at
+        - name: order_by
+          in: query
+          schema:
+            type: string
+          example: desc
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sat, 06 Sep 2025 13:45:55 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "short_links": [
+                            {
+                                "id": "032a6999-43f4-46e7-b124-13287e24bfd6",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing16",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:45:06.374+07:00",
+                                "updated_at": "2025-09-01T21:45:06.374+07:00",
+                                "detail": {
+                                    "id": "c3141eba-aba2-4cd9-acbd-a060db9fb77a",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "db88275d-d463-4f1b-8081-21e8aad94491",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing15",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:44:59.679+07:00",
+                                "updated_at": "2025-09-01T21:44:59.679+07:00",
+                                "detail": {
+                                    "id": "6ef92229-50a9-4dc3-a257-54f39696ae74",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "7e8fb223-634f-4195-ba43-bba42800cb3f",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing14",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:44:28.367+07:00",
+                                "updated_at": "2025-09-01T21:44:28.367+07:00",
+                                "detail": {
+                                    "id": "067af92a-7987-478a-a162-9a8073907a81",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "4be9cc70-d193-4a5c-936d-e7c88fa2ab18",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing13",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:43:50.513+07:00",
+                                "updated_at": "2025-09-01T21:43:50.513+07:00",
+                                "detail": {
+                                    "id": "b41ac14e-5d66-4f45-a351-e49d017c2633",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "fa490a26-57ab-406a-a80e-54e7bcea94fa",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing12",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:39:42.989+07:00",
+                                "updated_at": "2025-09-01T21:39:42.989+07:00",
+                                "detail": {
+                                    "id": "a78294fb-1162-4729-859c-89dad03f78dc",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "cd699533-fcc5-4fe2-890f-98fd51c2d057",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing11",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:37:00.733+07:00",
+                                "updated_at": "2025-09-01T21:37:00.733+07:00",
+                                "detail": {
+                                    "id": "db4f7360-8b12-47fa-8f91-db9777062c0a",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "f30140cf-0de1-415a-b3da-e6b8e90968a5",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing0",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:34:15.073+07:00",
+                                "updated_at": "2025-09-01T21:34:15.073+07:00",
+                                "detail": {
+                                    "id": "d31c7ab8-c924-43ea-9c8e-6e3cd0ed21df",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "7be8a377-022e-460d-8dad-3043eca05cad",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing6",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T00:59:32.895+07:00",
+                                "updated_at": "2025-09-01T00:59:32.895+07:00",
+                                "detail": {
+                                    "id": "91be7280-4ecd-4b67-b69a-a686607d8233",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "37720cd7-ae8f-4337-892d-33e3eb6f76d3",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing5",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-08-31T22:51:40.981+07:00",
+                                "updated_at": "2025-08-31T22:51:40.981+07:00",
+                                "detail": {
+                                    "id": "d8753e27-8194-403f-a27c-41a075e9f2e5",
+                                    "passcode": 123456,
+                                    "current_clicks": 17,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "56080afe-3b2c-4292-8fcf-92e045ce3e4c",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing4",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-08-31T22:51:24.08+07:00",
+                                "updated_at": "2025-08-31T22:51:24.08+07:00",
+                                "detail": {
+                                    "id": "9ba5f0be-2eb8-41c4-af79-fbb9fe0bce98",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            }
+                        ],
+                        "total_count": 20,
+                        "page": 1,
+                        "limit": 10,
+                        "total_pages": 2,
+                        "sort": "created_at",
+                        "order_by": "desc"
+                    },
+                    "message": "Short links retrieved successfully"
+                }
+  /admin/shorts/bakass:
+    get:
+      tags:
+        - Short-Links > Admin
+      summary: Get Detail Links
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sun, 07 Sep 2025 22:07:00 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "short_links": [
+                            {
+                                "id": "6dbd2436-07ca-44bb-aacf-cc0c2abafcfb",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "bakass",
+                                "original_url": "https://googles.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-08-31T22:27:38.713+07:00",
+                                "updated_at": "2025-08-31T22:27:38.713+07:00"
+                            }
+                        ],
+                        "short_link_detail": {
+                            "id": "0064bfd5-421f-410b-937e-23f5cad24e31",
+                            "current_clicks": 14,
+                            "enable_stats": true
+                        },
+                        "views": {
+                            "recent_views": [
+                                {
+                                    "id": "010a5dcc-435f-4736-8545-011a7f26f6cb",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:35:30.386+07:00"
+                                },
+                                {
+                                    "id": "1b31e108-6971-4e21-97c0-56bcf2baa4fb",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:35:29.643+07:00"
+                                },
+                                {
+                                    "id": "995bc8d3-e758-4981-af30-e2c6b50857cb",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:35:29.042+07:00"
+                                },
+                                {
+                                    "id": "0dad15cc-ec5b-486e-8b7d-85fdce13e382",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=1",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:35:28.345+07:00"
+                                },
+                                {
+                                    "id": "776bb9da-6a3a-4176-ba7e-bf2f0d01222a",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:35:12.17+07:00"
+                                },
+                                {
+                                    "id": "60d8717f-c8a7-45c9-8997-0f595133bacc",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:35:09.873+07:00"
+                                },
+                                {
+                                    "id": "d98d456a-42c9-4e69-9ca8-74e328703596",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:34:58.99+07:00"
+                                },
+                                {
+                                    "id": "3053639b-ffca-410d-a60d-2710bc58a56b",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:28:21.963+07:00"
+                                },
+                                {
+                                    "id": "2126f65a-3e8c-4453-a0a5-01a2b8917b00",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:28:21.393+07:00"
+                                },
+                                {
+                                    "id": "2fb50255-8d39-47fd-9a21-6b88d0d6522c",
+                                    "ip_address": "::1",
+                                    "user_agent": "PostmanRuntime/7.45.0",
+                                    "referer": "http://localhost:8080/v1/short/bakass?passcode=x",
+                                    "device": "Desktop",
+                                    "browser": "Unknown",
+                                    "os": "Unknown",
+                                    "clicked_at": "2025-08-31T22:28:21.009+07:00"
+                                }
+                            ],
+                            "total_count": 14,
+                            "page": 1,
+                            "limit": 10,
+                            "total_pages": 2,
+                            "sort": "clicked_at",
+                            "order_by": "desc"
+                        }
+                    },
+                    "message": "Short link views with pagination retrieved successfully"
+                }
+  /admin/shorts/tesdelete:
+    delete:
+      tags:
+        - Short-Links > Admin
+      summary: Delete Short
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /admin/shorts/bulk-delete:
+    delete:
+      tags:
+        - Short-Links > Admin
+      summary: Delete Bulk
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /admin/shorts/tesdelete/banned:
+    put:
+      tags:
+        - Short-Links > Admin
+      summary: Banned Short
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                reason: Diduga penyelewengan terhadap terms and service
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /admin/shorts/tesdelete/unban:
+    put:
+      tags:
+        - Short-Links > Admin
+      summary: Unban Short Link
+      requestBody:
+        content: {}
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /admin/shorts/tesdelete1/edotensei:
+    post:
+      tags:
+        - Short-Links > Admin
+      summary: Revive
+      requestBody:
+        content: {}
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /admin/shorts/short/stats:
+    get:
+      tags:
+        - Short-Links > Admin
+      summary: Get All Stats
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+          example: '2'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          example: '10'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /api/short:
+    get:
+      tags:
+        - Short-Links > API Key
+      summary: Get All
+      parameters:
+        - name: X-API-Key
+          in: header
+          schema:
+            type: string
+          example: >-
+            sk_lh_R35R8wmedY7EmTloKTcTMS3pVAmJMSpk.pjbgc4xFHCsrTFW5GdkdX-S-i7bA9CHEkZipGndXT8I
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Wed, 24 Sep 2025 03:00:32 GMT
+            Transfer-Encoding:
+              schema:
+                type: string
+                example: chunked
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": true,
+                    "data": {
+                        "short_links": [
+                            {
+                                "id": "032a6999-43f4-46e7-b124-13287e24bfd6",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing16",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:45:06.374+07:00",
+                                "updated_at": "2025-09-01T21:45:06.374+07:00",
+                                "detail": {
+                                    "id": "c3141eba-aba2-4cd9-acbd-a060db9fb77a",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "db88275d-d463-4f1b-8081-21e8aad94491",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing15",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:44:59.679+07:00",
+                                "updated_at": "2025-09-01T21:44:59.679+07:00",
+                                "detail": {
+                                    "id": "6ef92229-50a9-4dc3-a257-54f39696ae74",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "7e8fb223-634f-4195-ba43-bba42800cb3f",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing14",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:44:28.367+07:00",
+                                "updated_at": "2025-09-01T21:44:28.367+07:00",
+                                "detail": {
+                                    "id": "067af92a-7987-478a-a162-9a8073907a81",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "4be9cc70-d193-4a5c-936d-e7c88fa2ab18",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing13",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:43:50.513+07:00",
+                                "updated_at": "2025-09-01T21:43:50.513+07:00",
+                                "detail": {
+                                    "id": "b41ac14e-5d66-4f45-a351-e49d017c2633",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "fa490a26-57ab-406a-a80e-54e7bcea94fa",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing12",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:39:42.989+07:00",
+                                "updated_at": "2025-09-01T21:39:42.989+07:00",
+                                "detail": {
+                                    "id": "a78294fb-1162-4729-859c-89dad03f78dc",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "cd699533-fcc5-4fe2-890f-98fd51c2d057",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing11",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:37:00.733+07:00",
+                                "updated_at": "2025-09-01T21:37:00.733+07:00",
+                                "detail": {
+                                    "id": "db4f7360-8b12-47fa-8f91-db9777062c0a",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "f30140cf-0de1-415a-b3da-e6b8e90968a5",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing0",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T21:34:15.073+07:00",
+                                "updated_at": "2025-09-01T21:34:15.073+07:00",
+                                "detail": {
+                                    "id": "d31c7ab8-c924-43ea-9c8e-6e3cd0ed21df",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "7be8a377-022e-460d-8dad-3043eca05cad",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing6",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-09-01T00:59:32.895+07:00",
+                                "updated_at": "2025-09-01T00:59:32.895+07:00",
+                                "detail": {
+                                    "id": "91be7280-4ecd-4b67-b69a-a686607d8233",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "37720cd7-ae8f-4337-892d-33e3eb6f76d3",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing5",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-08-31T22:51:40.981+07:00",
+                                "updated_at": "2025-08-31T22:51:40.981+07:00",
+                                "detail": {
+                                    "id": "d8753e27-8194-403f-a27c-41a075e9f2e5",
+                                    "passcode": 123456,
+                                    "current_clicks": 17,
+                                    "enable_stats": true
+                                }
+                            },
+                            {
+                                "id": "56080afe-3b2c-4292-8fcf-92e045ce3e4c",
+                                "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                "short_code": "testing4",
+                                "original_url": "https://google.com",
+                                "is_active": true,
+                                "expires_at": null,
+                                "created_at": "2025-08-31T22:51:24.08+07:00",
+                                "updated_at": "2025-08-31T22:51:24.08+07:00",
+                                "detail": {
+                                    "id": "9ba5f0be-2eb8-41c4-af79-fbb9fe0bce98",
+                                    "passcode": 123456,
+                                    "enable_stats": true
+                                }
+                            }
+                        ],
+                        "total_count": 20,
+                        "page": 1,
+                        "limit": 10,
+                        "total_pages": 2,
+                        "sort": "created_at",
+                        "order_by": "desc"
+                    },
+                    "message": "Short links retrieved successfully"
+                }
+  /short:
+    post:
+      tags:
+        - Short-Links
+      summary: Create Bulk
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                is_bulky: true
+                links:
+                  - original_url: https://example1.com
+                    title: Example Title 1
+                    description: Description for example 1
+                    custom_code: example12
+                    passcode: '111111'
+                    expires_at: '2025-12-31T23:59:59Z'
+                  - original_url: https://example2.com
+                    title: Example Title 2
+                    description: Description for example 2
+                    custom_code: example21
+                    passcode: '222222'
+                    expires_at: '2025-12-31T23:59:59Z'
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ''
+          in: header
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Created
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Sun, 31 Aug 2025 15:27:38 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '129'
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                example-0:
+                  summary: Create
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "original_url": "https://googles.com",
+                            "custom_code": "bakass"
+                        },
+                        "message": "Short link created successfully"
+                    }
+                example-1:
+                  summary: Create Bulk
+                  value: |-
+                    {
+                        "success": true,
+                        "data": {
+                            "links": [
+                                {
+                                    "id": "ca967130-420b-4b23-bbd6-fa58afbb4261",
+                                    "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                    "short_code": "example1",
+                                    "original_url": "https://example1.com",
+                                    "title": "Example Title 1",
+                                    "description": "Description for example 1",
+                                    "is_active": true,
+                                    "expires_at": "2025-12-31T23:59:59Z",
+                                    "created_at": "2025-10-03T14:26:03.682+07:00",
+                                    "updated_at": "2025-10-03T14:26:03.682+07:00"
+                                },
+                                {
+                                    "id": "6034a8a7-4aa9-49ee-a200-370d21b777b4",
+                                    "user_id": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
+                                    "short_code": "example2",
+                                    "original_url": "https://example2.com",
+                                    "title": "Example Title 2",
+                                    "description": "Description for example 2",
+                                    "is_active": true,
+                                    "expires_at": "2025-12-31T23:59:59Z",
+                                    "created_at": "2025-10-03T14:26:03.683+07:00",
+                                    "updated_at": "2025-10-03T14:26:03.683+07:00"
+                                }
+                            ],
+                            "message": "Successfully created 2 short links",
+                            "total_count": 2
+                        },
+                        "message": "Bulk short links created successfully"
+                    }
+  /short/huby:
+    get:
+      tags:
+        - Short-Links
+      summary: Redirect
+      security:
+        - noauthAuth: []
+      parameters:
+        - name: passcode
+          in: query
+          schema:
+            type: integer
+          example: '132331'
+      responses:
+        '429':
+          description: Too Many Requests
+          headers:
+            Access-Control-Allow-Credentials:
+              schema:
+                type: boolean
+                example: 'true'
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: >-
+                  Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token,
+                  Authorization, accept, origin, Cache-Control,
+                  X-Requested-With, X-API-Key
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: '86400'
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Thu, 18 Dec 2025 14:59:58 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '116'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": false,
+                    "message": "Rate limit exceeded",
+                    "error": {
+                        "rate_limit": "Too many requests, please try again later"
+                    }
+                }
+  /short/Gcub:
+    get:
+      tags:
+        - Short-Links
+      summary: Check
+      parameters:
+        - name: passcode
+          in: query
+          schema:
+            type: integer
+          example: '123456'
+      responses:
+        '410':
+          description: Gone
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: application/json; charset=utf-8
+            Date:
+              schema:
+                type: string
+                example: Fri, 03 Oct 2025 05:47:32 GMT
+            Content-Length:
+              schema:
+                type: integer
+                example: '97'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |-
+                {
+                    "success": false,
+                    "message": "Short link has expired",
+                    "error": {
+                        "details": "short link has expired"
+                    }
+                }
