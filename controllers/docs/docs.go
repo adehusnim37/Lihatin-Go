@@ -53,8 +53,40 @@ func (c *Controller) GetAPIInfo(ctx *gin.Context) {
 			"description": "URL Shortener and Link Management API",
 			"docs": gin.H{
 				"postman": "/v1/docs/postman",
+				"openapi": "/v1/docs/openapi",
 			},
 		},
 		Message: "API information retrieved successfully",
 	})
+}
+
+// GetOpenAPISpec serves the OpenAPI specification YAML file
+func (c *Controller) GetOpenAPISpec(ctx *gin.Context) {
+	// The file is located in docs/openapi.yaml
+	filePath := filepath.Join("docs", "openapi.yaml")
+
+	// Read the file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		// Try to look up if running from root
+		filePath = filepath.Join(".", "docs", "openapi.yaml")
+		data, err = os.ReadFile(filePath)
+
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, common.APIResponse{
+				Success: false,
+				Message: "OpenAPI spec not found",
+				Error:   map[string]string{"file": "Spec file does not exist"},
+			})
+			return
+		}
+	}
+
+	// Set headers for YAML response
+	ctx.Header("Content-Type", "application/x-yaml")
+	ctx.Header("Access-Control-Allow-Origin", "*")
+	ctx.Header("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+
+	// Write raw YAML response
+	ctx.Data(http.StatusOK, "application/x-yaml", data)
 }

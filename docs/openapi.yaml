@@ -1,0 +1,340 @@
+openapi: 3.0.0
+info:
+  title: Lihatin API
+  description: URL Shortener and Link Management API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local server
+  - url: https://api.lihat.in
+    description: Production server
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    ShortLink:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        short_code:
+          type: string
+        original_url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+security:
+  - apiKeyAuth: []
+tags:
+  - name: Short-Links
+    description: API endpoints for managing short links
+paths:
+  /api/short:
+    get:
+      tags:
+        - Short-Links
+      summary: List Short Links
+      description: Retrieve a paginated list of short links created by the authenticated user.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of items per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, views]
+            default: created_at
+          description: Field to sort by
+        - name: order_by
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      short_links:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ShortLink"
+                      total_count:
+                        type: integer
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                  message:
+                    type: string
+    post:
+      tags:
+        - Short-Links
+      summary: Create Short Link
+      description: Create a new short link.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - original_url
+              properties:
+                original_url:
+                  type: string
+                  format: uri
+                  example: https://example.com
+                title:
+                  type: string
+                  example: Example Title
+                description:
+                  type: string
+                  example: Description for example
+                custom_code:
+                  type: string
+                  example: example123
+                passcode:
+                  type: string
+                  example: "123456"
+                expires_at:
+                  type: string
+                  format: date-time
+                  example: "2025-12-31T23:59:59Z"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ShortLink"
+                  message:
+                    type: string
+  /api/short/{code}:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The short code of the link
+    get:
+      tags:
+        - Short-Links
+      summary: Get Short Link
+      description: Retrieve details of a specific short link.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ShortLink"
+                  message:
+                    type: string
+    put:
+      tags:
+        - Short-Links
+      summary: Update Short Link
+      description: Update an existing short link.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: New Title
+                description:
+                  type: string
+                original_url:
+                  type: string
+                passcode:
+                  type: string
+                expires_at:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/ShortLink"
+                  message:
+                    type: string
+    delete:
+      tags:
+        - Short-Links
+      summary: Delete Short Link
+      description: Delete a specific short link.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+  /api/short/{code}/stats:
+    get:
+      tags:
+        - Short-Links
+      summary: Get Short Link Stats
+      description: Retrieve statistics for a specific short link.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      clicks:
+                        type: integer
+                      unique_clicks:
+                        type: integer
+                      last_clicked_at:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+  /api/short/{code}/views:
+    get:
+      tags:
+        - Short-Links
+      summary: Get Short Link Views (Paginated)
+      description: Retrieve paginated view history for a specific short link.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ip:
+                          type: string
+                        user_agent:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                  message:
+                    type: string
+  /api/short/stats:
+    get:
+      tags:
+        - Short-Links
+      summary: Get All Stats
+      description: Retrieve aggregated statistics for all short links owned by the user.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total_views:
+                        type: integer
+                      total_links:
+                        type: integer
+                  message:
+                    type: string

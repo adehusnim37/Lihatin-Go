@@ -18,5 +18,8 @@ func RegisterDocsRoutes(router *gin.RouterGroup) {
 
 		// Postman collection endpoint
 		docsGroup.GET("/postman", docsController.GetPostmanCollection)
+
+		// OpenAPI spec endpoint
+		docsGroup.GET("/spec", docsController.GetOpenAPISpec)
 	}
 }
