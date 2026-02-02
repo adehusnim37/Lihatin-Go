@@ -2,9 +2,9 @@ package logger
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
+	"github.com/adehusnim37/lihatin-go/dto"
 	httpPkg "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/repositories"
@@ -26,79 +26,204 @@ func NewLoggerController(base *controllers.BaseController) *LoggerController {
 	}
 }
 
-// GetAllLogs retrieves all logs
+// GetAllLogs retrieves all logs with pagination
+// Query params: page (default: 1), limit (default: 10, max: 100), sort (default: created_at), order_by (default: desc)
 func (c *LoggerController) GetAllLogs(ctx *gin.Context) {
-	logs, err := c.repo.GetAllLogs()
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
+	userRole := ctx.GetString("role")
+	userID := ctx.GetString("user_id")
+	// Parse and validate pagination parameters
+	page, limit, sort, orderBy, errs := httpPkg.PaginateValidateLogger(
+		ctx.Query("page"),
+		ctx.Query("limit"),
+		ctx.Query("sort"),
+		ctx.Query("order_by"),
+	)
+
+	if errs != nil {
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Failed to retrieve logs",
-			Error:   map[string]string{"error": "Failed to retrieve logs, please try again later"},
+			Message: "Invalid pagination parameters",
+			Error:   errs,
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    logs,
-		Message: "Logs retrieved successfully",
-		Error:   nil,
-	})
-}
 
-// GetLogsByUsername retrieves logs by username
-func (c *LoggerController) GetLogsByUsername(ctx *gin.Context) {
-	username := ctx.Param("username")
-	logs, err := c.repo.GetLogsByUsername(username)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve logs",
-			Error:   map[string]string{"error": "Failed to retrieve logs, please try again later"},
-		})
-		return
-	}
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    logs,
-		Message: "Logs retrieved successfully",
-		Error:   nil,
-	})
-}
-
-func (c *LoggerController) GetLogsByShortLink(ctx *gin.Context) {
-	code := ctx.Param("code")
-	pageStr := ctx.DefaultQuery("page", "1")
-	limitStr := ctx.DefaultQuery("limit", "10")
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit < 1 {
-		limit = 10
-	}
-
-	logs, totalCount, err := c.repo.GetLogsByShortLink(code, page, limit)
+	// Fetch logs from repository
+	logs, totalCount, err := c.repo.GetAllLogs(page, limit, sort, orderBy, userRole, userID)
 	if err != nil {
 		httpPkg.HandleError(ctx, err, "")
 		return
 	}
 
+	// Calculate pagination metadata
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	responseData := map[string]interface{}{
-		"logs": logs,
-		"meta": map[string]interface{}{
-			"current_page": page,
-			"limit":        limit,
-			"total_items":  totalCount,
-			"total_pages":  totalPages,
-		},
+	// Build response using DTO
+	response := dto.PaginatedActivityLogsResponse{
+		Logs:       dto.ToActivityLogResponseList(logs),
+		TotalCount: totalCount,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
 	}
 
-	httpPkg.SendOKResponse(ctx, responseData, "Logs retrieved successfully")
+	httpPkg.SendOKResponse(ctx, response, "Logs retrieved successfully")
+}
+
+// GetLogsByUsername retrieves logs by username with pagination
+// Query params: page (default: 1), limit (default: 10, max: 100), sort (default: created_at), order_by (default: desc)
+func (c *LoggerController) GetLogsByUsername(ctx *gin.Context) {
+	userRole := ctx.GetString("role")
+	username := ctx.GetString("username")
+	userID := ctx.GetString("user_id")
+
+	// Parse and validate pagination parameters
+	page, limit, sort, orderBy, errs := httpPkg.PaginateValidateLogger(
+		ctx.Query("page"),
+		ctx.Query("limit"),
+		ctx.Query("sort"),
+		ctx.Query("order_by"),
+	)
+
+	if errs != nil {
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Invalid pagination parameters",
+			Error:   errs,
+		})
+		return
+	}
+
+	// Fetch logs from repository
+	logs, totalCount, err := c.repo.GetLogsByUsername(username, page, limit, sort, orderBy, userRole, userID)
+	if err != nil {
+		httpPkg.HandleError(ctx, err, "")
+		return
+	}
+
+	// Calculate pagination metadata
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	// Build response using DTO
+	response := dto.PaginatedActivityLogsResponse{
+		Logs:       dto.ToActivityLogResponseList(logs),
+		TotalCount: totalCount,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	}
+
+	httpPkg.SendOKResponse(ctx, response, "Logs retrieved successfully")
+}
+
+// GetLogsByShortLink retrieves logs for a specific short link with pagination
+// Query params: page (default: 1), limit (default: 10, max: 100), sort (default: created_at), order_by (default: desc)
+func (c *LoggerController) GetLogsByShortLink(ctx *gin.Context) {
+	code := ctx.Param("code")
+	userRole := ctx.GetString("role")
+	userID := ctx.GetString("user_id")
+	// Parse and validate pagination parameters
+	page, limit, sort, orderBy, errs := httpPkg.PaginateValidateLogger(
+		ctx.Query("page"),
+		ctx.Query("limit"),
+		ctx.Query("sort"),
+		ctx.Query("order_by"),
+	)
+
+	if errs != nil {
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Invalid pagination parameters",
+			Error:   errs,
+		})
+		return
+	}
+
+	// Fetch logs from repository
+	logs, totalCount, err := c.repo.GetLogsByShortLink(code, page, limit, sort, orderBy, userRole, userID)
+	if err != nil {
+		httpPkg.HandleError(ctx, err, "")
+		return
+	}
+
+	// Calculate pagination metadata
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	// Build response using DTO
+	response := dto.PaginatedActivityLogsResponse{
+		Logs:       dto.ToActivityLogResponseList(logs),
+		TotalCount: totalCount,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	}
+
+	httpPkg.SendOKResponse(ctx, response, "Logs retrieved successfully")
+}
+
+// GetLogsWithFilter retrieves logs with advanced filtering and pagination
+// Supports filtering by username, action, method, route, level, status_code, ip_address, date_from, date_to, api_key
+// Query params: page, limit, sort, order_by + filter parameters
+func (c *LoggerController) GetLogsWithFilter(ctx *gin.Context) {
+	// Parse filter from query parameters
+	var filter dto.ActivityLogFilter
+	if err := ctx.ShouldBindQuery(&filter); err != nil {
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Invalid filter parameters",
+			Error:   map[string]string{"error": err.Error()},
+		})
+		return
+	}
+
+	// Parse and validate pagination parameters
+	page, limit, sort, orderBy, errs := httpPkg.PaginateValidateLogger(
+		ctx.Query("page"),
+		ctx.Query("limit"),
+		ctx.Query("sort"),
+		ctx.Query("order_by"),
+	)
+
+	if errs != nil {
+		ctx.JSON(http.StatusBadRequest, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Invalid pagination parameters",
+			Error:   errs,
+		})
+		return
+	}
+
+	// Fetch logs from repository with filters
+	logs, totalCount, err := c.repo.GetLogsWithFilter(filter, page, limit, sort, orderBy)
+	if err != nil {
+		httpPkg.HandleError(ctx, err, "")
+		return
+	}
+
+	// Calculate pagination metadata
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
+	// Build response using DTO
+	response := dto.PaginatedActivityLogsResponse{
+		Logs:       dto.ToActivityLogResponseList(logs),
+		TotalCount: totalCount,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	}
+
+	httpPkg.SendOKResponse(ctx, response, "Logs retrieved successfully")
 }

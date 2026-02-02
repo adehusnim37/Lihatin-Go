@@ -32,7 +32,7 @@ type ActivityLogResponse struct {
 	Level          logging.LogLevel `json:"level"`
 	Message        string           `json:"message"`
 	Username       string           `json:"username"`
-	APIKey         string          `json:"api_key,omitempty"`
+	APIKey         string           `json:"api_key,omitempty"`
 	Timestamp      time.Time        `json:"timestamp"`
 	IPAddress      string           `json:"ip_address"`
 	UserAgent      string           `json:"user_agent"`
@@ -127,12 +127,18 @@ type LogExportRequest struct {
 
 // ToActivityLogResponse converts logging.ActivityLog to ActivityLogResponse
 func ToActivityLogResponse(log *logging.ActivityLog) ActivityLogResponse {
+	// Safely handle nullable APIKey pointer
+	apiKey := ""
+	if log.APIKey != nil {
+		apiKey = *log.APIKey
+	}
+
 	return ActivityLogResponse{
 		ID:             log.ID,
 		Level:          logging.LogLevel(log.Level),
 		Message:        log.Message,
 		Username:       log.Username,
-		APIKey:         *log.APIKey,
+		APIKey:         apiKey,
 		Timestamp:      log.Timestamp,
 		IPAddress:      log.IPAddress,
 		UserAgent:      log.UserAgent,

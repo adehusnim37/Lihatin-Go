@@ -12,14 +12,10 @@ import (
 // ListShortLinks handles both user and admin requests with role-based filtering
 func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	// Get user info from context (set by auth middleware)
-	userID, _ := ctx.Get("user_id")
+	userID:= ctx.GetString("user_id")
 
 	// Get user role from context (set by auth middleware)
-	userRole, _ := ctx.Get("role")
-
-	// Convert to strings
-	userIDStr := userID.(string)
-	userRoleStr := userRole.(string)
+	userRole := ctx.GetString("role")
 
 	// Get pagination parameters from query string
 	pageStr := ctx.DefaultQuery("page", "1")
@@ -28,7 +24,7 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 
 	// Validate and convert pagination parameters
-	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRoleStr))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRole))
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
@@ -40,8 +36,8 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	}
 
 	logger.Logger.Info("Fetching short links",
-		"user_id", userIDStr,
-		"user_role", userRoleStr,
+		"user_id", userID,
+		"user_role", userRole,
 		"page", page,
 		"limit", limit,
 		"sort", sort,
@@ -52,18 +48,18 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	var paginatedResponse any
 	var repositoryErr error
 
-	if userRoleStr == "admin" {
+	if userRole == "admin" {
 		// ✅ Admin: Get all short links (no user filter)
-		logger.Logger.Info("Admin accessing all short links", "admin_user", userIDStr)
+		logger.Logger.Info("Admin accessing all short links", "admin_user", userID)
 		paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(page, limit, sort, orderBy)
 	} else {
 		// ✅ User: Get only user's short links (filtered by user_id)
-		logger.Logger.Info("User accessing own short links", "user_id", userIDStr)
-		paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(userIDStr, page, limit, sort, orderBy)
+		logger.Logger.Info("User accessing own short links", "user_id", userID)
+		paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(userID, page, limit, sort, orderBy)
 	}
 
 	if repositoryErr != nil {
-		httputil.HandleError(ctx, repositoryErr, userIDStr)
+		httputil.HandleError(ctx, repositoryErr, userID)
 		return
 	}
 

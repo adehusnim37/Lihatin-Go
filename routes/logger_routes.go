@@ -2,12 +2,28 @@ package routes
 
 import (
 	"github.com/adehusnim37/lihatin-go/controllers/logger"
+	"github.com/adehusnim37/lihatin-go/middleware"
+	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterLoggerRoutes(rg *gin.RouterGroup, loggerController *logger.LoggerController) {
+// RegisterLoggerRoutes registers logger routes with query parameters for pagination and filtering
+// All endpoints support: page, limit, sort, order_by query parameters
+// Filter endpoint also supports: username, action, method, route, level, status_code, ip_address, date_from, date_to, api_key
+func RegisterLoggerRoutes(rg *gin.RouterGroup, userRepo repositories.UserRepository, loggerController *logger.LoggerController) {
 	logs := rg.Group("/logs")
-	logs.GET("/", loggerController.GetAllLogs)
-	logs.GET("/user/:username", loggerController.GetLogsByUsername)
-	logs.GET("/short/:code", loggerController.GetLogsByShortLink)
+	{
+		logs.Use(middleware.AuthMiddleware(userRepo))
+		// GET /logs?page=1&limit=10&sort=created_at&order_by=desc
+		logs.GET("/", loggerController.GetAllLogs)
+
+		// GET /logs/user/:username?page=1&limit=10&sort=created_at&order_by=desc
+		logs.GET("/user/:username", loggerController.GetLogsByUsername)
+
+		// GET /logs/short/:code?page=1&limit=10&sort=created_at&order_by=desc
+		logs.GET("/short/:code", loggerController.GetLogsByShortLink)
+
+		// GET /logs/filter?page=1&limit=10&sort=created_at&order_by=desc&username=john&level=error&status_code=500
+		logs.GET("/filter", loggerController.GetLogsWithFilter)
+	}
 }

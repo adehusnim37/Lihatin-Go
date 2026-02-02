@@ -74,3 +74,64 @@ func PaginateValidate(pageStr, limitStr, sort, orderBy string, role Role) (page,
 	}
 	return p, l, sort, orderBy, nil
 }
+
+// PaginateValidateLogger validates pagination parameters for logger endpoints
+// Supports logger-specific sort fields like timestamp, level, action, status_code
+func PaginateValidateLogger(pageStr, limitStr, sort, orderBy string) (page, limit int, outSort, outOrder string, errs map[string]string) {
+	errs = map[string]string{}
+
+	// defaults
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	if limitStr == "" {
+		limitStr = "10"
+	}
+	if sort == "" {
+		sort = "created_at"
+	}
+	if orderBy == "" {
+		orderBy = "desc"
+	}
+
+	// page
+	p, err := strconv.Atoi(pageStr)
+	if err != nil || p < 1 {
+		logger.Logger.Warn("Invalid page parameter", "page", pageStr)
+		errs["page"] = "Page must be a positive integer"
+	}
+
+	// limit - enforce max 100 to prevent excessive load
+	l, err := strconv.Atoi(limitStr)
+	if err != nil || l < 1 || l > 100 {
+		logger.Logger.Warn("Invalid limit parameter", "limit", limitStr)
+		errs["limit"] = "Limit must be between 1 and 100"
+	}
+
+	// whitelist sort fields for logger (prevent SQL injection)
+	validSorts := map[string]bool{
+		"created_at":    true,
+		"updated_at":    true,
+		"timestamp":     true,
+		"level":         true,
+		"action":        true,
+		"status_code":   true,
+		"response_time": true,
+		"username":      true,
+		"method":        true,
+		"route":         true,
+	}
+	if !validSorts[sort] {
+		errs["sort"] = "Sort must be one of: created_at, updated_at, timestamp, level, action, status_code, response_time, username, method, route"
+	}
+
+	// order_by
+	if orderBy != "asc" && orderBy != "desc" {
+		errs["order_by"] = "Order by must be either 'asc' or 'desc'"
+	}
+
+	if len(errs) > 0 {
+		return 0, 0, "", "", errs
+	}
+	return p, l, sort, orderBy, nil
+}
