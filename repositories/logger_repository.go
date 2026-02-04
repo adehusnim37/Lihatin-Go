@@ -47,7 +47,7 @@ func (r *LoggerRepository) GetLogsByUsername(username string, page, limit int, s
 	isAdmin := strings.EqualFold(userRoleStr, "admin")
 	if !isAdmin {
 		query = query.Where("user_id = ?", userID)
-	} 
+	}
 
 	// Count total records
 	if err := query.
@@ -206,4 +206,63 @@ func (r *LoggerRepository) GetLogsWithFilter(filter dto.ActivityLogFilter, page,
 		Find(&logs).Error
 
 	return logs, totalCount, err
+}
+
+// GetAllCountedLogs retrieves count of all logs by method type
+func (r *LoggerRepository) GetAllCountedLogs(userRoleStr, userID string) (map[string]int64, error) {
+	type MethodCount struct {
+		Method string
+		Count  int64
+	}
+
+	var results []MethodCount
+
+	// Initialize counts with all standard HTTP methods set to 0
+	counts := map[string]int64{
+		"GET":    0,
+		"POST":   0,
+		"PUT":    0,
+		"PATCH":  0,
+		"DELETE": 0,
+	}
+
+	// Build base query
+	query := r.DB.Model(&logging.ActivityLog{}).Select("method, COUNT(*) as count").Group("method")
+
+	isAdmin := strings.EqualFold(userRoleStr, "admin")
+	if !isAdmin {
+		query = query.Where("user_id = ?", userID)
+	}
+
+	// Execute query
+	if err := query.Scan(&results).Error; err != nil {
+		return nil, err
+	}
+
+	// Update counts with actual values from database
+	for _, result := range results {
+		counts[result.Method] = result.Count
+	}
+
+	return counts, nil
+}
+
+// GetLogByID retrieves a single log by its ID
+func (r *LoggerRepository) GetLogByID(logID, userRoleStr, userID string) (*logging.ActivityLog, error) {
+	var log logging.ActivityLog
+
+	// Build base query
+	query := r.DB.Model(&logging.ActivityLog{}).Where("id = ?", logID)
+
+	isAdmin := strings.EqualFold(userRoleStr, "admin")
+	if !isAdmin {
+		query = query.Where("user_id = ?", userID)
+	}
+
+	// Execute query
+	if err := query.First(&log).Error; err != nil {
+		return nil, err
+	}
+
+	return &log, nil
 }

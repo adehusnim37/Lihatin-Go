@@ -3,8 +3,8 @@ package admin
 import (
 	"net/http"
 
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -13,12 +13,7 @@ import (
 func (c *Controller) UnlockUser(ctx *gin.Context) {
 	userID := ctx.Param("id")
 	if userID == "" {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "User ID is required",
-			Error:   map[string]string{"user_id": "User ID parameter is required"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "USER_ID_REQUIRED", "User ID is required", "user_id", userID)
 		return
 	}
 
@@ -31,43 +26,23 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	// Check if user exists
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "User not found",
-			Error:   map[string]string{"user_id": "User with this ID does not exist"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusNotFound, "USER_NOT_FOUND", "User not found", "user_id", userID)
 		return
 	}
 
 	// Check if user is actually locked
 	if !user.IsLocked {
-		ctx.JSON(http.StatusConflict, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "User not locked",
-			Error:   map[string]string{"status": "User account is not currently locked"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusConflict, "USER_NOT_LOCKED", "User not locked", "user_id", userID)
 		return
 	}
 
 	// Unlock the user
 	if err := c.repo.GetUserAdminRepository().UnlockUser(userID, req.Reason); err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to unlock user",
-			Error:   map[string]string{"error": "Failed to unlock user account, please try again later"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "UNLOCK_USER_FAILED", "Failed to unlock user account, please try again later", "user_id", userID)
 		return
 	}
 
 	logger.Logger.Info("User unlocked successfully", "user_id", userID, "reason", req.Reason)
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    nil,
-		Message: "User account unlocked successfully",
-		Error:   nil,
-	})
+	httputil.SendOKResponse(ctx, nil, "User account unlocked successfully")
 }

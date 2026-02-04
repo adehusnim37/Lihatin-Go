@@ -34,6 +34,16 @@ func (w bodyLogWriter) WriteString(s string) (int, error) {
 // ActivityLogger middleware for logging user activities
 func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip logging for certain paths to prevent recursive logging or large responses
+		path := c.Request.URL.Path
+		skipPaths := []string{"/v1/logs", "/v1/health", "/v1/csrf-token", "/v1/auth/me"}
+		for _, skip := range skipPaths {
+			if strings.HasPrefix(path, skip) {
+				c.Next()
+				return
+			}
+		}
+
 		// Start timer
 		startTime := time.Now()
 
@@ -96,7 +106,7 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		}
 
 		// Get path and method
-		path := c.Request.URL.Path
+		path = c.Request.URL.Path
 		method := c.Request.Method
 
 		// Determine action and level based on method and status code
@@ -111,7 +121,6 @@ func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
 		if responseBody == "" {
 			responseBody = "{}" // Empty JSON object to satisfy database constraint
 		}
-
 		// Ensure requestBody is valid JSON for database constraint
 		if requestBody == "" {
 			requestBody = "{}" // Empty JSON object to satisfy database constraint

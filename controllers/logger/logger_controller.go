@@ -73,11 +73,42 @@ func (c *LoggerController) GetAllLogs(ctx *gin.Context) {
 	httpPkg.SendOKResponse(ctx, response, "Logs retrieved successfully")
 }
 
+// GetLogByID retrieves a single log by its ID
+func (c *LoggerController) GetLogByID(ctx *gin.Context) {
+	logID := ctx.Param("id")
+	userRole := ctx.GetString("role")
+	userID := ctx.GetString("user_id")
+
+	// Fetch log from repository
+	log, err := c.repo.GetLogByID(logID, userRole, userID)
+	if err != nil {
+		httpPkg.HandleError(ctx, err, "")
+		return
+	}
+
+	httpPkg.SendOKResponse(ctx, dto.ToActivityLogResponse(log), "Log retrieved successfully")
+}
+
+// GetAllCountedLogs retrieves count of all logs by method type
+func (c *LoggerController) GetAllCountedLogs(ctx *gin.Context) {
+	userRole := ctx.GetString("role")
+	userID := ctx.GetString("user_id")
+
+	// Fetch counted logs from repository
+	counts, err := c.repo.GetAllCountedLogs(userRole, userID)
+	if err != nil {
+		httpPkg.HandleError(ctx, err, "")
+		return
+	}
+
+	httpPkg.SendOKResponse(ctx, counts, "Log counts retrieved successfully")
+}
+
 // GetLogsByUsername retrieves logs by username with pagination
 // Query params: page (default: 1), limit (default: 10, max: 100), sort (default: created_at), order_by (default: desc)
 func (c *LoggerController) GetLogsByUsername(ctx *gin.Context) {
 	userRole := ctx.GetString("role")
-	username := ctx.GetString("username")
+	username := ctx.Param("username")
 	userID := ctx.GetString("user_id")
 
 	// Parse and validate pagination parameters

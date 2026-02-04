@@ -6,6 +6,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers/auth/admin"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
+	loginattempts "github.com/adehusnim37/lihatin-go/controllers/auth/login-attempts"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/repositories"
@@ -18,6 +19,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	apiKeyController := api.NewAPIKeyController(baseController)
 	// Create admin controller
 	adminController := admin.NewAdminController(baseController)
+	// Create login attempts controller
+	loginAttemptsController := loginattempts.NewLoginAttemptsController(baseController)
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
@@ -71,6 +74,16 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 			totpGroup.POST("/regenerate-recovery-codes", totpController.RegenerateRecoveryCodes)
 		}
 
+		// Login Attempts - accessible by all authenticated users
+		loginAttemptsGroup := protectedAuth.Group("/login-attempts")
+		{
+			loginAttemptsGroup.GET("", loginAttemptsController.GetLoginAttempts)
+			loginAttemptsGroup.GET("/stats/:email_or_username/:days", loginAttemptsController.LoginAttemptsStats)
+			loginAttemptsGroup.GET("/recent-activity", loginAttemptsController.GetRecentActivity)
+			loginAttemptsGroup.GET("/attempts-by-hour", loginAttemptsController.GetAttemptsByHour)
+			loginAttemptsGroup.GET("/:id", loginAttemptsController.GetLoginAttempt)
+		}
+
 		// Email verification for authenticated users
 
 	}
@@ -91,12 +104,19 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		adminAuth.GET("/users/:id", adminController.GetUserByID)
 		adminAuth.POST("/users/:id/lock", adminController.LockUser)
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
+
+		// Admin can access all login attempts (not filtered by user)
+		adminLoginAttemptsGroup := adminAuth.Group("/login-attempts")
 		{
-			adminAuth.GET("/login-attempts", adminController.GetLoginAttempts)
-			adminAuth.GET("/login-attempts/stats/:email_or_username/:days", adminController.LoginAttemptsStats)
-			adminAuth.GET("/login-attempts/:id", adminController.GetLoginAttempt)
-			// adminAuth.DELETE("/login-attempts/:id", adminController.DeleteLoginAttempt)
-			// adminAuth.DELETE("/login-attempts", adminController.ClearLoginAttempts)
+			adminLoginAttemptsGroup.GET("", loginAttemptsController.GetLoginAttempts)
+			adminLoginAttemptsGroup.GET("/stats/:email_or_username/:days", loginAttemptsController.LoginAttemptsStats)
+			adminLoginAttemptsGroup.GET("/recent-activity", loginAttemptsController.GetRecentActivity)
+			adminLoginAttemptsGroup.GET("/attempts-by-hour", loginAttemptsController.GetAttemptsByHour)
+			adminLoginAttemptsGroup.GET("/top-failed-ips", loginAttemptsController.GetTopFailedIPs)
+			adminLoginAttemptsGroup.GET("/suspicious-activity", loginAttemptsController.GetSuspiciousActivity)
+			adminLoginAttemptsGroup.GET("/:id", loginAttemptsController.GetLoginAttempt)
+			// adminLoginAttemptsGroup.DELETE("/:id", loginAttemptsController.DeleteLoginAttempt)
+			// adminLoginAttemptsGroup.DELETE("", loginAttemptsController.ClearLoginAttempts)
 		}
 	}
 

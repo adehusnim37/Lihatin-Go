@@ -61,8 +61,8 @@ type ActivityLogFilter struct {
 	Level      logging.LogLevel `json:"level,omitempty" form:"level" validate:"omitempty,oneof=debug info warn error fatal"`
 	StatusCode *int             `json:"status_code,omitempty" form:"status_code" validate:"omitempty,min=100,max=599"`
 	IPAddress  string           `json:"ip_address,omitempty" form:"ip_address"`
-	DateFrom   *time.Time       `json:"date_from,omitempty" form:"date_from" time_format:"2006-01-02T15:04:05Z"`
-	DateTo     *time.Time       `json:"date_to,omitempty" form:"date_to" time_format:"2006-01-02T15:04:05Z"`
+	DateFrom   *time.Time       `json:"date_from,omitempty" form:"date_from" time_format:"2006-01-02T15:04:05Z07:00"`
+	DateTo     *time.Time       `json:"date_to,omitempty" form:"date_to" time_format:"2006-01-02T15:04:05Z07:00"`
 	APIKey     string           `json:"api_key,omitempty" form:"api_key"`
 }
 

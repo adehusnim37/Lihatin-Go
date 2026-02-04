@@ -14,8 +14,18 @@ func RegisterLoggerRoutes(rg *gin.RouterGroup, userRepo repositories.UserReposit
 	logs := rg.Group("/logs")
 	{
 		logs.Use(middleware.AuthMiddleware(userRepo))
+
+		// Get logs with ID
+		logs.GET("/:id", loggerController.GetLogByID)
+
 		// GET /logs?page=1&limit=10&sort=created_at&order_by=desc
-		logs.GET("/", loggerController.GetAllLogs)
+		logs.GET("/all", loggerController.GetAllLogs)
+
+		//Get All Counted Logs Get,Post,Put,Patch,Delete
+		logs.GET("/all/count", loggerController.GetAllCountedLogs)
+
+		// GET /logs/filter?page=1&limit=10&sort=created_at&order_by=desc&username=john&level=error&status_code=500
+		logs.GET("/filter", loggerController.GetLogsWithFilter)
 
 		// GET /logs/user/:username?page=1&limit=10&sort=created_at&order_by=desc
 		logs.GET("/user/:username", loggerController.GetLogsByUsername)
@@ -23,7 +33,5 @@ func RegisterLoggerRoutes(rg *gin.RouterGroup, userRepo repositories.UserReposit
 		// GET /logs/short/:code?page=1&limit=10&sort=created_at&order_by=desc
 		logs.GET("/short/:code", loggerController.GetLogsByShortLink)
 
-		// GET /logs/filter?page=1&limit=10&sort=created_at&order_by=desc&username=john&level=error&status_code=500
-		logs.GET("/filter", loggerController.GetLogsWithFilter)
 	}
 }

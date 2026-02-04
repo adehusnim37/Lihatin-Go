@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -18,18 +17,12 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	sort := ctx.DefaultQuery("sort", "created_at")
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 	// Get user role from context (set by auth middleware)
-	userRole, _ := ctx.Get("role")
-	userRoleStr := userRole.(string)
+	userRole := ctx.GetString("role")
 
 	// Validate and convert pagination parameters
-	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRoleStr))
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRole))
 	if vErrs != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid pagination parameters",
-			Error:   vErrs,
-		})
+		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_PAGINATION_PARAMS", "Invalid pagination parameters", "pagination", vErrs)
 		return
 	}
 
@@ -47,12 +40,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	// Get users with pagination
 	users, totalCount, err := c.repo.GetUserAdminRepository().GetAllUsersWithPagination(limit, offset)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Failed to retrieve users",
-			Error:   map[string]string{"error": "Failed to retrieve users, please try again later"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "FAILED_TO_RETRIEVE_USERS", "Failed to retrieve users, please try again later", "error", err.Error())
 		return
 	}
 
@@ -85,10 +73,5 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		TotalPages: totalPages,
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    response,
-		Message: "Users retrieved successfully",
-		Error:   nil,
-	})
+	httputil.SendOKResponse(ctx, response, "Users retrieved successfully")
 }

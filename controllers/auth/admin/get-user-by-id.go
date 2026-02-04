@@ -4,7 +4,6 @@ import (
 	"net/http"
 	
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -45,10 +44,5 @@ func (c *Controller) GetUserByID(ctx *gin.Context) {
 		UpdatedAt:    user.UpdatedAt,
 	}
 
-	ctx.JSON(http.StatusOK, common.APIResponse{
-		Success: true,
-		Data:    adminUser,
-		Message: "User retrieved successfully",
-		Error:   nil,
-	})
+	httputil.SendOKResponse(ctx, adminUser, "User retrieved successfully")
 }

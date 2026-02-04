@@ -4,7 +4,7 @@
 
 ### 1. Get All Logs
 ```
-GET /api/logs
+GET http://localhost:8080/v1/logs?page=1&limit=10&sort=created_at&order_by=desc
 ```
 
 **Query Parameters:**
@@ -25,7 +25,7 @@ curl "http://localhost:8080/api/logs?page=1&limit=20&sort=timestamp&order_by=des
 
 ### 2. Get Logs by Username
 ```
-GET /api/logs/user/:username
+GET http://localhost:8080/v1/logs/user/:username
 ```
 
 **Path Parameters:**
@@ -42,7 +42,7 @@ curl "http://localhost:8080/api/logs/user/john_doe?page=1&limit=10"
 
 ### 3. Get Logs by Short Link
 ```
-GET /api/logs/short/:code
+GET http://localhost:8080/v1/logs/short/:code
 ```
 
 **Path Parameters:**
@@ -59,7 +59,7 @@ curl "http://localhost:8080/api/logs/short/abc123?page=1&limit=50"
 
 ### 4. Get Logs with Advanced Filtering
 ```
-GET /api/logs/filter
+GET http://localhost:8080/v1/logs/filter?level=error&limit=50&sort=timestamp&order_by=desc
 ```
 
 **Query Parameters:**
