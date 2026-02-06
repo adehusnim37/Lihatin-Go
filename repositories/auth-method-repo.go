@@ -293,7 +293,7 @@ func (r *AuthMethodRepository) SetupTOTP(userAuthID, encryptedSecret string, rec
 
 // GetAuthMethodStats retrieves authentication method statistics
 func (r *AuthMethodRepository) GetAuthMethodStats() (map[string]interface{}, error) {
-	stats := make(map[string]interface{})
+	stats := make(map[string]any)
 
 	// Count by type
 	var results []struct {
@@ -335,13 +335,13 @@ func (r *AuthMethodRepository) GetAuthMethodStats() (map[string]interface{}, err
 }
 
 // GetUserAuthMethodsSummary retrieves summary of auth methods for a user
-func (r *AuthMethodRepository) GetUserAuthMethodsSummary(userAuthID string) (map[string]interface{}, error) {
+func (r *AuthMethodRepository) GetUserAuthMethodsSummary(userAuthID string) (map[string]any, error) {
 	var authMethods []user.AuthMethod
 	if err := r.db.Where("user_auth_id = ?", userAuthID).Find(&authMethods).Error; err != nil {
 		return nil, fmt.Errorf("failed to get user auth methods: %w", err)
 	}
 
-	summary := make(map[string]interface{})
+	summary := make(map[string]any)
 	summary["total_methods"] = len(authMethods)
 
 	enabledCount := 0
