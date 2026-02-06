@@ -653,6 +653,78 @@ var (
 		http.StatusBadRequest,
 		"ip_address",
 	)
+	ErrAPIKeyValidationFailed = NewAppError(
+		"API_KEY_VALIDATION_FAILED",
+		"Failed to validate API key",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyPermissionCheckFailed = NewAppError(
+		"API_KEY_PERMISSION_CHECK_FAILED",
+		"Failed to check API key permissions",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyRevokeFailed = NewAppError(
+		"API_KEY_REVOKE_FAILED",
+		"Failed to revoke API key",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyDeleteExpiredFailed = NewAppError(
+		"API_KEY_DELETE_EXPIRED_FAILED",
+		"Failed to delete expired API keys",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyStatsFailed = NewAppError(
+		"API_KEY_STATS_FAILED",
+		"Failed to retrieve API key statistics",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyActivateFailed = NewAppError(
+		"API_KEY_ACTIVATE_FAILED",
+		"Failed to activate API key",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyDeactivateFailed = NewAppError(
+		"API_KEY_DEACTIVATE_FAILED",
+		"Failed to deactivate API key",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyExpiresAtInvalid = NewAppError(
+		"API_KEY_EXPIRES_AT_INVALID",
+		"Expiration date must be in the future",
+		http.StatusBadRequest,
+		"expires_at",
+	)
+	ErrAPIKeyInvalidPermission = NewAppError(
+		"API_KEY_INVALID_PERMISSION",
+		"Invalid permission specified for API key",
+		http.StatusBadRequest,
+		"permissions",
+	)
+	ErrAPIKeyInvalidLimitUsage = NewAppError(
+		"API_KEY_INVALID_LIMIT_USAGE",
+		"Limit usage must be non-negative or null for unlimited",
+		http.StatusBadRequest,
+		"limit_usage",
+	)
+	ErrAPIKeyReloadFailed = NewAppError(
+		"API_KEY_RELOAD_FAILED",
+		"Failed to reload updated API key",
+		http.StatusInternalServerError,
+		"api_key",
+	)
+	ErrAPIKeyAlreadyActive = NewAppError(
+		"API_KEY_ALREADY_ACTIVE",
+		"API key is already active",
+		http.StatusBadRequest,
+		"api_key",
+	)
 )
 
 // Activity Log Errors

@@ -2,7 +2,6 @@ package api
 
 import (
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
@@ -35,20 +34,6 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	// Convert to response model using DTO
-	response := dto.APIKeyResponse{
-		ID:          updatedKey.ID,
-		Name:        updatedKey.Name,
-		KeyPreview:  auth.GetKeyPreview(updatedKey.Key),
-		LimitUsage:  updatedKey.LimitUsage,
-		UsageCount:  updatedKey.UsageCount,
-		LastIPUsed:  updatedKey.LastIPUsed,
-		LastUsedAt:  updatedKey.LastUsedAt,
-		ExpiresAt:   updatedKey.ExpiresAt,
-		IsActive:    updatedKey.IsActive,
-		Permissions: []string(updatedKey.Permissions),
-		CreatedAt:   updatedKey.CreatedAt,
-	}
 
-	http.SendOKResponse(ctx, response, "API key updated successfully")
+	http.SendOKResponse(ctx, updatedKey, "API key updated successfully")
 }

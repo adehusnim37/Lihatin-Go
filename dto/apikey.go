@@ -32,6 +32,7 @@ type APIKeyResponse struct {
 	IsActive    bool       `json:"is_active"`
 	Permissions []string   `json:"permissions"`
 	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // CreateAPIKeyResponse represents the response when creating a new API key

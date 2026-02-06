@@ -4,11 +4,9 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/models/logging"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,69 +39,13 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 		return
 	}
 
-
-
-	// Fetch activity logs for the API key
-	apiKey, activityLogs, totalRecords, err := c.repo.GetAPIKeyRepository().APIKeyUsageHistory(reqId, userID, userRole, page, limit, sort, orderBy)
+	// Fetch activity logs for the API key (now returns complete DTO)
+	response, err := c.repo.GetAPIKeyRepository().APIKeyUsageHistory(reqId, userID, userRole, page, limit, sort, orderBy)
 	if err != nil {
 		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	// Transform to DTOs
-	var activityLogResponses []dto.APIKeyActivityLogResponse
-    for _, log := range activityLogs {
-        activityLogResponses = append(activityLogResponses, dto.APIKeyActivityLogResponse{
-            ID:     log.ID,
-            APIKey: &apiKey.Key,  // ✅ Fixed: Use single apiKey, not array
-            UserID: &apiKey.UserID,
-            ActivityLog: dto.ActivityLogResponse{
-                ID:             log.ID,
-                Level:          logging.LogLevel(log.Level),
-                Message:        log.Message,
-                Username:       log.Username,
-                Timestamp:      log.Timestamp,
-                IPAddress:      log.IPAddress,
-                UserAgent:      log.UserAgent,
-                BrowserInfo:    log.BrowserInfo,
-                Action:         log.Action,
-                Route:          log.Route,
-                Method:         log.Method,
-                StatusCode:     log.StatusCode,
-                RequestBody:    log.RequestBody,
-                RequestHeaders: log.RequestHeaders,
-                QueryParams:    log.QueryParams,
-                RouteParams:    log.RouteParams,
-                ResponseBody:   log.ResponseBody,
-                ResponseTime:   log.ResponseTime,
-                CreatedAt:      log.CreatedAt,
-                UpdatedAt:      log.UpdatedAt,
-            },
-        })
-    }
-
-    // ✅ ENHANCED: Calculate pagination metadata
-    totalPages := int((totalRecords + int64(limit) - 1) / int64(limit))
-    hasNext := page < totalPages
-    hasPrev := page > 1
-
-    response := dto.APIKeyActivityLogsResponse{
-        ActivityLogs: activityLogResponses,
-        TotalCount:   totalRecords,
-        Page:         page,
-        Limit:        limit,
-        TotalPages:   totalPages,
-        HasNext:      hasNext,
-        HasPrev:      hasPrev,
-        APIKeyInfo: dto.APIKeyBasicInfo{
-            ID:         apiKey.ID,
-            Name:       apiKey.Name,
-            KeyPreview: auth.GetKeyPreview(apiKey.Key),
-            IsActive:   apiKey.IsActive,
-            CreatedAt:  apiKey.CreatedAt,
-        },
-    }
-
-
+	// Repository already returns APIKeyActivityLogsResponse DTO with all data and pagination
 	httputil.SendOKResponse(ctx, response, "API key activity logs fetched successfully")
 }

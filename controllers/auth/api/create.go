@@ -20,8 +20,8 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	// Create API key
-	apiKey, fullAPIKey, err := c.repo.GetAPIKeyRepository().CreateAPIKey(
+	// Create API key (now returns DTO directly)
+	response, err := c.repo.GetAPIKeyRepository().CreateAPIKey(
 		userID.(string),
 		req,
 	)
@@ -32,29 +32,12 @@ func (c *Controller) CreateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-	// Success response using proper DTO
+	// Success response using DTO from repository
 	logger.Logger.Info("API key created successfully",
 		"user_id", userID,
-		"api_key_id", apiKey.ID,
-		"api_key_name", apiKey.Name,
+		"api_key_id", response.ID,
+		"api_key_name", response.Name,
 	)
-
-	// Create response using DTO
-	response := dto.CreateAPIKeyResponse{
-		ID:          apiKey.ID,
-		Name:        apiKey.Name,
-		CreatedAt:   apiKey.CreatedAt,
-		ExpiresAt:   apiKey.ExpiresAt,
-		Permissions: []string(apiKey.Permissions),
-		BlockedIPs:  apiKey.BlockedIPs,
-		AllowedIPs:  apiKey.AllowedIPs,
-		LimitUsage:  apiKey.LimitUsage,
-		UsageCount:  apiKey.UsageCount,
-		IsActive:    apiKey.IsActive,
-		// Sensitive info
-		Key:         fullAPIKey, // Full key with secret (only shown once!)
-		Warning:     "Please save this key as it will not be shown again.",
-	}
 
 	http.SendCreatedResponse(ctx, response, "API key created successfully")
 }
