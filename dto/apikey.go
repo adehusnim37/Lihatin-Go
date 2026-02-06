@@ -64,31 +64,31 @@ type CreateAPIKeyRequest struct {
 
 // Enhanced response with API key info and pagination
 type APIKeyActivityLogsResponse struct {
-    ActivityLogs []APIKeyActivityLogResponse `json:"activity_logs"`
-    TotalCount   int64                       `json:"total_count"`
-    Page         int                         `json:"page"`
-    Limit        int                         `json:"limit"`
-    TotalPages   int                         `json:"total_pages"`
-    HasNext      bool                        `json:"has_next"`
-    HasPrev      bool                        `json:"has_prev"`
-    APIKeyInfo   APIKeyBasicInfo             `json:"api_key_info"`
+	ActivityLogs []APIKeyActivityLogResponse `json:"activity_logs"`
+	TotalCount   int64                       `json:"total_count"`
+	Page         int                         `json:"page"`
+	Limit        int                         `json:"limit"`
+	TotalPages   int                         `json:"total_pages"`
+	HasNext      bool                        `json:"has_next"`
+	HasPrev      bool                        `json:"has_prev"`
+	APIKeyInfo   APIKeyBasicInfo             `json:"api_key_info"`
 }
 
 // Basic API key info for responses
 type APIKeyBasicInfo struct {
-    ID         string    `json:"id"`
-    Name       string    `json:"name"`
-    KeyPreview string    `json:"key_preview"`
-    IsActive   bool      `json:"is_active"`
-    CreatedAt  time.Time `json:"created_at"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	KeyPreview string    `json:"key_preview"`
+	IsActive   bool      `json:"is_active"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // Enhanced activity log response
 type APIKeyActivityLogResponse struct {
-    ID          string              `json:"id"`
-    APIKey      *string             `json:"api_key,omitempty"`
-    UserID      *string             `json:"user_id,omitempty"`
-    ActivityLog ActivityLogResponse `json:"activity_log"`
+	ID          string              `json:"id"`
+	APIKey      *string             `json:"api_key,omitempty"`
+	UserID      *string             `json:"user_id,omitempty"`
+	ActivityLog ActivityLogResponse `json:"activity_log"`
 }
 
 // PaginatedAPIKeysResponse represents paginated API keys
@@ -128,4 +128,26 @@ type APIKeyUsageInfo struct {
 	LastIPUsed         *string    `json:"last_ip_used,omitempty"`
 	IsRegenerated      bool       `json:"is_regenerated"`
 	PreviousUsageReset bool       `json:"previous_usage_reset"`
+}
+
+// APIKeyStatsResponse represents statistics for API keys
+type APIKeyStatsResponse struct {
+	TotalKeys   int64           `json:"total_keys"`
+	ActiveKeys  int64           `json:"active_keys"`
+	ExpiredKeys int64           `json:"expired_keys"`
+	TotalUsage  int64           `json:"total_usage"`
+	MostUsedKey *APIKeyUsage    `json:"most_used_key,omitempty"`
+	LastUsedKey *APIKeyLastUsed `json:"last_used_key,omitempty"`
+}
+
+// APIKeyUsage represents usage statistics for a specific key
+type APIKeyUsage struct {
+	Name       string `json:"name"`
+	UsageCount int64  `json:"usage_count"`
+}
+
+// APIKeyLastUsed represents information about the last used key
+type APIKeyLastUsed struct {
+	Name       string     `json:"name"`
+	LastUsedAt *time.Time `json:"last_used_at"`
 }

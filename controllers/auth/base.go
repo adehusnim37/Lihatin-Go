@@ -6,14 +6,14 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/middleware"
+	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,8 +39,6 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 		emailService:   emailService,
 	}
 }
-
-
 
 // GetPremiumStatus returns premium subscription status
 func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
@@ -442,6 +440,7 @@ func (c *Controller) GetCurrentUser(ctx *gin.Context) {
 		LastName:  user.LastName,
 		Email:     user.Email,
 		Avatar:    user.Avatar,
+		Role:      user.Role,
 		IsPremium: user.IsPremium,
 		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05"),
 	}

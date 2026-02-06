@@ -4,9 +4,12 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 )
 
 // PermissionsList is a custom type for handling JSON serialization of permissions
@@ -88,14 +91,14 @@ func (ips IPList) Value() (driver.Value, error) {
 	}
 
 	// ✅ Add validation before marshaling
-	for _, ip := range ips {
-		if ip == "" {
-			return nil, fmt.Errorf("empty IP address not allowed")
-		}
+	if slices.Contains(ips, "") {
+		logger.Logger.Error("Empty IP address validation failed", "ips", ips)
+		return nil, apperrors.ErrEmptyIPAddress
 	}
 
 	jsonBytes, err := json.Marshal([]string(ips))
 	if err != nil {
+		logger.Logger.Error("Failed to marshal IPList", "error", err)
 		return nil, fmt.Errorf("failed to marshal IPList: %w", err)
 	}
 
@@ -136,12 +139,7 @@ func (ips *IPList) Scan(value interface{}) error {
 
 // Helper methods
 func (ips IPList) Contains(ip string) bool {
-	for _, allowedIP := range ips {
-		if allowedIP == ip {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ips, ip)
 }
 
 func (ips IPList) IsEmpty() bool {
@@ -150,11 +148,5 @@ func (ips IPList) IsEmpty() bool {
 
 // Add method for validation
 func (ips IPList) IsValid() bool {
-	for _, ip := range ips {
-		if ip == "" {
-			return false
-		}
-		// Add more IP validation if needed
-	}
-	return true
+	return !slices.Contains(ips, "")
 }

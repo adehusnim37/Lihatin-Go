@@ -258,3 +258,18 @@ func (c *LoggerController) GetLogsWithFilter(ctx *gin.Context) {
 
 	httpPkg.SendOKResponse(ctx, response, "Logs retrieved successfully")
 }
+
+// GetLogsStats retrieves stats of all logs
+func (c *LoggerController) GetLogsStats(ctx *gin.Context) {
+	userRole := ctx.GetString("role")
+	userID := ctx.GetString("user_id")
+
+	// Fetch stats from repository
+	stats, err := c.repo.GetLogsStats(userRole, userID)
+	if err != nil {
+		httpPkg.HandleError(ctx, err, "")
+		return
+	}
+
+	httpPkg.SendOKResponse(ctx, stats, "Logs stats retrieved successfully")
+}

@@ -1,6 +1,8 @@
 package loginattempts
 
 import (
+	"strings"
+
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -87,13 +89,14 @@ func (c *Controller) GetSuspiciousActivity(ctx *gin.Context) {
 func (c *Controller) GetRecentActivity(ctx *gin.Context) {
 	logger.Logger.Info("GetRecentActivity called")
 
-	isAdmin := ctx.GetBool("is_admin")
+	role := ctx.GetString("role")
+	isAdmin := strings.EqualFold(role, "admin")
 	var emailOrUsername string
 
 	if !isAdmin {
 		// Non-admin users can only view their own data
-		if email, exists := ctx.Get("email"); exists {
-			emailOrUsername = email.(string)
+		if email := ctx.GetString("username"); email != "" {
+			emailOrUsername = email
 		} else {
 			httputil.SendErrorResponse(ctx, 401, "AUTH_REQUIRED", "Authentication required", "", nil)
 			return

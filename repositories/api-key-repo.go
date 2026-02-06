@@ -1,17 +1,18 @@
 package repositories
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"slices"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/logging"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -619,30 +620,56 @@ func (r *APIKeyRepository) DeleteExpiredAPIKeys(id dto.APIKeyIDRequest) error {
 }
 
 // GetAPIKeyStats returns API key statistics
-func (r *APIKeyRepository) GetAPIKeyStats(userID string) (map[string]interface{}, error) {
-	stats := make(map[string]interface{})
+// GetAPIKeyStats returns API key statistics
+func (r *APIKeyRepository) GetAPIKeyStats(userID string) (*dto.APIKeyStatsResponse, error) {
+	stats := &dto.APIKeyStatsResponse{}
 
-	// Total API keys for user
-	var total int64
-	if err := r.db.Model(&user.APIKey{}).Where("user_id = ? AND deleted_at IS NULL", userID).Count(&total).Error; err != nil {
+	// Basic counts
+	query := r.db.Model(&user.APIKey{}).Where("user_id = ? AND deleted_at IS NULL", userID)
+
+	if err := query.Count(&stats.TotalKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to count total API keys: %w", err)
 	}
-	stats["total"] = total
 
-	// Active API keys
-	var active int64
-	if err := r.db.Model(&user.APIKey{}).Where("user_id = ? AND is_active = ? AND deleted_at IS NULL", userID, true).Count(&active).Error; err != nil {
+	if err := query.Where("is_active = ?", true).Count(&stats.ActiveKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to count active API keys: %w", err)
 	}
-	stats["active"] = active
 
-	// Expired API keys
-	var expired int64
 	if err := r.db.Model(&user.APIKey{}).Where("user_id = ? AND expires_at IS NOT NULL AND expires_at < ? AND deleted_at IS NULL",
-		userID, time.Now()).Count(&expired).Error; err != nil {
+		userID, time.Now()).Count(&stats.ExpiredKeys).Error; err != nil {
 		return nil, fmt.Errorf("failed to count expired API keys: %w", err)
 	}
-	stats["expired"] = expired
+
+	// Total Usage
+	var totalUsage sql.NullInt64
+	if err := query.Session(&gorm.Session{}).Select("SUM(usage_count)").Scan(&totalUsage).Error; err != nil {
+		return nil, fmt.Errorf("failed to get total usage: %w", err)
+	}
+	if totalUsage.Valid {
+		stats.TotalUsage = totalUsage.Int64
+	}
+
+	// Most Used Key
+	var mostUsed user.APIKey
+	if err := query.Session(&gorm.Session{}).Order("usage_count DESC").First(&mostUsed).Error; err == nil {
+		stats.MostUsedKey = &dto.APIKeyUsage{
+			Name:       mostUsed.Name,
+			UsageCount: mostUsed.UsageCount,
+		}
+	} else if err != gorm.ErrRecordNotFound {
+		return nil, fmt.Errorf("failed to get most used key: %w", err)
+	}
+
+	// Last Used Key (based on last_used_at)
+	var lastUsed user.APIKey
+	if err := query.Session(&gorm.Session{}).Where("last_used_at IS NOT NULL").Order("last_used_at DESC").First(&lastUsed).Error; err == nil {
+		stats.LastUsedKey = &dto.APIKeyLastUsed{
+			Name:       lastUsed.Name,
+			LastUsedAt: lastUsed.LastUsedAt,
+		}
+	} else if err != gorm.ErrRecordNotFound {
+		return nil, fmt.Errorf("failed to get last used key: %w", err)
+	}
 
 	return stats, nil
 }
@@ -844,7 +871,7 @@ func (r *APIKeyRepository) DeactivateAPIKey(keyID dto.APIKeyIDRequest, userID st
 /*
 APIKeyUsageHistory retrieves usage history for an API key with pagination and sorting
 */
-func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID, userRole string, page, limit int, sort, orderBy string) (*user.APIKey, []logging.ActivityLog, int64 ,error) {
+func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest, userID, userRole string, page, limit int, sort, orderBy string) (*user.APIKey, []logging.ActivityLog, int64, error) {
 	var apiKeys user.APIKey
 	var activityLogs []logging.ActivityLog
 	var totalCount int64
@@ -860,7 +887,7 @@ func (r *APIKeyRepository) APIKeyUsageHistory(keyID dto.APIKeyIDRequest,  userID
 
 	// Start a transaction
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		query:= tx.Where("id = ? AND deleted_at IS NULL", keyID.ID)
+		query := tx.Where("id = ? AND deleted_at IS NULL", keyID.ID)
 		if userRole != "admin" {
 			query = query.Where("user_id = ?", userID)
 		}

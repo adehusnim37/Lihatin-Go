@@ -21,6 +21,9 @@ func RegisterLoggerRoutes(rg *gin.RouterGroup, userRepo repositories.UserReposit
 		// GET /logs?page=1&limit=10&sort=created_at&order_by=desc
 		logs.GET("/all", loggerController.GetAllLogs)
 
+		// Get logs stats
+		logs.GET("/stats", loggerController.GetLogsStats)
+
 		//Get All Counted Logs Get,Post,Put,Patch,Delete
 		logs.GET("/all/count", loggerController.GetAllCountedLogs)
 

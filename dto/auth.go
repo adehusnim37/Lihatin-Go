@@ -59,6 +59,7 @@ type UserProfile struct {
 	LastName  string `json:"last_name"`
 	Email     string `json:"email"`
 	Avatar    string `json:"avatar"`
+	Role      string `json:"role"`
 	IsPremium bool   `json:"is_premium"`
 	CreatedAt string `json:"created_at"`
 }

@@ -647,6 +647,12 @@ var (
 		http.StatusInternalServerError,
 		"api_key",
 	)
+	ErrEmptyIPAddress = NewAppError(
+		"EMPTY_IP_ADDRESS",
+		"Empty IP address not allowed",
+		http.StatusBadRequest,
+		"ip_address",
+	)
 )
 
 // Activity Log Errors

@@ -85,8 +85,16 @@ type ActivityLogStatsResponse struct {
 	LogsByStatus        map[int]int64              `json:"logs_by_status"`
 	TopUsers            []UserLogCount             `json:"top_users"`
 	TopRoutes           []RouteLogCount            `json:"top_routes"`
+	LogsOverTime        []TimeLogCount             `json:"logs_over_time"`
+	RecentErrors        []ActivityLogResponse      `json:"recent_errors"`
 	AverageResponseTime int64                      `json:"average_response_time"`
 	ErrorRate           float64                    `json:"error_rate"`
+}
+
+// TimeLogCount for time-series statistics
+type TimeLogCount struct {
+	Time  string `json:"time"`
+	Count int64  `json:"count"`
 }
 
 // UserLogCount for user activity statistics

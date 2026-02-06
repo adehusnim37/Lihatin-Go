@@ -198,7 +198,7 @@ func PaginateValidateLoginAttempts(pageStr, limitStr, sort, orderBy string, isAd
 
 // ParseLoginAttemptsFilters parses and validates filter parameters for login attempts
 // Returns a map of filters ready to use in repository queries
-func ParseLoginAttemptsFilters(queryParams map[string]string, isAdmin bool, userEmail string) (filters map[string]interface{}, errs map[string]string) {
+func ParseLoginAttemptsFilters(queryParams map[string]string, isAdmin bool, username string) (filters map[string]interface{}, errs map[string]string) {
 	filters = make(map[string]interface{})
 	errs = make(map[string]string)
 
@@ -221,11 +221,6 @@ func ParseLoginAttemptsFilters(queryParams map[string]string, isAdmin bool, user
 		}
 	}
 
-	// Username filter - exact match
-	if username, exists := queryParams["username"]; exists && username != "" {
-		filters["username"] = username
-	}
-
 	// IP Address filter - validate IP format (basic)
 	if ipAddress, exists := queryParams["ip_address"]; exists && ipAddress != "" {
 		// Basic validation: should contain dots or colons (IPv4/IPv6)
@@ -246,8 +241,8 @@ func ParseLoginAttemptsFilters(queryParams map[string]string, isAdmin bool, user
 	}
 
 	// Authorization: non-admin users can only see their own attempts
-	if !isAdmin && userEmail != "" {
-		filters["email_or_username"] = userEmail
+	if !isAdmin && username != "" {
+		filters["email_or_username"] = username
 	}
 
 	return filters, errs

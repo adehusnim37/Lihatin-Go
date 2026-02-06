@@ -125,7 +125,7 @@ func (r *LoginAttemptRepository) GetLoginStats(email_or_username string, days in
 
 	// Last successful login
 	var lastSuccess user.LoginAttempt
-	if err := r.db.Where("user_id = ? AND success = ?", email_or_username, true).
+	if err := r.db.Where("email_or_username = ? AND success = ?", email_or_username, true).
 		Order("created_at DESC").First(&lastSuccess).Error; err == nil {
 		stats["last_successful_login"] = lastSuccess.CreatedAt
 	}
@@ -134,7 +134,7 @@ func (r *LoginAttemptRepository) GetLoginStats(email_or_username string, days in
 }
 
 // GetAllLoginAttempts retrieves all login attempts with enhanced filtering
-func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int, filters map[string]interface{}) ([]user.LoginAttempt, int64, error) {
+func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int, filters map[string]interface{}, isAdmin bool, username string) ([]user.LoginAttempt, int64, error) {
 	var attempts []user.LoginAttempt
 	var total int64
 
@@ -152,18 +152,21 @@ func (r *LoginAttemptRepository) GetAllLoginAttempts(limit, offset int, filters 
 		query = query.Where("id = ?", id)
 	}
 
-	if username, ok := filters["username"].(string); ok && username != "" {
+	// For non-admin users filtering their own attempts
+	if !isAdmin {
+		if emailOrUsername, ok := filters["email_or_username"].(string); ok && emailOrUsername != "" {
+			query = query.Where("email_or_username = ?", emailOrUsername)
+		}
+	}
+
+	// For non-admin users filtering their own attempts by username
+	if !isAdmin && username != "" {
 		query = query.Where("email_or_username = ?", username)
 	}
 
-	// For non-admin users filtering their own attempts
-	if emailOrUsername, ok := filters["email_or_username"].(string); ok && emailOrUsername != "" {
-		query = query.Where("email_or_username = ?", emailOrUsername)
-	}
-
-	// Search filter (partial match on email_or_username)
+	// Search filter (partial match on user_agent)
 	if search, ok := filters["search"].(string); ok && search != "" {
-		query = query.Where("email_or_username LIKE ?", "%"+search+"%")
+		query = query.Where("user_agent LIKE ?", "%"+search+"%")
 	}
 
 	// IP Address filter

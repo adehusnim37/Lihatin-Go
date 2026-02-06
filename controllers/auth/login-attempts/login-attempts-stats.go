@@ -2,6 +2,7 @@ package loginattempts
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
@@ -20,10 +21,12 @@ func (c *Controller) LoginAttemptsStats(ctx *gin.Context) {
 	}
 
 	// Authorization check: non-admin users can only view their own stats
-	isAdmin := ctx.GetBool("is_admin")
+		role := ctx.GetString("role")
+		isAdmin := strings.EqualFold(role, "admin")
+		
 	if !isAdmin {
-		userEmail, exists := ctx.Get("email")
-		if !exists || req.EmailOrUsername != userEmail.(string) {
+		userEmail := ctx.GetString("username")
+		if req.EmailOrUsername != userEmail {
 			httputil.SendErrorResponse(ctx, 403, "ACCESS_DENIED", "You can only view your own statistics", "", nil)
 			return
 		}
