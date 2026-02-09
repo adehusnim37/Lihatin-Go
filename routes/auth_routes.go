@@ -94,6 +94,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	{
 		// Premium features that require email verification
 		emailVerifiedGroup.GET("/premium-status", authController.GetPremiumStatus)
+		emailVerifiedGroup.POST("/redeem-premium-code", authController.RedeemPremiumCode)
 	}
 
 	// Admin-only routes (admin and super_admin access)

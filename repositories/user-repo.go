@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -22,6 +22,7 @@ type UserRepository interface {
 	CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error)
 	CreateUser(user *user.User) error
 	UpdateUser(id string, user dto.UpdateProfileRequest) error
+	SetPremium(id string, isPremium bool) error
 }
 
 type userRepository struct {
@@ -185,5 +186,23 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	}
 
 	logger.Logger.Info("User updated successfully", "user_id", id, "fields_updated", updatedFields)
+	return nil
+}
+
+func (ur *userRepository) SetPremium(id string, isPremium bool) error {
+	result := ur.db.Model(&user.User{}).
+		Where("id = ? AND deleted_at IS NULL", id).
+		Update("is_premium", isPremium)
+
+	if result.Error != nil {
+		logger.Logger.Error("Failed to update premium status", "user_id", id, "error", result.Error)
+		return apperrors.ErrUserUpdateFailed
+	}
+
+	if result.RowsAffected == 0 {
+		return apperrors.ErrUserNotFound
+	}
+
+	logger.Logger.Info("Premium status updated", "user_id", id, "is_premium", isPremium)
 	return nil
 }
