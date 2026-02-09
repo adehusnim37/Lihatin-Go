@@ -251,6 +251,12 @@ var (
 		http.StatusBadRequest,
 		"user_auth",
 	)
+	ErrUserAuthEmailNotVerified = NewAppError(
+		"USER_AUTH_EMAIL_NOT_VERIFIED",
+		"User email is not verified",
+		http.StatusForbidden,
+		"email",
+	)
 	ErrUserAuthUpdateFailed = NewAppError(
 		"USER_AUTH_UPDATE_FAILED",
 		"Failed to update user authentication data",

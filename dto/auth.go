@@ -66,11 +66,12 @@ type UserProfile struct {
 
 // RegisterRequest represents the user registration request payload
 type RegisterRequest struct {
-	FirstName string `json:"first_name" binding:"required,min=2,max=50"`
-	LastName  string `json:"last_name" binding:"required,min=2,max=50"`
-	Username  string `json:"username" binding:"required,min=3,max=30,alphanum"`
-	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
+	FirstName  string `json:"first_name" binding:"required,min=2,max=50"`
+	LastName   string `json:"last_name" binding:"required,min=2,max=50"`
+	Username   string `json:"username" binding:"required,min=3,max=30,alphanum"`
+	Email      string `json:"email" binding:"required,email"`
+	Password   string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
+	SecretCode string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
 }
 
 // UpdateProfileRequest represents the user profile update request payload

@@ -563,6 +563,17 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 	return nil
 }
 
+// Is Email Verified checks if user's email is verified
+func (r *UserAuthRepository) IsEmailVerified(userID string) (bool, error) {
+	var userAuth user.UserAuth
+
+	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
+		return false, apperrors.ErrUserAuthEmailNotVerified
+	}
+
+	return userAuth.IsEmailVerified, nil
+}
+
 // IsAccountLocked checks if account is currently locked
 func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
 	var userAuth user.UserAuth
@@ -642,8 +653,8 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 	// First get the user
 	err := r.db.Where("email = ? OR username = ?", emailOrUsername, emailOrUsername).First(&userx).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil, sql.ErrNoRows
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, apperrors.ErrUserNotFound
 		}
 		return nil, nil, apperrors.ErrUserAuthFindFailed
 	}
@@ -651,7 +662,7 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 	// Then get the auth data
 	err = r.db.Where("user_id = ?", userx.ID).First(&userAuth).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, apperrors.ErrUserAuthFindFailed
 		}
 		return nil, nil, apperrors.ErrUserAuthFindFailed

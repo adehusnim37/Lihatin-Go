@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/premium"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
@@ -22,6 +24,8 @@ import (
 // Register creates a new user account
 func (c *Controller) Register(ctx *gin.Context) {
 	var req dto.RegisterRequest
+	var premiumReservationKey string
+	isPremiumFromCode := false
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -41,6 +45,50 @@ func (c *Controller) Register(ctx *gin.Context) {
 			map[string]string{"email": "Email is already registered"},
 		)
 		return
+	}
+
+	if req.SecretCode != "" {
+		manager := middleware.GetSessionManager()
+		if manager == nil || manager.GetRedisClient() == nil {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusInternalServerError,
+				"PREMIUM_CODE_REDEEM_FAILED",
+				"Premium code service is unavailable",
+				"secret_code",
+			)
+			return
+		}
+
+		key, _, err := premium.RedeemOneTimeCode(
+			context.Background(),
+			manager.GetRedisClient(),
+			req.SecretCode,
+			"pending:"+req.Email,
+			time.Now(),
+		)
+		if err != nil {
+			switch {
+			case errors.Is(err, premium.ErrCodeFormat), errors.Is(err, premium.ErrCodeSignature):
+				httputil.SendErrorResponse(ctx, http.StatusBadRequest, "PREMIUM_CODE_INVALID", "Secret code is invalid", "secret_code")
+				return
+			case errors.Is(err, premium.ErrCodeExpired):
+				httputil.SendErrorResponse(ctx, http.StatusBadRequest, "PREMIUM_CODE_EXPIRED", "Secret code is expired", "secret_code")
+				return
+			case errors.Is(err, premium.ErrCodeUsed):
+				httputil.SendErrorResponse(ctx, http.StatusConflict, "PREMIUM_CODE_ALREADY_USED", "Secret code has already been used", "secret_code")
+				return
+			case errors.Is(err, premium.ErrSecretKeyMissing):
+				httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "PREMIUM_CODE_CONFIG_INVALID", "Premium code is not configured", "secret_code")
+				return
+			default:
+				httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "PREMIUM_CODE_REDEEM_FAILED", "Failed to redeem premium code", "secret_code")
+				return
+			}
+		}
+
+		premiumReservationKey = key
+		isPremiumFromCode = true
 	}
 
 	// Hash password
@@ -64,10 +112,16 @@ func (c *Controller) Register(ctx *gin.Context) {
 		Email:     req.Email,
 		Username:  req.Username,
 		Password:  hashedPassword,
-		IsPremium: false,
+		IsPremium: isPremiumFromCode,
 	}
 
 	if err := c.repo.GetUserRepository().CreateUser(newUser); err != nil {
+		if premiumReservationKey != "" {
+			manager := middleware.GetSessionManager()
+			if manager != nil {
+				_ = premium.ReleaseReservation(context.Background(), manager.GetRedisClient(), premiumReservationKey)
+			}
+		}
 		httputil.SendErrorResponse(
 			ctx,
 			http.StatusInternalServerError,
@@ -77,6 +131,13 @@ func (c *Controller) Register(ctx *gin.Context) {
 			map[string]string{"server": "Failed to create user account"},
 		)
 		return
+	}
+
+	if premiumReservationKey != "" {
+		manager := middleware.GetSessionManager()
+		if manager != nil {
+			_ = premium.MarkRedeemedOwner(context.Background(), manager.GetRedisClient(), premiumReservationKey, newUser.ID)
+		}
 	}
 
 	token, err := auth.GenerateVerificationToken()

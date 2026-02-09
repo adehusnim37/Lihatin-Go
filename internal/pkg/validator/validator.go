@@ -64,6 +64,7 @@ var indonesianMessages = map[string]string{
 	"slice":        "%s harus berupa array",
 	"map":          "%s harus berupa peta",
 	"set":          "%s harus berupa set",
+	"secret_code":  "%s harus berupa secret code yang valid",
 }
 
 // Type mapping for Indonesian error messages
@@ -333,6 +334,12 @@ func validateSixDigit(fl validator.FieldLevel) bool {
 	return value >= 100000 && value <= 999999
 }
 
+// validateSecretCode validates premium secret code format (base32-like, optional separator)
+func validateSecretCode(fl validator.FieldLevel) bool {
+	secretCode := fl.Field().String()
+	return regexp.MustCompile(`^[A-Za-z0-9\-\s]{20,80}$`).MatchString(secretCode)
+}
+
 // SetupCustomValidators registers custom validation rules
 func SetupCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("pwdcomplex", validatePasswordComplexity)
@@ -342,4 +349,5 @@ func SetupCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("no_special", validateNoSpecial)
 	v.RegisterValidation("saveurlshort", validateSaveUrlShort)
 	v.RegisterValidation("six_digit", validateSixDigit)
+	v.RegisterValidation("secret_code", validateSecretCode)
 }

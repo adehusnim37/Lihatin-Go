@@ -2,18 +2,16 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -34,67 +32,30 @@ func (c *Controller) Login(ctx *gin.Context) {
 		if user != nil {
 			c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
 		}
-
-		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Invalid credentials",
-				Error:   map[string]string{"auth": "Invalid email/username or password"},
-			})
-			return
-		}
-
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "An error occurred during login, please try again later"},
-		})
+		httputil.HandleError(ctx, err, nil)
 		return
 	}
 
 	// Check if account is locked
 	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(user.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "An error occurred during login"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
 	}
 
 	if isLocked {
-		ctx.JSON(http.StatusTooManyRequests, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Account temporarily locked",
-			Error:   map[string]string{"auth": "Too many failed login attempts. Please try again later."},
-		})
-		return
-	}
-
-	// Check if account is locked
-	if user.IsLocked {
-		ctx.JSON(http.StatusForbidden, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Account locked",
-			Error:   map[string]string{"auth": "Your account has been locked. Please contact support."},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account is locked. Please try again later.", "auth")
 		return
 	}
 
 	// Check if account is active
 	if !userAuth.IsActive {
-		ctx.JSON(http.StatusForbidden, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Account deactivated",
-			Error:   map[string]string{"auth": "Your account has been deactivated. Please contact support."},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
+		return
+	}
+
+	if !userAuth.IsEmailVerified {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "Your email address is not verified. Please verify your email to proceed.", "email")
 		return
 	}
 
@@ -103,24 +64,14 @@ func (c *Controller) Login(ctx *gin.Context) {
 		// Increment failed login attempts
 		c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
 
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid credentials",
-			Error:   map[string]string{"auth": "Invalid email/username or password"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email/username or password", "auth")
 		return
 	}
 
 	// Check if TOTP is enabled for the user
 	hasTOTP, err := c.repo.GetAuthMethodRepository().HasTOTPEnabled(userAuth.ID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "An error occurred during login"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
 	}
 
@@ -134,12 +85,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 				"user_id", user.ID,
 				"error", err.Error(),
 			)
-			ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-				Success: false,
-				Data:    nil,
-				Message: "Login failed",
-				Error:   map[string]string{"error": "Failed to generate authentication token"},
-			})
+			httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "PENDING_TOKEN_GENERATION_FAILED", "Failed to generate authentication token", "auth")
 			return
 		}
 
@@ -186,11 +132,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Message: "Failed to create session",
-			Error:   map[string]string{"server": "Session creation failed"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SESSION_CREATION_FAILED", "Failed to create session", "server")
 		return
 	}
 
@@ -204,12 +146,7 @@ func (c *Controller) Login(ctx *gin.Context) {
 	role := user.Role
 	token, err := auth.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, role, user.IsPremium, userAuth.IsEmailVerified)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "Failed to generate authentication token"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "JWT_GENERATION_FAILED", "Failed to generate authentication token", "auth")
 		return
 	}
 
@@ -228,23 +165,13 @@ func (c *Controller) Login(ctx *gin.Context) {
 			"user_id", user.ID,
 			"error", err.Error(),
 		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "Failed to generate refresh token"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "REFRESH_TOKEN_GENERATION_FAILED", "Failed to generate refresh token", "auth")
 		return
 	}
 
 	// Update last login and reset failed attempts
 	if err := c.repo.GetUserAuthRepository().UpdateLastLogin(user.ID, *deviceID, *lastIP); err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "Failed to update last login"},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LAST_LOGIN_UPDATE_FAILED", "Failed to update last login", "auth")
 		return
 	}
 

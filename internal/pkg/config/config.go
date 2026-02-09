@@ -110,8 +110,9 @@ const (
 	Env                    = "ENV"
 
 	// Security
-	EnvCSRFSecret = "CSRF_SECRET"
-	EnvRateLimit  = "RATE_LIMIT"
+	EnvCSRFSecret        = "CSRF_SECRET"
+	EnvRateLimit         = "RATE_LIMIT"
+	EnvPremiumCodeSecret = "PREMIUM_CODE_SECRET"
 
 	// Email
 	EnvEmailVerificationExpiry = "EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS"
