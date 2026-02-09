@@ -1,0 +1,69 @@
+services:
+  mysql:
+    image: mysql:8.0.43
+    container_name: lihatin-mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    command:
+      - --defaults-file=/etc/mysql/my.cnf
+      - --mysqlx=0
+    ports:
+      - "${DB_BIND_IP:-127.0.0.1}:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/my.cnf:ro
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./backups/mysql:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    mem_limit: 1300m
+    cpus: 1.5
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  valkey:
+    image: valkey/valkey:8.1-alpine
+    container_name: lihatin-valkey
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["sh", "-c", "valkey-server /usr/local/etc/valkey/valkey.conf --requirepass $$REDIS_PASSWORD"]
+    ports:
+      - "${DB_BIND_IP:-127.0.0.1}:6379:6379"
+    volumes:
+      - valkey_data:/data
+      - ./valkey/valkey.conf:/usr/local/etc/valkey/valkey.conf:ro
+      - ./backups/valkey:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a $$REDIS_PASSWORD PING | grep -q PONG"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 320m
+    cpus: 0.5
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  mysql_data:
+  valkey_data:
