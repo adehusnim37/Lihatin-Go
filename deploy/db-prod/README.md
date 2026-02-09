@@ -1,14 +1,14 @@
-# Production DB Stack (MySQL + Valkey)
+# Production DB Stack (MariaDB + Valkey)
 
 Production-ready Docker stack for a VPS with `2 vCPU / 2GB RAM`.
 This stack is tuned for Lihatin-Go and intended for **database-only** usage.
 
 ## Included
 
-- MySQL 8.0 with conservative memory settings
+- MariaDB 11.4 with conservative memory settings
 - Valkey 8 with AOF persistence and memory cap
 - Health checks, restart policy, resource limits
-- Backup and restore scripts for MySQL + Valkey
+- Backup and restore scripts for MariaDB + Valkey
 
 ## 1) Prepare Server
 
@@ -49,16 +49,16 @@ Check health:
 
 ```bash
 docker compose ps
-docker compose logs -f mysql
+docker compose logs -f mariadb
 docker compose logs -f valkey
 ```
 
 ## 4) App Connection Strings
 
-MySQL DSN (`DATABASE_URL`):
+MariaDB DSN (`DATABASE_URL`):
 
 ```txt
-<MYSQL_USER>:<MYSQL_PASSWORD>@tcp(<DB_HOST>:3306)/<MYSQL_DATABASE>?charset=utf8mb4&parseTime=true&loc=Local
+<MARIADB_USER>:<MARIADB_PASSWORD>@tcp(<DB_HOST>:3306)/<MARIADB_DATABASE>?charset=utf8mb4&parseTime=true&loc=Local
 ```
 
 Valkey (Redis-compatible):
@@ -91,8 +91,8 @@ crontab -e
 Restore:
 
 ```bash
-# MySQL
-./scripts/restore.sh mysql ./backups/mysql/mysql_lihatin_go_YYYYMMDD_HHMMSS.sql.gz
+# MariaDB
+./scripts/restore.sh mariadb ./backups/mariadb/mariadb_lihatin_go_YYYYMMDD_HHMMSS.sql.gz
 
 # Valkey
 ./scripts/restore.sh valkey ./backups/valkey/valkey_YYYYMMDD_HHMMSS.rdb
@@ -109,7 +109,7 @@ Restore:
 
 ## 7) Capacity Notes for 2GB VPS
 
-- MySQL memory cap in compose: `1300m`
+- MariaDB memory cap in compose: `1300m`
 - Valkey memory cap in compose: `320m`
 - Valkey dataset configured with `maxmemory 256mb` + `allkeys-lru`
 - Enough for small-to-medium workloads with proper indexing and query tuning.

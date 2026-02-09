@@ -1,22 +1,21 @@
 services:
-  mysql:
-    image: mysql:8.0.43
-    container_name: lihatin-mysql
+  mariadb:
+    image: mariadb:11.4
+    container_name: lihatin-mariadb
     restart: unless-stopped
     env_file:
       - .env
     command:
       - --defaults-file=/etc/mysql/my.cnf
-      - --mysqlx=0
     ports:
       - "${DB_BIND_IP:-127.0.0.1}:3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./mysql/my.cnf:/etc/mysql/my.cnf:ro
-      - ./mysql/conf.d:/etc/mysql/conf.d:ro
-      - ./backups/mysql:/backups
+      - mariadb_data:/var/lib/mysql
+      - ./mariadb/my.cnf:/etc/mysql/my.cnf:ro
+      - ./mariadb/conf.d:/etc/mysql/conf.d:ro
+      - ./backups/mariadb:/backups
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent"]
       interval: 20s
       timeout: 5s
       retries: 10
@@ -65,5 +64,5 @@ services:
         max-file: "5"
 
 volumes:
-  mysql_data:
+  mariadb_data:
   valkey_data:

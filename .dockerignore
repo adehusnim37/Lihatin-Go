@@ -1,0 +1,23 @@
+.git
+.gitignore
+.env
+*.log
+*.tmp
+*.swp
+
+# Build and cache artifacts
+bin/
+coverage/
+
+# Docs and local tooling not needed in image
+docs/
+examples/
+tests/
+cmd/migrate/
+cmd/premium-code/
+deploy/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/

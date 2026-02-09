@@ -1,0 +1,29 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: lihatin-go:prod
+    container_name: lihatin-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${APP_BIND_IP:-127.0.0.1}:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    mem_limit: 700m
+    cpus: 1.5
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

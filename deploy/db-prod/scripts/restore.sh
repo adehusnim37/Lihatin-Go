@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 <mysql|valkey|redis> <backup_file>"
+  echo "Usage: $0 <mariadb|mysql|valkey|redis> <backup_file>"
   exit 1
 fi
 
@@ -27,9 +27,9 @@ source .env
 set +a
 
 case "$TYPE" in
-  mysql)
-    echo "[WARN] Restoring MySQL from $FILE"
-    gunzip -c "$FILE" | docker compose exec -T mysql sh -lc 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD"'
+  mariadb|mysql)
+    echo "[WARN] Restoring MariaDB from $FILE"
+    gunzip -c "$FILE" | docker compose exec -T mariadb sh -lc 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD"'
     ;;
   valkey|redis)
     echo "[WARN] Restoring Valkey from $FILE"
@@ -38,7 +38,7 @@ case "$TYPE" in
     docker compose start valkey
     ;;
   *)
-    echo "[ERROR] invalid type: $TYPE (expected mysql|valkey|redis)"
+    echo "[ERROR] invalid type: $TYPE (expected mariadb|mysql|valkey|redis)"
     exit 1
     ;;
 esac
