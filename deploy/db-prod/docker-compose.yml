@@ -10,7 +10,7 @@ services:
     ports:
       - "${DB_BIND_IP:-127.0.0.1}:3306:3306"
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
       - ./mariadb/my.cnf:/etc/mysql/my.cnf:ro
       - ./mariadb/conf.d:/etc/mysql/conf.d:ro
       - ./backups/mariadb:/backups
@@ -64,5 +64,5 @@ services:
         max-file: "5"
 
 volumes:
-  mariadb_data:
+  mysql_data:
   valkey_data:
