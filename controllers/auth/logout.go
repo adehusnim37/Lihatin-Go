@@ -2,13 +2,14 @@ package auth
 
 import (
 	"context"
+	nethttp "net/http"
 
-	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -95,31 +96,46 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
 		ctx.Request.TLS != nil
 
+	// Get domain and set cookie domain (must match original cookie)
+	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
+
+	// For production with subdomains, use root domain with dot prefix
+	if domain != "localhost" && domain != "127.0.0.1" {
+		domain = "." + domain
+	}
+
 	// Clear access_token cookie
-	ctx.SetCookie(
-		"access_token", // name
-		"",             // empty value
-		-1,             // maxAge -1 to delete immediately
-		"/",            // path
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"),    // domain (must match the domain used when setting)
-		isSecure,       // secure (match original cookie setting)
-		true,           // httpOnly
-	)
+	accessTokenCookie := &nethttp.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   -1,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: nethttp.SameSiteNoneMode,
+	}
 
 	// Clear refresh_token cookie
-	ctx.SetCookie(
-		"refresh_token", // name
-		"",              // empty value
-		-1,              // maxAge -1 to delete immediately
-		"/",             // path
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // domain (must match the domain used when setting)
-		isSecure, // secure
-		true,     // httpOnly
-	)
+	refreshTokenCookie := &nethttp.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   -1,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: nethttp.SameSiteNoneMode,
+	}
+
+	// Apply cookies to response
+	nethttp.SetCookie(ctx.Writer, accessTokenCookie)
+	nethttp.SetCookie(ctx.Writer, refreshTokenCookie)
 
 	logger.Logger.Info("HTTP-Only cookies cleared",
 		"user_id", userID,
 		"is_secure", isSecure,
+		"domain", domain,
 	)
 
 	http.SendOKResponse(ctx, nil, "Logout successful")

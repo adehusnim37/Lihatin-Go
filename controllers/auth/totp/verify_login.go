@@ -5,14 +5,14 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
+	"github.com/adehusnim37/lihatin-go/middleware"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -185,32 +185,50 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		c.emailService.SendLoginAlertEmail(user.Email, user.FirstName, clientIP, userAgent)
 	}()
 
-	// Set cookies
+	// Set cookies with proper SameSite for CORS
 	isSecure := ctx.Request.TLS != nil || ctx.GetHeader("X-Forwarded-Proto") == "https"
 
-	ctx.SetCookie(
-		"access_token",
-		token,
-		config.GetEnvAsInt(config.EnvJWTExpired, 24)*3600,
-		"/",
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"),
-		isSecure,
-		true,
-	)
+	// Get domain and set cookie domain
+	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
 
-	ctx.SetCookie(
-		"refresh_token",
-		refreshToken,
-		config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168)*3600,
-		"/",
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"),
-		isSecure,
-		true,
-	)
+	// For production with subdomains, use root domain with dot prefix
+	if domain != "localhost" && domain != "127.0.0.1" {
+		domain = "." + domain
+	}
+
+	// Set Access Token Cookie
+	accessTokenCookie := &http.Cookie{
+		Name:     "access_token",
+		Value:    token,
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   config.GetEnvAsInt(config.EnvJWTExpired, 24) * 3600,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	}
+
+	// Set Refresh Token Cookie
+	refreshTokenCookie := &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168) * 3600,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	}
+
+	// Apply cookies to response
+	http.SetCookie(ctx.Writer, accessTokenCookie)
+	http.SetCookie(ctx.Writer, refreshTokenCookie)
 
 	logger.Logger.Info("TOTP login successful, tokens issued",
 		"user_id", user.ID,
 		"secure", isSecure,
+		"domain", domain,
+		"same_site", "None",
 	)
 
 	// Prepare response

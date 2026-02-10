@@ -353,31 +353,47 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
 		ctx.Request.TLS != nil
 
+	// Get domain and set cookie domain
+	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
+
+	// For production with subdomains, use root domain with dot prefix
+	if domain != "localhost" && domain != "127.0.0.1" {
+		domain = "." + domain
+	}
+
 	// Access token cookie (short-lived: default 48 hours)
-	ctx.SetCookie(
-		"access_token", // name
-		newToken,       // value
-		48*60*60,       // maxAge in seconds (48 hours)
-		"/",            // path
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
-		isSecure, // secure (HTTPS only in production)
-		true,     // httpOnly (prevent JavaScript access)
-	)
+	newAccessTokenCookie := &http.Cookie{
+		Name:     "access_token",
+		Value:    newToken,
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   48 * 60 * 60,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	}
 
 	// Refresh token cookie (long-lived: default 168 hours = 7 days)
-	ctx.SetCookie(
-		"refresh_token", // name
-		newRefreshToken, // value
-		168*60*60,       // maxAge in seconds (168 hours = 7 days)
-		"/",             // path
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // domain (localhost for dev, change to actual domain in prod)
-		isSecure, // secure
-		true,     // httpOnly
-	)
+	newRefreshTokenCookie := &http.Cookie{
+		Name:     "refresh_token",
+		Value:    newRefreshToken,
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   168 * 60 * 60,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
+	}
+
+	// Apply cookies to response
+	http.SetCookie(ctx.Writer, newAccessTokenCookie)
+	http.SetCookie(ctx.Writer, newRefreshTokenCookie)
 
 	logger.Logger.Info("Tokens rotated and set as HTTP-Only cookies",
 		"user_id", user.ID,
 		"is_secure", isSecure,
+		"domain", domain,
+		"same_site", "None",
 	)
 
 	// ⚠️ DO NOT return tokens in response body (security requirement)

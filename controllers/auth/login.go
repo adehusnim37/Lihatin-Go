@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
@@ -185,33 +186,49 @@ func (c *Controller) Login(ctx *gin.Context) {
 	// Determine if we're in production (HTTPS) or development (HTTP)
 	isSecure := ctx.Request.TLS != nil || ctx.GetHeader("X-Forwarded-Proto") == "https"
 
-	// Set Access Token Cookie (HttpOnly, Secure in prod, Short-lived)
-	// Domain set to localhost for cross-port development (3000 <-> 8080)
-	ctx.SetCookie(
-		"access_token", // Name
-		token,          // Value
-		config.GetEnvAsInt(config.EnvJWTExpired, 24)*3600, // MaxAge in seconds (default 24 hours)
-		"/", // Path
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
-		isSecure, // Secure (true in production/HTTPS)
-		true,     // HttpOnly (MUST be true for security)
-	)
+	// Get domain and set cookie domain
+	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
 
-	// Set Refresh Token Cookie (HttpOnly, Secure in prod, Long-lived)
-	ctx.SetCookie(
-		"refresh_token", // Name
-		refreshToken,    // Value
-		config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168)*3600, // MaxAge in seconds (default 7 days)
-		"/", // Path
-		config.GetEnvOrDefault(config.EnvDomain, "localhost"), // Domain (localhost for dev, change to actual domain in prod)
-		isSecure, // Secure (true in production/HTTPS)
-		true,     // HttpOnly (MUST be true for security)
-	)
+	// For production with subdomains (api.lihat.in and lihat.in), use root domain
+	// Prefix with dot to make it work across subdomains
+	if domain != "localhost" && domain != "127.0.0.1" {
+		domain = "." + domain // .lihat.in works for api.lihat.in and lihat.in
+	}
+
+	// Set Access Token Cookie with proper SameSite for CORS
+	accessTokenCookie := &http.Cookie{
+		Name:     "access_token",
+		Value:    token,
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   config.GetEnvAsInt(config.EnvJWTExpired, 24) * 3600,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode, // Required for cross-origin cookies in production
+	}
+
+	// Set Refresh Token Cookie with proper SameSite for CORS
+	refreshTokenCookie := &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168) * 3600,
+		Secure:   isSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode, // Required for cross-origin cookies in production
+	}
+
+	// Apply cookies to response
+	http.SetCookie(ctx.Writer, accessTokenCookie)
+	http.SetCookie(ctx.Writer, refreshTokenCookie)
 
 	// Log successful cookie setting (but not the actual token values)
 	logger.Logger.Info("Authentication cookies set successfully",
 		"user_id", user.ID,
 		"secure", isSecure,
+		"domain", domain,
+		"same_site", "None",
 		"access_token_max_age_hours", config.GetEnvAsInt(config.EnvJWTExpired, 24),
 		"refresh_token_max_age_hours", config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168),
 	)
@@ -233,9 +250,17 @@ func (c *Controller) Login(ctx *gin.Context) {
 			UserID:          userAuth.UserID,
 			IsEmailVerified: userAuth.IsEmailVerified,
 			IsTOTPEnabled:   userAuth.IsTOTPEnabled,
-			LastLoginAt:     userAuth.LastLoginAt.Format("2006-01-02T15:04:05Z07:00"),
+			LastLoginAt:     formatTimeOrEmpty(userAuth.LastLoginAt),
 		},
 	}
 
 	httputil.SendOKResponse(ctx, responseData, "Login successful")
+}
+
+// Helper function to safely format time pointer
+func formatTimeOrEmpty(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02T15:04:05Z07:00")
 }
