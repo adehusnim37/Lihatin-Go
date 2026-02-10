@@ -37,6 +37,8 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 			// Webhook & Public API
 			"/v1/webhook",
 			"/v1/public",
+			"/v1/health",
+			"/v1/csrf-token", // CSRF token endpoint itself (prevent chicken-egg problem)
 			// Public Auth Endpoints (no session yet)
 			"/v1/auth/register",
 			"/v1/auth/login",
