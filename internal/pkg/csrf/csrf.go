@@ -377,7 +377,7 @@ func validateOrigin(c *gin.Context, opts Options) error {
 
 	// Check trusted origins
 	for _, trusted := range opts.TrustedOrigins {
-		if parsedOrigin.Host == trusted {
+		if isTrustedOrigin(parsedOrigin.Host, trusted) {
 			return nil
 		}
 	}
@@ -419,12 +419,33 @@ func validateReferer(c *gin.Context, opts Options) error {
 
 	// Check trusted origins
 	for _, trusted := range opts.TrustedOrigins {
-		if parsedReferer.Host == trusted {
+		if isTrustedOrigin(parsedReferer.Host, trusted) {
 			return nil
 		}
 	}
 
 	return ErrBadReferer
+}
+
+// isTrustedOrigin supports env formats:
+// - host only (e.g. lihat.in)
+// - full origin URL (e.g. https://lihat.in)
+func isTrustedOrigin(requestHost, trusted string) bool {
+	trusted = strings.TrimSpace(trusted)
+	if trusted == "" {
+		return false
+	}
+
+	if !strings.Contains(trusted, "://") {
+		return requestHost == trusted
+	}
+
+	parsed, err := url.Parse(trusted)
+	if err != nil {
+		return false
+	}
+
+	return requestHost == parsed.Host
 }
 
 // validateToken compares request token with stored token
