@@ -153,8 +153,9 @@ func (c *Controller) Register(ctx *gin.Context) {
 		return
 	}
 
-	jwtExpiredHours := config.GetEnvAsInt(config.EnvJWTExpired, 24)
-	expirationTime := time.Now().Add(time.Duration(jwtExpiredHours) * time.Hour)
+	// Use EMAIL_VERIFICATION_EXPIRY instead of JWT_EXPIRED for email tokens
+	emailVerificationHours := config.GetEnvAsInt(config.EnvEmailVerificationExpiry, 24)
+	expirationTime := time.Now().Add(time.Duration(emailVerificationHours) * time.Hour)
 
 	// Get device and IP info
 	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)

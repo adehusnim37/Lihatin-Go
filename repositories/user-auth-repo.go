@@ -108,6 +108,24 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		}
 	}()
 
+	// Debug: Check if token exists at all (without expiry check)
+	var debugAuth user.UserAuth
+	debugErr := r.db.Where("email_verification_token = ?", token).First(&debugAuth).Error
+	if debugErr == nil {
+		logger.Logger.Info("Token found in database",
+			"user_id", debugAuth.UserID,
+			"is_verified", debugAuth.IsEmailVerified,
+			"expires_at", debugAuth.EmailVerificationTokenExpiresAt,
+			"now", time.Now(),
+		)
+	} else {
+		tokenPreview := token
+		if len(token) > 16 {
+			tokenPreview = token[:16] + "..."
+		}
+		logger.Logger.Warn("Token not found in database", "token_preview", tokenPreview)
+	}
+
 	// 1️⃣ Cari userAuth berdasarkan token dan pastikan belum expired
 	var userAuth user.UserAuth
 	if err = tx.
