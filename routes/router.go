@@ -32,10 +32,22 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	env := config.GetEnvOrDefault("ENV", "development")
 	if env == "production" {
 		csrfOpts := csrf.DefaultOptions()
-		// Skip CSRF untuk webhook dan API key authenticated routes
+		// Skip CSRF untuk public routes yang tidak memerlukan session
 		csrfOpts.SkipPaths = []string{
+			// Webhook & Public API
 			"/v1/webhook",
 			"/v1/public",
+			// Public Auth Endpoints (no session yet)
+			"/v1/auth/register",
+			"/v1/auth/login",
+			"/v1/auth/forgot-password",
+			"/v1/auth/reset-password",
+			"/v1/auth/verify-email",
+			"/v1/auth/resend-verification-email",
+			"/v1/auth/revoke-email-change",
+			"/v1/auth/refresh-token",
+			"/v1/auth/verify-totp-login",
+			"/v1/auth/validate-reset",
 		}
 		r.Use(csrf.Middleware(csrfOpts))
 	}
