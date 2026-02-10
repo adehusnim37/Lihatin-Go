@@ -71,7 +71,7 @@ func (es *EmailService) SendChangeEmailConfirmation(toEmail, userName, token str
 </body>
 </html>
 `, userName, confirmationURL, confirmationURL, confirmationURL,
-		config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL CHANGE CONFIRMATION
@@ -96,7 +96,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, userName, confirmationURL, config.GetRequiredEnv(config.EnvBackendURL))
+`, userName, confirmationURL, config.GetRequiredEnv(config.EnvFrontendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

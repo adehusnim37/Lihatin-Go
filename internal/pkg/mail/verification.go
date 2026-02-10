@@ -204,7 +204,7 @@ func (es *EmailService) SendVerificationEmail(toEmail, userName, token string) e
 </body>
 </html>
 `, userName, verificationURL, verificationURL, verificationURL,
-		config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL VERIFICATION REQUIRED
@@ -229,7 +229,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, userName, verificationURL, config.GetRequiredEnv(config.EnvBackendURL))
+`, userName, verificationURL, config.GetRequiredEnv(config.EnvFrontendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

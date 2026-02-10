@@ -71,9 +71,9 @@ func (es *EmailService) SendSuccessEmailVerification(toEmail, userName string) e
 </body>
 </html>
 `, userName, dashboardURL, dashboardURL, dashboardURL,
-		config.GetRequiredEnv(config.EnvBackendURL),
-		config.GetRequiredEnv(config.EnvBackendURL),
-		config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetRequiredEnv(config.EnvFrontendURL),
+		config.GetRequiredEnv(config.EnvFrontendURL),
+		config.GetRequiredEnv(config.EnvFrontendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL VERIFIED SUCCESSFULLY
@@ -99,7 +99,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, userName, dashboardURL, config.GetRequiredEnv(config.EnvBackendURL))
+`, userName, dashboardURL, config.GetRequiredEnv(config.EnvFrontendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

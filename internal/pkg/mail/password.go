@@ -241,7 +241,7 @@ func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) 
 </body>
 </html>
 `, userName, resetURL, resetURL, resetURL,
-		config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - PASSWORD RESET REQUEST
@@ -271,7 +271,7 @@ The Lihatin Security Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated security message, please do not reply directly to this email.
-`, userName, resetURL, config.GetRequiredEnv(config.EnvBackendURL))
+`, userName, resetURL, config.GetRequiredEnv(config.EnvFrontendURL))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

@@ -22,6 +22,14 @@ func RunMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate UserAuth model: %w", err)
 	}
 
+	if err := db.AutoMigrate(&user.HistoryUser{}); err != nil {
+		return fmt.Errorf("failed to migrate HistoryUser model: %w", err)
+	}
+
+	if err := db.AutoMigrate(&user.LoginAttempt{}); err != nil {
+		return fmt.Errorf("failed to migrate LoginAttempt model: %w", err)
+	}
+
 	if err := db.AutoMigrate(&user.AuthMethod{}); err != nil {
 		return fmt.Errorf("failed to migrate AuthMethod model: %w", err)
 	}

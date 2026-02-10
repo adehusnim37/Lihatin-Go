@@ -76,7 +76,7 @@ func (es *EmailService) SendChangeOldEmailNotification(oldEmail, newEmail, usern
 </body>
 </html>
 `, username, oldEmail, newEmail, revokeURL, dashboardURL, revokeURL, revokeURL,
-		config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL), config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL CHANGE NOTIFICATION
@@ -102,7 +102,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, username, oldEmail, newEmail, revokeURL, config.GetRequiredEnv(config.EnvBackendURL))
+`, username, oldEmail, newEmail, revokeURL, config.GetRequiredEnv(config.EnvFrontendURL))
 
 	return es.sendEmail(oldEmail, subject, textBody, htmlBody)
 }
