@@ -3,13 +3,15 @@ package logger
 import (
 	"log/slog"
 	"os"
+
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 )
 
 var Logger *slog.Logger
 
 func init() {
 	// Development: Text format
-	if os.Getenv("ENV") == "development" {
+	if config.GetEnvOrDefault(config.Env, "development") == "development" {
 		Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}))

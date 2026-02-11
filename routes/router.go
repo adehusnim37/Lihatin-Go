@@ -29,7 +29,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	r.Use(pkgauth.CORSMiddleware())
 
 	// Apply CSRF middleware (only in production)
-	env := config.GetEnvOrDefault("ENV", "development")
+	env := config.GetEnvOrDefault(config.Env, "development")
 	if env == "production" {
 		csrfOpts := csrf.DefaultOptions()
 		// Skip CSRF untuk public routes yang tidak memerlukan session

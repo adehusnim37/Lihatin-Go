@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -498,6 +499,21 @@ func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
 		return "", err
 	}
 
+	// Derive secure flag dynamically:
+	// - keep secure cookie on HTTPS requests
+	// - allow non-secure cookie for localhost HTTP dev/testing
+	secureCookie := opts.Secure
+	if opts.Secure {
+		isHTTPS := c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
+		if !isHTTPS && isLocalHost(c.Request.Host) {
+			secureCookie = false
+			logger.Logger.Warn("CSRF: Secure cookie disabled for localhost over HTTP",
+				"host", c.Request.Host,
+				"path", c.Request.URL.Path,
+			)
+		}
+	}
+
 	// Save to cookie
 	c.SetCookie(
 		opts.CookieName,
@@ -505,7 +521,7 @@ func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
 		opts.MaxAge,
 		opts.CookiePath,
 		opts.CookieDomain,
-		opts.Secure,
+		secureCookie,
 		opts.HttpOnly,
 	)
 
@@ -513,6 +529,15 @@ func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
 	c.SetSameSite(opts.SameSite)
 
 	return token, nil
+}
+
+func isLocalHost(host string) bool {
+	// Handle host:port and IPv6 bracket format.
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 // getTokenFromRequest extracts CSRF token from request
@@ -603,7 +628,7 @@ func TemplateFunc(c *gin.Context) string {
 
 // DefaultOptions returns sensible defaults for production
 func DefaultOptions() Options {
-	secret := config.GetEnvOrDefault("CSRF_SECRET", "")
+	secret := config.GetEnvOrDefault(config.EnvCSRFSecret, "")
 	if secret == "" {
 		// Generate a random secret if not set (will change on restart!)
 		randomBytes := make([]byte, 32)
@@ -618,7 +643,7 @@ func DefaultOptions() Options {
 		CookieDomain: config.GetEnvOrDefault(config.EnvDomain, ""),
 		CookiePath:   "/",
 		MaxAge:       DefaultMaxAge,
-		Secure:       config.GetEnvOrDefault("ENV", "development") == "production",
+		Secure:       config.GetEnvOrDefault(config.Env, "development") == "production",
 		HttpOnly:     false, // Must be false for JS to read
 		SameSite:     http.SameSiteLaxMode,
 		HeaderName:   DefaultHeaderName,
