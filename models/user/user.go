@@ -26,9 +26,10 @@ type User struct {
 	Role            string     `json:"role" gorm:"size:20;default:user"` // user, admin, super_admin
 
 	// Relationships
-	UserAuth     []UserAuth    `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
-	APIKeys      []APIKey      `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
-	HistoryUsers []HistoryUser `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
+	UserAuth        []UserAuth        `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
+	APIKeys         []APIKey          `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
+	HistoryUsers    []HistoryUser     `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
+	PremiumKeyUsage []PremiumKeyUsage `json:"premium_key_usage,omitempty" gorm:"foreignKey:UserID"`
 }
 
 // TableName specifies the table name for GORM

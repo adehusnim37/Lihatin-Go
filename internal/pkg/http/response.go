@@ -101,3 +101,13 @@ func SendErrorResponse(ctx *gin.Context, statusCode int, errorCode, message, fie
 		Error:   map[string]string{field: message},
 	})
 }
+
+// SendValidationErrorResponse sends a standardized validation error response (400 Bad Request)
+func SendValidationErrorResponse(ctx *gin.Context, message string, errs map[string]string) {
+	ctx.JSON(http.StatusBadRequest, common.APIResponse{
+		Success: false,
+		Data:    nil,
+		Message: message,
+		Error:   errs,
+	})
+}

@@ -183,28 +183,18 @@ func (c *Controller) Login(ctx *gin.Context) {
 		c.emailService.SendLoginAlertEmail(user.Email, user.FirstName, clientIP, userAgent)
 	}()
 
-	// Determine if we're in production (HTTPS) or development (HTTP)
-	isSecure := ctx.Request.TLS != nil || ctx.GetHeader("X-Forwarded-Proto") == "https"
-
-	// Get domain and set cookie domain
-	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
-
-	// For production with subdomains (api.lihat.in and lihat.in), use root domain
-	// Prefix with dot to make it work across subdomains
-	if domain != "localhost" && domain != "127.0.0.1" {
-		domain = "." + domain // .lihat.in works for api.lihat.in and lihat.in
-	}
+	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
 
 	// Set Access Token Cookie with proper SameSite for CORS
 	accessTokenCookie := &http.Cookie{
 		Name:     "access_token",
 		Value:    token,
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   config.GetEnvAsInt(config.EnvJWTExpired, 24) * 3600,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode, // Required for cross-origin cookies in production
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Set Refresh Token Cookie with proper SameSite for CORS
@@ -212,11 +202,11 @@ func (c *Controller) Login(ctx *gin.Context) {
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168) * 3600,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode, // Required for cross-origin cookies in production
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Apply cookies to response
@@ -226,9 +216,9 @@ func (c *Controller) Login(ctx *gin.Context) {
 	// Log successful cookie setting (but not the actual token values)
 	logger.Logger.Info("Authentication cookies set successfully",
 		"user_id", user.ID,
-		"secure", isSecure,
-		"domain", domain,
-		"same_site", "None",
+		"secure", cookieSettings.Secure,
+		"domain", cookieSettings.Domain,
+		"same_site", cookieSettings.SameSiteLabel,
 		"access_token_max_age_hours", config.GetEnvAsInt(config.EnvJWTExpired, 24),
 		"refresh_token_max_age_hours", config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168),
 	)

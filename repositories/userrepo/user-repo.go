@@ -1,4 +1,4 @@
-package repositories
+package userrepo
 
 import (
 	"errors"
@@ -19,7 +19,7 @@ type UserRepository interface {
 	GetAllUsers() ([]user.User, error)
 	GetUserByID(id string) (*user.User, error)
 	GetUserByEmailOrUsername(input string) (*user.User, error)
-	CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error)
+	CheckPremiumByUsernameOrEmail(inputs string) (bool, error)
 	CreateUser(user *user.User) error
 	UpdateUser(id string, user dto.UpdateProfileRequest) error
 	SetPremium(id string, isPremium bool) error
@@ -67,19 +67,19 @@ func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
 	return &user, nil
 }
 
-func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (*user.User, error) {
+func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (bool, error) {
 	var user user.User
 	result := ur.db.Select("is_premium").Where("(username = ? OR email = ?) AND deleted_at IS NULL", inputs, inputs).First(&user)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound
+			return false, apperrors.ErrUserNotFound
 		}
 		logger.Logger.Error("Database error while checking premium status", "input", inputs, "error", result.Error)
-		return nil, apperrors.ErrUserDatabaseError
+		return false, apperrors.ErrUserDatabaseError
 	}
 
-	return &user, nil
+	return true, nil
 }
 
 func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {

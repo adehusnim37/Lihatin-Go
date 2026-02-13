@@ -978,3 +978,94 @@ var (
 		"auth_method",
 	)
 )
+
+// Premium Key Errors
+var (
+	ErrPremiumCodeNotFound = NewAppError(
+		"PREMIUM_CODE_NOT_FOUND",
+		"Premium code not found",
+		http.StatusNotFound,
+		"premium_code",
+	)
+	ErrPremiumCodeExpired = NewAppError(
+		"PREMIUM_CODE_EXPIRED",
+		"Premium code has expired",
+		http.StatusBadRequest,
+		"premium_code",
+	)
+	ErrPremiumCodeLimitReached = NewAppError(
+		"PREMIUM_CODE_LIMIT_REACHED",
+		"Premium code usage limit reached",
+		http.StatusBadRequest,
+		"premium_code",
+	)
+	ErrPremiumCodeAlreadyUsed = NewAppError(
+		"PREMIUM_CODE_ALREADY_USED",
+		"Premium code already used by this user",
+		http.StatusBadRequest,
+		"premium_code",
+	)
+	ErrPremiumCodeRedeemFailed = NewAppError(
+		"PREMIUM_CODE_REDEEM_FAILED",
+		"Failed to redeem premium code",
+		http.StatusBadRequest,
+		"premium_code",
+	)
+	ErrPremiumCodeGenerateFailed = NewAppError(
+		"PREMIUM_CODE_GENERATE_FAILED",
+		"Failed to generate premium code",
+		http.StatusBadRequest,
+		"premium_code",
+	)
+	ErrPremiumCodeCountFailed = NewAppError(
+		"PREMIUM_CODE_COUNT_FAILED",
+		"Failed to count premium codes",
+		http.StatusInternalServerError,
+		"premium_code",
+	)
+
+
+	// Pending Auth Errors
+	ErrServerInternalPendingAuth = NewAppError(
+		"SERVER_INTERNAL_PENDING_AUTH",
+		"Server internal error for pending auth",
+		http.StatusInternalServerError,
+		"pending_auth",
+	)
+	ErrCreatePendingAuthFailed = NewAppError(
+		"CREATE_PENDING_AUTH_FAILED",
+		"Failed to create pending auth",
+		http.StatusBadRequest,
+		"pending_auth",
+	)
+	ErrPendingAuthNotFound = NewAppError(
+		"PENDING_AUTH_NOT_FOUND",
+		"Pending auth not found",
+		http.StatusNotFound,
+		"pending_auth",
+	)
+	ErrPendingAuthExpired = NewAppError(
+		"PENDING_AUTH_EXPIRED",
+		"Pending auth has expired",
+		http.StatusBadRequest,
+		"pending_auth",
+	)
+	ErrPendingAuthInvalid = NewAppError(
+		"PENDING_AUTH_INVALID",
+		"Invalid pending auth",
+		http.StatusBadRequest,
+		"pending_auth",
+	)
+	ErrPendingAuthDeleteFailed = NewAppError(
+		"PENDING_AUTH_DELETE_FAILED",
+		"Failed to delete pending auth",
+		http.StatusBadRequest,
+		"pending_auth",
+	)
+	ErrPendingAuthAttemptsExceeded = NewAppError(
+		"PENDING_AUTH_ATTEMPTS_EXCEEDED",
+		"Too many attempts. Please Login again.",
+		http.StatusBadRequest,
+		"pending_auth",
+	)
+)

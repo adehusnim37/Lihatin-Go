@@ -56,6 +56,15 @@ func RunMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate ActivityLog model: %w", err)
 	}
 
+	// Migrate Premium models
+	if err := db.AutoMigrate(&user.PremiumKey{}); err != nil {
+		return fmt.Errorf("failed to migrate PremiumKey model: %w", err)
+	}
+
+	if err := db.AutoMigrate(&user.PremiumKeyUsage{}); err != nil {
+		return fmt.Errorf("failed to migrate PremiumKeyUsage model: %w", err)
+	}
+
 	log.Println("✅ All models migrated successfully!")
 	return nil
 }

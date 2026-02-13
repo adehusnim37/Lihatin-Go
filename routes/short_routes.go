@@ -3,11 +3,12 @@ package routes
 import (
 	shortlink "github.com/adehusnim37/lihatin-go/controllers/shortlink"
 	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo repositories.UserRepository, authRepo *repositories.AuthRepository) {
+func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo userrepo.UserRepository, authRepo *authrepo.AuthRepository) {
 	shortGroup := rg.Group("/short")
 	{
 		shortGroup.Use(middleware.RateLimitMiddleware(25))

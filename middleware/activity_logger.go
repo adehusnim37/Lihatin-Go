@@ -11,7 +11,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/logging"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/loggerrepo"
 	"github.com/gin-gonic/gin"
 	"github.com/mssola/useragent"
 )
@@ -32,7 +32,7 @@ func (w bodyLogWriter) WriteString(s string) (int, error) {
 }
 
 // ActivityLogger middleware for logging user activities
-func ActivityLogger(loggerRepo *repositories.LoggerRepository) gin.HandlerFunc {
+func ActivityLogger(loggerRepo *loggerrepo.LoggerRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip logging for certain paths to prevent recursive logging or large responses
 		path := c.Request.URL.Path

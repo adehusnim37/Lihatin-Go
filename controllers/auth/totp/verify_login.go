@@ -2,6 +2,7 @@ package totp
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -31,12 +32,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		logger.Logger.Warn("Invalid pending auth token for TOTP login",
 			"error", err.Error(),
 		)
-		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Authentication expired",
-			Error:   map[string]string{"auth": "Your authentication session has expired. Please login again."},
-		})
+		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_AUTH_TOKEN", "Invalid authentication token", "auth")
 		return
 	}
 
@@ -84,11 +80,36 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 
 	// Validate TOTP code
 	if !auth.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1) {
+		remainingAttempts, attemptErr := auth.IncrementPendingAuthAttempts(context.Background(), req.PendingAuthToken)
+		if attemptErr != nil {
+			logger.Logger.Warn("Failed to record pending auth attempt",
+				"user_id", userID,
+				"error", attemptErr.Error(),
+			)
+			httputil.HandleError(ctx, attemptErr, userID)
+			return
+		}
+
 		logger.Logger.Warn("Invalid TOTP code during login",
 			"user_id", userID,
+			"remaining_attempts", remainingAttempts,
 		)
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_TOTP", "Invalid verification code", "totp")
+		httputil.SendErrorResponse(
+			ctx,
+			http.StatusBadRequest,
+			"INVALID_TOTP",
+			fmt.Sprintf("Invalid verification code. %d attempt(s) remaining.", remainingAttempts),
+			"totp",
+		)
 		return
+	}
+
+	// Consume pending auth token only after successful TOTP validation.
+	if err := auth.ConsumePendingAuthToken(context.Background(), req.PendingAuthToken); err != nil {
+		logger.Logger.Warn("Failed to consume pending auth token after successful TOTP",
+			"user_id", userID,
+			"error", err.Error(),
+		)
 	}
 
 	// TOTP verified! Now issue JWT tokens (same as normal login)
@@ -185,27 +206,18 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		c.emailService.SendLoginAlertEmail(user.Email, user.FirstName, clientIP, userAgent)
 	}()
 
-	// Set cookies with proper SameSite for CORS
-	isSecure := ctx.Request.TLS != nil || ctx.GetHeader("X-Forwarded-Proto") == "https"
-
-	// Get domain and set cookie domain
-	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
-
-	// For production with subdomains, use root domain with dot prefix
-	if domain != "localhost" && domain != "127.0.0.1" {
-		domain = "." + domain
-	}
+	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
 
 	// Set Access Token Cookie
 	accessTokenCookie := &http.Cookie{
 		Name:     "access_token",
 		Value:    token,
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   config.GetEnvAsInt(config.EnvJWTExpired, 24) * 3600,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Set Refresh Token Cookie
@@ -213,11 +225,11 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168) * 3600,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Apply cookies to response
@@ -226,9 +238,9 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 
 	logger.Logger.Info("TOTP login successful, tokens issued",
 		"user_id", user.ID,
-		"secure", isSecure,
-		"domain", domain,
-		"same_site", "None",
+		"secure", cookieSettings.Secure,
+		"domain", cookieSettings.Domain,
+		"same_site", cookieSettings.SameSiteLabel,
 	)
 
 	// Prepare response

@@ -1,12 +1,9 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,12 +27,7 @@ func (c *Controller) GetAPIKeyActivityLogs(ctx *gin.Context) {
 
 	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRole))
 	if vErrs != nil {
-		ctx.JSON(http.StatusBadRequest, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Invalid pagination parameters",
-			Error:   vErrs,
-		})
+		httputil.SendValidationErrorResponse(ctx, "Invalid pagination parameters", vErrs)
 		return
 	}
 

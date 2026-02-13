@@ -11,13 +11,15 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/apikeyrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"github.com/gin-gonic/gin"
 )
 
 // AuthMiddleware provides JWT authentication middleware
 // 🔐 SECURITY: Prioritizes HTTP-Only cookies over Authorization header for token validation
-func AuthMiddleware(userRepo repositories.UserRepository) gin.HandlerFunc {
+func AuthMiddleware(userRepo userrepo.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var token string
 
@@ -237,7 +239,7 @@ func RequireRole(requiredRole string) gin.HandlerFunc {
 }
 
 // OptionalAuth middleware that extracts user info if token is present but doesn't require it
-func OptionalAuth(userRepo repositories.UserRepository) gin.HandlerFunc {
+func OptionalAuth(userRepo userrepo.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 
@@ -395,7 +397,7 @@ func IPWhitelistMiddleware(whitelist []string) gin.HandlerFunc {
 }
 
 // APIKeyMiddleware validates API keys for service-to-service communication
-func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc {
+func APIKeyMiddleware(apiKeyRepo *apikeyrepo.APIKeyRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get API key from request header
 		apiKey := c.GetHeader("X-API-Key")
@@ -457,7 +459,7 @@ func APIKeyMiddleware(apiKeyRepo *repositories.APIKeyRepository) gin.HandlerFunc
 }
 
 // ✅ NEW: Multiple permissions middleware
-func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermissions []string, requireAll bool) gin.HandlerFunc {
+func CheckPermissionAPIKey(authRepo *authrepo.AuthRepository, requiredPermissions []string, requireAll bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First ensure API key authentication has run
 		apiKeyID, exists := c.Get("api_key_id")
@@ -536,7 +538,7 @@ func CheckPermissionAPIKey(authRepo *repositories.AuthRepository, requiredPermis
 }
 
 // AuthRepositoryAPIKeyMiddleware validates API keys using AuthRepository
-func AuthRepositoryAPIKeyMiddleware(authRepo *repositories.AuthRepository) gin.HandlerFunc {
+func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey == "" {

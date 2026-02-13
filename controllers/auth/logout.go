@@ -5,7 +5,6 @@ import (
 	nethttp "net/http"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -90,30 +89,19 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		return
 	}
 
-	// Clear HTTP-Only cookies (XSS protection)
-	// Detect if running on HTTPS
-	isSecure := ctx.GetHeader("X-Forwarded-Proto") == "https" ||
-		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
-		ctx.Request.TLS != nil
-
-	// Get domain and set cookie domain (must match original cookie)
-	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
-
-	// For production with subdomains, use root domain with dot prefix
-	if domain != "localhost" && domain != "127.0.0.1" {
-		domain = "." + domain
-	}
+	// Clear HTTP-Only cookies with the same attributes used during login.
+	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
 
 	// Clear access_token cookie
 	accessTokenCookie := &nethttp.Cookie{
 		Name:     "access_token",
 		Value:    "",
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   -1,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: nethttp.SameSiteNoneMode,
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Clear refresh_token cookie
@@ -121,11 +109,11 @@ func (c *Controller) Logout(ctx *gin.Context) {
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   -1,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: nethttp.SameSiteNoneMode,
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Apply cookies to response
@@ -134,8 +122,9 @@ func (c *Controller) Logout(ctx *gin.Context) {
 
 	logger.Logger.Info("HTTP-Only cookies cleared",
 		"user_id", userID,
-		"is_secure", isSecure,
-		"domain", domain,
+		"is_secure", cookieSettings.Secure,
+		"domain", cookieSettings.Domain,
+		"same_site", cookieSettings.SameSiteLabel,
 	)
 
 	http.SendOKResponse(ctx, nil, "Logout successful")

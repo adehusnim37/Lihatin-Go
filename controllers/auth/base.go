@@ -7,20 +7,19 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/gin-gonic/gin"
 )
 
 // Controller provides all handlers for authentication operations
 type Controller struct {
 	*controllers.BaseController
-	repo         *repositories.AuthRepository
+	repo         *authrepo.AuthRepository
 	emailService *mail.EmailService
 }
 
@@ -30,7 +29,7 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 		panic("GormDB is required for AuthController")
 	}
 
-	authRepo := repositories.NewAuthRepository(base.GormDB)
+	authRepo := authrepo.NewAuthRepository(base.GormDB)
 	emailService := mail.NewEmailService()
 
 	return &Controller{
@@ -348,29 +347,18 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 	)
 
 	// ✅ Set tokens as HTTP-Only cookies (XSS protection)
-	// Detect if running on HTTPS (check standard headers)
-	isSecure := ctx.GetHeader("X-Forwarded-Proto") == "https" ||
-		ctx.GetHeader("X-Forwarded-Ssl") == "on" ||
-		ctx.Request.TLS != nil
-
-	// Get domain and set cookie domain
-	domain := config.GetEnvOrDefault(config.EnvDomain, "localhost")
-
-	// For production with subdomains, use root domain with dot prefix
-	if domain != "localhost" && domain != "127.0.0.1" {
-		domain = "." + domain
-	}
+	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
 
 	// Access token cookie (short-lived: default 48 hours)
 	newAccessTokenCookie := &http.Cookie{
 		Name:     "access_token",
 		Value:    newToken,
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   48 * 60 * 60,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Refresh token cookie (long-lived: default 168 hours = 7 days)
@@ -378,11 +366,11 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		Name:     "refresh_token",
 		Value:    newRefreshToken,
 		Path:     "/",
-		Domain:   domain,
+		Domain:   cookieSettings.Domain,
 		MaxAge:   168 * 60 * 60,
-		Secure:   isSecure,
+		Secure:   cookieSettings.Secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: cookieSettings.SameSite,
 	}
 
 	// Apply cookies to response
@@ -391,9 +379,9 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 
 	logger.Logger.Info("Tokens rotated and set as HTTP-Only cookies",
 		"user_id", user.ID,
-		"is_secure", isSecure,
-		"domain", domain,
-		"same_site", "None",
+		"is_secure", cookieSettings.Secure,
+		"domain", cookieSettings.Domain,
+		"same_site", cookieSettings.SameSiteLabel,
 	)
 
 	// ⚠️ DO NOT return tokens in response body (security requirement)

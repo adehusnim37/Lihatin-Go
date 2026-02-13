@@ -7,20 +7,29 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
 	loginattempts "github.com/adehusnim37/lihatin-go/controllers/auth/login-attempts"
+	authpremium "github.com/adehusnim37/lihatin-go/controllers/auth/premium"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
 	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo repositories.UserRepository, loginAttemptRepo repositories.LoginAttemptRepository, emailController *email.Controller, totpController *totp.Controller, baseController *controllers.BaseController) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo userrepo.UserRepository, loginAttemptRepo authrepo.LoginAttemptRepository, emailController *email.Controller, totpController *totp.Controller, baseController *controllers.BaseController) {
+
 	// Create API key controller
 	apiKeyController := api.NewAPIKeyController(baseController)
+
 	// Create admin controller
 	adminController := admin.NewAdminController(baseController)
+
 	// Create login attempts controller
 	loginAttemptsController := loginattempts.NewLoginAttemptsController(baseController)
+
+	// Create premium code controller
+	premiumController := authpremium.NewPremiumController(baseController)
+
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
@@ -41,6 +50,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.GET("/verify-email", emailController.VerifyEmail) // Token passed as query param
 		authGroup.POST("/resend-verification-email", emailController.ResendVerificationEmail)
 		authGroup.GET("/revoke-email-change", emailController.UndoChangeEmail) // Token passed as query param
+		authGroup.POST("/send-verification-email", emailController.SendVerificationEmails)
 
 		// Token refresh
 		authGroup.POST("/refresh-token", authController.RefreshToken)
@@ -48,29 +58,31 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 	// Protected authentication routes (require JWT auth)
 	protectedAuth := rg.Group("/auth")
-	protectedAuth.Use(middleware.AuthMiddleware(userRepo))
+	protectedAuth.Use(middleware.AuthMiddleware(userRepo), middleware.RequireEmailVerification())
 	{
-		// Current user info (for cookie-based auth check)
+		// Get current user
 		protectedAuth.GET("/me", authController.GetCurrentUser)
 
 		// Account management
-		protectedAuth.POST("/logout", authController.Logout)
-		protectedAuth.POST("/change-password", authController.ChangePassword)
+		protectedAuth.GET("/premium-status", authController.GetPremiumStatus)
 		protectedAuth.GET("/profile", authController.GetProfile)
-		protectedAuth.PUT("/profile", authController.UpdateProfile)
-		protectedAuth.DELETE("/delete-account", authController.DeleteAccount, middleware.RequireEmailVerification())
-		protectedAuth.POST("/send-verification-email", emailController.SendVerificationEmails)
-		protectedAuth.POST("/change-email", emailController.ChangeEmail)
 		protectedAuth.GET("/check-email-change-eligibility", emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
 		protectedAuth.GET("/check-verification-email", emailController.CheckVerificationEmail)
+		protectedAuth.POST("/logout", authController.Logout)
+		protectedAuth.POST("/change-password", authController.ChangePassword)
+		protectedAuth.POST("/redeem-premium-code", premiumController.ActivatePremium)
+		protectedAuth.POST("/change-email", emailController.ChangeEmail)
+		protectedAuth.POST("/profile", authController.UpdateProfile)
+		protectedAuth.DELETE("/delete-account", authController.DeleteAccount)
+
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")
 		{
+			totpGroup.GET("/recovery-codes", totpController.GetRecoveryCodes)
 			totpGroup.POST("/setup", totpController.SetupTOTP)
 			totpGroup.POST("/verify", totpController.VerifyTOTP)
 			totpGroup.POST("/disable", totpController.DisableTOTP)
-			totpGroup.GET("/recovery-codes", totpController.GetRecoveryCodes)
 			totpGroup.POST("/regenerate-recovery-codes", totpController.RegenerateRecoveryCodes)
 		}
 
@@ -84,27 +96,27 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 			loginAttemptsGroup.GET("/:id", loginAttemptsController.GetLoginAttempt)
 		}
 
-		// Email verification for authenticated users
-
-	}
-
-	// Email verification routes that require email verification
-	emailVerifiedGroup := rg.Group("/auth")
-	emailVerifiedGroup.Use(middleware.AuthMiddleware(userRepo), middleware.RequireEmailVerification())
-	{
-		// Premium features that require email verification
-		emailVerifiedGroup.GET("/premium-status", authController.GetPremiumStatus)
-		emailVerifiedGroup.POST("/redeem-premium-code", authController.RedeemPremiumCode)
+		// History Users
+		// historyGroup := protectedAuth.Group("/history")
+		// {
+		// 	// historyGroup.GET("", historyController.GetHistory)
+		// 	// historyGroup.GET("/:id", historyController.GetHistoryByID)
+		// 	// historyGroup.GET("/stats/:email_or_username/:days", historyController.GetHistoryStats)
+		// 	// historyGroup.GET("/recent-activity", historyController.GetRecentActivity)
+		// 	// historyGroup.GET("/attempts-by-hour", historyController.GetAttemptsByHour)
+		// }
 	}
 
 	// Admin-only routes (admin and super_admin access)
 	adminAuth := rg.Group("/auth/admin")
 	adminAuth.Use(middleware.AuthMiddleware(userRepo), middleware.AdminAuth())
 	{
+		adminAuth.GET("/premium-codes", premiumController.GetAllPremiumKeys)
 		adminAuth.GET("/users", adminController.GetAllUsers)
 		adminAuth.GET("/users/:id", adminController.GetUserByID)
 		adminAuth.POST("/users/:id/lock", adminController.LockUser)
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
+		adminAuth.POST("/premium-codes", premiumController.GeneratePremiumCode)
 
 		// Admin can access all login attempts (not filtered by user)
 		adminLoginAttemptsGroup := adminAuth.Group("/login-attempts")
@@ -121,27 +133,27 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		}
 	}
 
-	// Super Admin-only routes (super_admin access only)
-	superAdminAuth := rg.Group("/auth/super-admin")
-	superAdminAuth.Use(middleware.AuthMiddleware(userRepo), middleware.SuperAdminAuth())
-	{
-		// Add super admin specific routes here if needed
-		// Example: superAdminAuth.POST("/create-admin", authController.CreateAdmin)
-	}
+	// // Super Admin-only routes (super_admin access only)
+	// superAdminAuth := rg.Group("/auth/super-admin")
+	// superAdminAuth.Use(middleware.AuthMiddleware(userRepo), middleware.SuperAdminAuth())
+	// {
+	// 	// Add super admin specific routes here if needed
+	// 	// Example: superAdminAuth.POST("/create-admin", authController.CreateAdmin)
+	// }
 
 	// API Key management
 	apiKeyGroup := rg.Group("/api-keys")
 	{
-		apiKeyGroup.Use(middleware.AuthMiddleware(userRepo))
+		apiKeyGroup.Use(middleware.AuthMiddleware(userRepo), middleware.RequireEmailVerification())
 		apiKeyGroup.GET("/", apiKeyController.GetAPIKeys)
 		apiKeyGroup.GET("/:id", apiKeyController.GetAPIKey)
+		apiKeyGroup.GET("/:id/usage", apiKeyController.GetAPIKeyActivityLogs)
+		apiKeyGroup.GET("/stats", apiKeyController.GetAPIKeyStats)
 		apiKeyGroup.POST("/", apiKeyController.CreateAPIKey)
-		apiKeyGroup.DELETE("/:id", apiKeyController.RevokeAPIKey)
-		apiKeyGroup.PUT("/:id", apiKeyController.UpdateAPIKey)
 		apiKeyGroup.POST("/:id/refresh", apiKeyController.RefreshAPIKey)
 		apiKeyGroup.POST("/:id/activate", apiKeyController.ActivateAPIKey)
 		apiKeyGroup.POST("/:id/deactivate", apiKeyController.DeactivateAPIKey)
-		apiKeyGroup.GET("/:id/usage", apiKeyController.GetAPIKeyActivityLogs)
-		apiKeyGroup.GET("/stats", apiKeyController.GetAPIKeyStats)
+		apiKeyGroup.DELETE("/:id", apiKeyController.RevokeAPIKey)
+		apiKeyGroup.PUT("/:id", apiKeyController.UpdateAPIKey)
 	}
 }

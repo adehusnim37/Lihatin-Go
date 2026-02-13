@@ -6,18 +6,21 @@ import (
 	"log"
 	"os"
 
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"gorm.io/driver/mysql"
+	"github.com/go-sql-driver/mysql"
+	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func main() {
-	// Database connection
-	dsn := "adehusnim:ryugamine123A@tcp(localhost:3306)/LihatinGo?charset=utf8mb4&parseTime=True&loc=Local"
-	ensureDatabase()
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	// Load environment variables
+	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
+
+	ensureDatabase(dsn)
+	db, err := gorm.Open(gormmysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect database: %v", err)
 	}
@@ -45,23 +48,32 @@ func main() {
 	}
 }
 
-func ensureDatabase() {
-	dsnRoot := "adehusnim:ryugamine123A@tcp(localhost:3306)/"
+func ensureDatabase(dsn string) {
+	// Parse DSN to get config
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		log.Fatalf("Failed to parse DSN: %v", err)
+	}
+
+	// Store original DB name and clear it to connect to root
+	dbName := cfg.DBName
+	cfg.DBName = ""
+	dsnRoot := cfg.FormatDSN()
+
 	db, err := sql.Open("mysql", dsnRoot)
-	log.Printf("Connecting to database with DSN: %s", dsnRoot)
+	log.Printf("Connecting to database server...")
 	if err != nil {
 		log.Fatalf("Failed to connect root: %v", err)
 	}
-	log.Printf("Checking/creating database LihatinGo...")
-	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS LihatinGo DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+	defer db.Close()
+
+	log.Printf("Checking/creating database %s...", dbName)
+	query := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;", dbName)
+	_, err = db.Exec(query)
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}
-	log.Printf("Database created/exists. Testing connection...")
-	err = db.Close()
-	if err != nil {
-		return
-	}
+	log.Printf("Database %s created/exists.", dbName)
 }
 
 // runMigrations creates/updates all tables
@@ -76,6 +88,8 @@ func runMigrations(db *gorm.DB) {
 		&user.LoginAttempt{},
 		&user.APIKey{},
 		&user.HistoryUser{},
+		&user.PremiumKey{},
+		&user.PremiumKeyUsage{},
 
 		// ShortLink models
 		&shortlink.ShortLink{},
@@ -110,6 +124,8 @@ func dropAllTables(db *gorm.DB) {
 		&user.AuthMethod{},
 		&user.UserAuth{},
 		&user.User{},
+		&user.PremiumKey{},
+		&user.PremiumKeyUsage{},
 	}
 
 	for _, table := range tables {
@@ -143,6 +159,8 @@ func showMigrationStatus(db *gorm.DB) {
 		&shortlink.ShortLinkDetail{},
 		&shortlink.ViewLinkDetail{},
 		&logging.ActivityLog{},
+		&user.PremiumKey{},
+		&user.PremiumKeyUsage{},
 	}
 
 	for _, model := range models {

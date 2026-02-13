@@ -1,6 +1,8 @@
-package repositories
+package authrepo
 
 import (
+	"github.com/adehusnim37/lihatin-go/repositories/apikeyrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"gorm.io/gorm"
 )
 
@@ -9,12 +11,12 @@ type AuthRepository struct {
 	db               *gorm.DB
 	userAuthRepo     *UserAuthRepository
 	authMethodRepo   *AuthMethodRepository
-	apiKeyRepo       *APIKeyRepository
+	apiKeyRepo       *apikeyrepo.APIKeyRepository
 	loginAttemptRepo *LoginAttemptRepository
-	userAdminRepo    UserAdminRepository
+	userAdminRepo    userrepo.UserAdminRepository
 
 	// Public accessors for commonly used repositories
-	APIKeyRepo       *APIKeyRepository
+	APIKeyRepo       *apikeyrepo.APIKeyRepository
 	LoginAttemptRepo *LoginAttemptRepository
 }
 
@@ -26,9 +28,9 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 		panic("Failed to get SQL DB from GORM: " + err.Error())
 	}
 
-	apiKeyRepo := NewAPIKeyRepository(gormDB)
+	apiKeyRepo := apikeyrepo.NewAPIKeyRepository(gormDB)
 	loginAttemptRepo := NewLoginAttemptRepository(gormDB)
-	userAdminRepo := NewUserAdminRepository(gormDB)
+	userAdminRepo := userrepo.NewUserAdminRepository(gormDB)
 
 	return &AuthRepository{
 		db:               gormDB,
@@ -45,8 +47,8 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 }
 
 // GetUserRepository returns a GORM-based user repository
-func (r *AuthRepository) GetUserRepository() UserRepository {
-	return NewUserRepository(r.db)
+func (r *AuthRepository) GetUserRepository() userrepo.UserRepository {
+	return userrepo.NewUserRepository(r.db)
 }
 
 // GetUserAuthRepository returns the user auth repository
@@ -60,7 +62,7 @@ func (r *AuthRepository) GetAuthMethodRepository() *AuthMethodRepository {
 }
 
 // GetAPIKeyRepository returns the API key repository
-func (r *AuthRepository) GetAPIKeyRepository() *APIKeyRepository {
+func (r *AuthRepository) GetAPIKeyRepository() *apikeyrepo.APIKeyRepository {
 	return r.apiKeyRepo
 }
 
@@ -70,6 +72,6 @@ func (r *AuthRepository) GetLoginAttemptRepository() *LoginAttemptRepository {
 }
 
 // GetUserAdminRepository returns the user admin repository
-func (r *AuthRepository) GetUserAdminRepository() UserAdminRepository {
+func (r *AuthRepository) GetUserAdminRepository() userrepo.UserAdminRepository {
 	return r.userAdminRepo
 }

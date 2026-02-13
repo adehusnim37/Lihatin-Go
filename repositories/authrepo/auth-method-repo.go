@@ -1,4 +1,4 @@
-package repositories
+package authrepo
 
 import (
 	"database/sql"
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

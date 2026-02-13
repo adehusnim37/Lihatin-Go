@@ -101,7 +101,7 @@ func BuildSecretCode(validUntil time.Time) (string, error) {
 	return base32Encoding.EncodeToString(raw), nil
 }
 
-func verifyCode(code string, now time.Time) (time.Time, string, error) {
+func VerifyCode(code string, now time.Time) (time.Time, string, error) {
 	secret, err := loadSecretKey()
 	if err != nil {
 		return time.Time{}, "", err
@@ -142,7 +142,7 @@ func RedeemOneTimeCode(ctx context.Context, redisClient *redis.Client, code, own
 		return "", time.Time{}, ErrRedisUnavailable
 	}
 
-	expiry, digest, err := verifyCode(code, now)
+	expiry, digest, err := VerifyCode(code, now)
 	if err != nil {
 		return "", time.Time{}, err
 	}

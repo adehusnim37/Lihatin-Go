@@ -1,4 +1,4 @@
-package repositories
+package loggerrepo
 
 import (
 	"fmt"

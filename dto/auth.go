@@ -74,11 +74,6 @@ type RegisterRequest struct {
 	SecretCode string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
 }
 
-// RedeemPremiumCodeRequest represents redeem premium code payload
-type RedeemPremiumCodeRequest struct {
-	SecretCode string `json:"secret_code" binding:"required,secret_code"`
-}
-
 // UpdateProfileRequest represents the user profile update request payload
 type UpdateProfileRequest struct {
 	FirstName *string `json:"first_name" binding:"omitempty,min=2,max=50"`

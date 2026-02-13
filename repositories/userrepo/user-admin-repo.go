@@ -1,12 +1,12 @@
-package repositories
+package userrepo
 
 import (
 	"errors"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/user"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/gorm"
 )
 

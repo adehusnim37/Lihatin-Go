@@ -1,4 +1,4 @@
-package repositories
+package apikeyrepo
 
 import (
 	"database/sql"

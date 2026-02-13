@@ -7,19 +7,19 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	httpPkg "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/loggerrepo"
 	"github.com/gin-gonic/gin"
 )
 
 // LoggerController handles logging operations
 type LoggerController struct {
 	*controllers.BaseController
-	repo *repositories.LoggerRepository
+	repo *loggerrepo.LoggerRepository
 }
 
 // NewLoggerController creates a new logger controller
 func NewLoggerController(base *controllers.BaseController) *LoggerController {
-	loggerRepo := repositories.NewLoggerRepository(base.GormDB)
+	loggerRepo := loggerrepo.NewLoggerRepository(base.GormDB)
 	return &LoggerController{
 		BaseController: base,
 		repo:           loggerRepo,

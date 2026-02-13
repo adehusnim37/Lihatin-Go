@@ -14,7 +14,9 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/csrf"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
-	"github.com/adehusnim37/lihatin-go/repositories"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/loggerrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/driver/mysql"
@@ -71,10 +73,10 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	totpController := totp.NewController(baseController)
 
 	// Setup repositories for middleware
-	loggerRepo := repositories.NewLoggerRepository(gormDB)
-	userRepo := repositories.NewUserRepository(gormDB) // Changed to use GORM
-	loginAttemptRepo := repositories.NewLoginAttemptRepository(gormDB)
-	authRepo := repositories.NewAuthRepository(gormDB) // Add auth repository for API key middleware
+	loggerRepo := loggerrepo.NewLoggerRepository(gormDB)
+	userRepo := userrepo.NewUserRepository(gormDB) // Changed to use GORM
+	loginAttemptRepo := authrepo.NewLoginAttemptRepository(gormDB)
+	authRepo := authrepo.NewAuthRepository(gormDB) // Add auth repository for API key middleware
 
 	// Apply global middleware for activity logging
 	r.Use(middleware.ActivityLogger(loggerRepo))

@@ -2,14 +2,14 @@ package admin
 
 import (
 	"github.com/adehusnim37/lihatin-go/controllers"
-	"github.com/adehusnim37/lihatin-go/repositories"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 )
 
 // Controller handles email-related authentication operations
 type Controller struct {
 	*controllers.BaseController
-	repo         *repositories.AuthRepository
+	repo         *authrepo.AuthRepository
 	emailService *mail.EmailService
 }
 
@@ -19,7 +19,7 @@ func NewAdminController(base *controllers.BaseController) *Controller {
 		panic("GormDB is required for EmailController")
 	}
 
-	authRepo := repositories.NewAuthRepository(base.GormDB)
+	authRepo := authrepo.NewAuthRepository(base.GormDB)
 	emailService := mail.NewEmailService()
 
 	return &Controller{
