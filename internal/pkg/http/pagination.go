@@ -247,3 +247,58 @@ func ParseLoginAttemptsFilters(queryParams map[string]string, isAdmin bool, user
 
 	return filters, errs
 }
+
+// PaginateValidateUserHistory validates pagination parameters for user history endpoints
+// Supports user history specific sort fields like changed_at, action_type, changed_by
+func PaginateValidateUserHistory(pageStr, limitStr, sort, orderBy string) (page, limit int, outSort, outOrder string, errs map[string]string) {
+	errs = map[string]string{}
+
+	// defaults
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	if limitStr == "" {
+		limitStr = "10"
+	}
+	if sort == "" {
+		sort = "changed_at"
+	}
+	if orderBy == "" {
+		orderBy = "desc"
+	}
+
+	// page
+	p, err := strconv.Atoi(pageStr)
+	if err != nil || p < 1 {
+		logger.Logger.Warn("Invalid page parameter", "page", pageStr)
+		errs["page"] = "Page must be a positive integer"
+	}
+
+	// limit
+	l, err := strconv.Atoi(limitStr)
+	if err != nil || l < 1 || l > 100 {
+		logger.Logger.Warn("Invalid limit parameter", "limit", limitStr)
+		errs["limit"] = "Limit must be between 1 and 100"
+	}
+
+	// whitelist sort fields for user history
+	validSorts := map[string]bool{
+		"changed_at":  true,
+		"action_type": true,
+		"changed_by":  true,
+		"user_id":     true,
+	}
+	if !validSorts[sort] {
+		errs["sort"] = "Sort must be one of: changed_at, action_type, changed_by, user_id"
+	}
+
+	// order_by
+	if orderBy != "asc" && orderBy != "desc" {
+		errs["order_by"] = "Order by must be either 'asc' or 'desc'"
+	}
+
+	if len(errs) > 0 {
+		return 0, 0, "", "", errs
+	}
+	return p, l, sort, orderBy, nil
+}

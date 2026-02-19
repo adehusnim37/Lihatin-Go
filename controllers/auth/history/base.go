@@ -2,23 +2,28 @@ package history
 
 import (
 	"github.com/adehusnim37/lihatin-go/controllers"
-	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 )
 
+// Controller handles email-related authentication operations
 type Controller struct {
 	*controllers.BaseController
-	userRepo userrepo.UserRepository
+	repo         *authrepo.AuthRepository
+	historyRepo  *authrepo.HistoryUserRepository
 }
 
+// NewHistoryUserController creates a new email authentication controller
 func NewHistoryUserController(base *controllers.BaseController) *Controller {
 	if base.GormDB == nil {
-		panic("GormDB is required for PremiumController")
+		panic("GormDB is required for EmailController")
 	}
 
-	userRepo := userrepo.NewUserRepository(base.GormDB)
+	authRepo := authrepo.NewAuthRepository(base.GormDB)
+	historyRepo := authrepo.NewHistoryUserRepository(base.GormDB)
 
 	return &Controller{
 		BaseController: base,
-		userRepo:       userRepo,
+		repo:           authRepo,
+		historyRepo:    historyRepo,
 	}
 }

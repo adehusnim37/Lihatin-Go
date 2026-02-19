@@ -6,6 +6,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers/auth/admin"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/api"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/email"
+	history "github.com/adehusnim37/lihatin-go/controllers/auth/history"
 	loginattempts "github.com/adehusnim37/lihatin-go/controllers/auth/login-attempts"
 	authpremium "github.com/adehusnim37/lihatin-go/controllers/auth/premium"
 	"github.com/adehusnim37/lihatin-go/controllers/auth/totp"
@@ -29,6 +30,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 	// Create premium code controller
 	premiumController := authpremium.NewPremiumController(baseController)
+
+	// Create history controller
+	historyController := history.NewHistoryUserController(baseController)
 
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
@@ -97,14 +101,14 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		}
 
 		// History Users
-		// historyGroup := protectedAuth.Group("/history")
-		// {
-		// 	// historyGroup.GET("", historyController.GetHistory)
-		// 	// historyGroup.GET("/:id", historyController.GetHistoryByID)
-		// 	// historyGroup.GET("/stats/:email_or_username/:days", historyController.GetHistoryStats)
-		// 	// historyGroup.GET("/recent-activity", historyController.GetRecentActivity)
-		// 	// historyGroup.GET("/attempts-by-hour", historyController.GetAttemptsByHour)
-		// }
+		historyGroup := protectedAuth.Group("/history")
+		{
+			historyGroup.GET("", historyController.GetUserHistory)
+			historyGroup.GET("/:id", historyController.GetHistoryByID)
+			// historyGroup.GET("/stats/:email_or_username/:days", historyController.GetHistoryStats)
+			// historyGroup.GET("/recent-activity", historyController.GetRecentActivity)
+			// historyGroup.GET("/attempts-by-hour", historyController.GetAttemptsByHour)
+		}
 	}
 
 	// Admin-only routes (admin and super_admin access)

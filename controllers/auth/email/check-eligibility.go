@@ -20,7 +20,7 @@ func (c *Controller) CheckEmailChangeEligibility(ctx *gin.Context) {
 		return
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"eligible":       eligible,
 		"days_remaining": daysRemaining,
 	}
@@ -44,7 +44,7 @@ func (c *Controller) GetEmailChangeHistory(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 
 	// Get last 90 days of history
-	history, err := c.repo.GetUserAuthRepository().GetEmailChangeHistory(userID, 90)
+	history, err := c.repo.GetHistoryUserRepository().GetEmailChangeHistory(userID, 90)
 	if err != nil {
 		logger.Logger.Error("Failed to get email change history",
 			"user_id", userID,

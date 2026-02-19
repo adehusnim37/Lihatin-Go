@@ -327,7 +327,7 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	}
 
 	if err := r.db.Create(&usrHistory).Error; err != nil {
-		return apperrors.ErrUserHistoryCreationFailed
+		return apperrors.ErrUserHistoryCreateFailed
 	}
 
 	// Update email in user table
@@ -769,57 +769,4 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 	return nil
 }
 
-// CheckEmailChangeEligibility checks if user is eligible to change email
-// Returns error if user has changed email or revoked in last 30 days
-func (r *UserAuthRepository) CheckEmailChangeEligibility(userID string) (eligible bool, daysRemaining int, err error) {
-	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
 
-	var recentHistory user.HistoryUser
-	err = r.db.Where(
-		"user_id = ? AND action_type IN (?, ?) AND changed_at > ?",
-		userID,
-		user.ActionEmailChange,
-		"email_change_revoked",
-		thirtyDaysAgo,
-	).Order("changed_at DESC").First(&recentHistory).Error
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// No recent history, user is eligible
-			return true, 0, nil
-		}
-		return false, 0, err
-	}
-
-	// Calculate days remaining until eligible
-	daysSinceChange := int(time.Since(recentHistory.ChangedAt).Hours() / 24)
-	daysRemaining = 30 - daysSinceChange
-
-	if daysRemaining <= 0 {
-		return true, 0, nil
-	}
-
-	return false, daysRemaining, nil
-}
-
-// GetEmailChangeHistory returns email change history for a user
-func (r *UserAuthRepository) GetEmailChangeHistory(userID string, days int) ([]user.HistoryUser, error) {
-	var history []user.HistoryUser
-
-	cutoffDate := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-
-	err := r.db.Where(
-		"user_id = ? AND action_type IN (?, ?, ?) AND changed_at > ?",
-		userID,
-		user.ActionEmailChange,
-		"email_change_revoked",
-		"email_verification",
-		cutoffDate,
-	).Order("changed_at DESC").Find(&history).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return history, nil
-}

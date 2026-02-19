@@ -14,6 +14,7 @@ type AuthRepository struct {
 	apiKeyRepo       *apikeyrepo.APIKeyRepository
 	loginAttemptRepo *LoginAttemptRepository
 	userAdminRepo    userrepo.UserAdminRepository
+	historyUserRepo  *HistoryUserRepository
 
 	// Public accessors for commonly used repositories
 	APIKeyRepo       *apikeyrepo.APIKeyRepository
@@ -31,6 +32,7 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 	apiKeyRepo := apikeyrepo.NewAPIKeyRepository(gormDB)
 	loginAttemptRepo := NewLoginAttemptRepository(gormDB)
 	userAdminRepo := userrepo.NewUserAdminRepository(gormDB)
+	historyUserRepo := NewHistoryUserRepository(gormDB)
 
 	return &AuthRepository{
 		db:               gormDB,
@@ -39,6 +41,7 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 		apiKeyRepo:       apiKeyRepo,
 		loginAttemptRepo: loginAttemptRepo,
 		userAdminRepo:    userAdminRepo,
+		historyUserRepo:  historyUserRepo,
 
 		// Public accessors
 		APIKeyRepo:       apiKeyRepo,
@@ -75,3 +78,9 @@ func (r *AuthRepository) GetLoginAttemptRepository() *LoginAttemptRepository {
 func (r *AuthRepository) GetUserAdminRepository() userrepo.UserAdminRepository {
 	return r.userAdminRepo
 }
+
+// GetHistoryUserRepository returns the history user repository
+func (r *AuthRepository) GetHistoryUserRepository() *HistoryUserRepository {
+	return r.historyUserRepo
+}
+

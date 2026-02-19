@@ -223,12 +223,6 @@ var (
 		http.StatusBadRequest,
 		"user",
 	)
-	ErrUserHistoryCreationFailed = NewAppError(
-		"USER_HISTORY_CREATION_FAILED",
-		"Failed to create user history record",
-		http.StatusBadRequest,
-		"user_history",
-	)
 )
 
 // User Auth Errors
@@ -837,18 +831,6 @@ var (
 		http.StatusBadRequest,
 		"action_type",
 	)
-	ErrInvalidHistoryData = NewAppError(
-		"INVALID_HISTORY_DATA",
-		"Invalid or corrupted history data",
-		http.StatusInternalServerError,
-		"history",
-	)
-	ErrUserHistoryFindFailed = NewAppError(
-		"USER_HISTORY_FIND_FAILED",
-		"Failed to find user history",
-		http.StatusInternalServerError,
-		"history",
-	)
 	ErrTokenInvalid = NewAppError(
 		"INVALID_TOKEN",
 		"Invalid token",
@@ -1024,7 +1006,6 @@ var (
 		"premium_code",
 	)
 
-
 	// Pending Auth Errors
 	ErrServerInternalPendingAuth = NewAppError(
 		"SERVER_INTERNAL_PENDING_AUTH",
@@ -1067,5 +1048,55 @@ var (
 		"Too many attempts. Please Login again.",
 		http.StatusBadRequest,
 		"pending_auth",
+	)
+
+	// User Auth History Errors
+	ErrUserHistoryCreateFailed = NewAppError(
+		"USER_HISTORY_CREATION_FAILED",
+		"Failed to create user history record",
+		http.StatusBadRequest,
+		"user_history",
+	)
+	ErrUserHistoryCountFailed = NewAppError(
+		"USER_HISTORY_COUNT_FAILED",
+		"Failed to count user history",
+		http.StatusInternalServerError,
+		"user_history",
+	)
+	ErrUserHistoryFindFailed = NewAppError(
+		"USER_HISTORY_FIND_FAILED",
+		"Failed to find user history",
+		http.StatusBadRequest,
+		"user_history",
+	)
+	ErrUserHistoryUpdateFailed = NewAppError(
+		"USER_HISTORY_UPDATE_FAILED",
+		"Failed to update user history",
+		http.StatusBadRequest,
+		"user_history",
+	)
+	ErrUserHistoryDeleteFailed = NewAppError(
+		"USER_HISTORY_DELETE_FAILED",
+		"Failed to delete user history",
+		http.StatusBadRequest,
+		"user_history",
+	)
+	ErrUserHistoryNotFound = NewAppError(
+		"USER_HISTORY_NOT_FOUND",
+		"User history not found",
+		http.StatusNotFound,
+		"user_history",
+	)
+	ErrInvalidHistoryData = NewAppError(
+		"INVALID_HISTORY_DATA",
+		"Invalid or corrupted history data",
+		http.StatusInternalServerError,
+		"history",
+	)
+	ErrServerInternalHistory = NewAppError(
+		"SERVER_INTERNAL_HISTORY",
+		"Server internal error for history",
+		http.StatusInternalServerError,
+		"history",
 	)
 )
