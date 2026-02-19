@@ -57,11 +57,13 @@ type ActionHistoryUser string
 
 // ActionType constants for audit trail
 const (
-	ActionEmailChange    ActionHistoryUser = "email_change"
-	ActionPasswordChange ActionHistoryUser = "password_change"
-	ActionPhoneChange    ActionHistoryUser = "phone_change"
-	ActionUsernameChange ActionHistoryUser = "username_change"
-	ActionProfileUpdate  ActionHistoryUser = "profile_update"
-	ActionAccountLock    ActionHistoryUser = "account_lock"
-	ActionAccountUnlock  ActionHistoryUser = "account_unlock"
+	ActionEmailChange        ActionHistoryUser = "email_change"
+	ActionEmailChangeRevoked ActionHistoryUser = "email_change_revoked"
+	ActionEmailVerification  ActionHistoryUser = "email_verification"
+	ActionPasswordChange     ActionHistoryUser = "password_change"
+	ActionPhoneChange        ActionHistoryUser = "phone_change"
+	ActionUsernameChange     ActionHistoryUser = "username_change"
+	ActionProfileUpdate      ActionHistoryUser = "profile_update"
+	ActionAccountLock        ActionHistoryUser = "account_lock"
+	ActionAccountUnlock      ActionHistoryUser = "account_unlock"
 )

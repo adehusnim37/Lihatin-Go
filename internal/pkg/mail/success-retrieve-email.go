@@ -1,16 +1,16 @@
 package mail
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 )
 
 // SendSuccessRetrieveEmail sends a reassuring email to old email after successful revoke
 func (es *EmailService) SendSuccessRetrieveEmail(toEmail, userName string) error {
-    subject := "Your Account is Secure - Email Change Revoked Successfully"
+	subject := "Your Account is Secure - Email Change Revoked Successfully"
 
-    htmlBody := fmt.Sprintf(`
+	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,13 +259,13 @@ func (es *EmailService) SendSuccessRetrieveEmail(toEmail, userName string) error
 </body>
 </html>
 `, userName, toEmail,
-        config.GetRequiredEnv(config.EnvBackendURL),
-        config.GetRequiredEnv(config.EnvBackendURL),
-        config.GetRequiredEnv(config.EnvBackendURL),
-        config.GetRequiredEnv(config.EnvBackendURL),
-        config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"),
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"),
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"),
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"),
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"))
 
-    textBody := fmt.Sprintf(`
+	textBody := fmt.Sprintf(`
 YOUR ACCOUNT IS SECURE - EMAIL CHANGE REVOKED SUCCESSFULLY
 
 Dear %s,
@@ -302,8 +302,8 @@ Thank you for helping us keep your account secure.
 © 2025 Lihatin. All rights reserved.
 This is an automated security notification. Please do not reply to this email.
 `, userName, toEmail,
-        config.GetRequiredEnv(config.EnvBackendURL),
-        config.GetRequiredEnv(config.EnvBackendURL))
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"),
+		config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"))
 
-    return es.sendEmail(toEmail, subject, textBody, htmlBody)
+	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

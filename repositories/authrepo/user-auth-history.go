@@ -194,7 +194,7 @@ func (r *HistoryUserRepository) CreateHistoryUser(history *user.HistoryUser) err
 
 // CheckEmailChangeEligibility checks if user is eligible to change email
 // Returns error if user has changed email or revoked in last 30 days
-func (r *UserAuthRepository) CheckEmailChangeEligibility(userID string) (eligible bool, daysRemaining int, err error) {
+func (r *HistoryUserRepository) CheckEmailChangeEligibility(userID string) (eligible bool, daysRemaining int, err error) {
 	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
 
 	var recentHistory user.HistoryUser
@@ -202,7 +202,7 @@ func (r *UserAuthRepository) CheckEmailChangeEligibility(userID string) (eligibl
 		"user_id = ? AND action_type IN (?, ?) AND changed_at > ?",
 		userID,
 		user.ActionEmailChange,
-		"email_change_revoked",
+		user.ActionEmailChangeRevoked,
 		thirtyDaysAgo,
 	).Order("changed_at DESC").First(&recentHistory).Error
 

@@ -1,9 +1,12 @@
 package email
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
-	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -11,10 +14,11 @@ import (
 // UndoChangeEmail reverts the email change process using the provided token
 func (c *Controller) UndoChangeEmail(ctx *gin.Context) {
 	token := ctx.Query("token")
+	frontendURL := config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
 
 	if token == "" {
 		logger.Logger.Warn("Undo email change attempted without token")
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "TOKEN_REQUIRED", "Revoke token is required", "token", nil)
+		ctx.Redirect(http.StatusFound, frontendURL+"/auth/revoke-email-change?status=error&error=token_required")
 		return
 	}
 
@@ -25,7 +29,7 @@ func (c *Controller) UndoChangeEmail(ctx *gin.Context) {
 			"token", token,
 			"error", err.Error(),
 		)
-		httputil.HandleError(ctx, err, nil)
+		ctx.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/revoke-email-change?status=error&error=%s", frontendURL, mapUndoChangeEmailError(err)))
 		return
 	}
 
@@ -35,14 +39,28 @@ func (c *Controller) UndoChangeEmail(ctx *gin.Context) {
 			"email", email,
 			"error", err.Error(),
 		)
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "EMAIL_SEND_FAILED", "Failed to send email notification", "email", email)
-		return
+		// Revocation has already succeeded. Keep user flow successful.
+		logger.Logger.Warn("Email change revoked but success notification email failed to send")
 	}
 
 	logger.Logger.Info("Email change revoked successfully", "token", token)
 
-	// Send success response
-	httputil.SendOKResponse(ctx, map[string]interface{}{
-		"message": "Email change has been revoked. Your original email has been restored and verified.",
-	}, "Email change revoked successfully")
+	// Redirect to frontend status page
+	ctx.Redirect(http.StatusFound, frontendURL+"/auth/revoke-email-change?status=success")
+}
+
+func mapUndoChangeEmailError(err error) string {
+	var appErr *apperrors.AppError
+	if errors.As(err, &appErr) {
+		switch appErr.Code {
+		case "REVOKE_TOKEN_EXPIRED":
+			return "token_expired"
+		case "REVOKE_TOKEN_NOT_FOUND":
+			return "token_not_found"
+		case "INVALID_ACTION_TYPE":
+			return "invalid_request"
+		}
+	}
+
+	return "revoke_failed"
 }

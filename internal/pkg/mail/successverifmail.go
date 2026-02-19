@@ -9,7 +9,7 @@ import (
 // SendSuccessEmailVerification sends a confirmation email after successful email verification
 func (es *EmailService) SendSuccessEmailVerification(toEmail, userName string) error {
 	subject := "Your Email Has Been Verified - Lihatin"
-	dashboardURL := fmt.Sprintf("%s/dashboard", config.GetRequiredEnv(config.EnvFrontendURL))
+	dashboardURL := fmt.Sprintf("%s/main", config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -71,9 +71,9 @@ func (es *EmailService) SendSuccessEmailVerification(toEmail, userName string) e
 </body>
 </html>
 `, userName, dashboardURL, dashboardURL, dashboardURL,
-		config.GetRequiredEnv(config.EnvFrontendURL),
-		config.GetRequiredEnv(config.EnvFrontendURL),
-		config.GetRequiredEnv(config.EnvFrontendURL))
+		config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"),
+		config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"),
+		config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL VERIFIED SUCCESSFULLY
@@ -99,7 +99,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, userName, dashboardURL, config.GetRequiredEnv(config.EnvFrontendURL))
+`, userName, dashboardURL, config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

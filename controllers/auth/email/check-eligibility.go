@@ -10,7 +10,7 @@ import (
 func (c *Controller) CheckEmailChangeEligibility(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 
-	eligible, daysRemaining, err := c.repo.GetUserAuthRepository().CheckEmailChangeEligibility(userID)
+	eligible, daysRemaining, err := c.repo.GetHistoryUserRepository().CheckEmailChangeEligibility(userID)
 	if err != nil {
 		logger.Logger.Error("Failed to check email change eligibility",
 			"user_id", userID,

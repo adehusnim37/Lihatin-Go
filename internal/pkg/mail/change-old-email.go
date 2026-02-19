@@ -10,8 +10,8 @@ import (
 func (es *EmailService) SendChangeOldEmailNotification(oldEmail, newEmail, username, revokeToken string) error {
 	subject := "Lihatin - Email Change Notification"
 
-	revokeURL := fmt.Sprintf("%s/v1/auth/revoke-email-change?token=%s", config.GetRequiredEnv(config.EnvBackendURL), revokeToken)
-	dashboardURL := fmt.Sprintf("%s/dashboard", config.GetRequiredEnv(config.EnvFrontendURL))
+	revokeURL := fmt.Sprintf("%s/v1/auth/revoke-email-change?token=%s", config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080"), revokeToken)
+	dashboardURL := fmt.Sprintf("%s/dashboard", config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -76,7 +76,7 @@ func (es *EmailService) SendChangeOldEmailNotification(oldEmail, newEmail, usern
 </body>
 </html>
 `, username, oldEmail, newEmail, revokeURL, dashboardURL, revokeURL, revokeURL,
-		config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL))
+		config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL CHANGE NOTIFICATION
@@ -102,7 +102,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, username, oldEmail, newEmail, revokeURL, config.GetRequiredEnv(config.EnvFrontendURL))
+`, username, oldEmail, newEmail, revokeURL, config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	return es.sendEmail(oldEmail, subject, textBody, htmlBody)
 }

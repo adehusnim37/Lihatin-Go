@@ -9,7 +9,7 @@ import (
 // SendChangeEmailConfirmation sends a confirmation email for email change
 func (es *EmailService) SendChangeEmailConfirmation(toEmail, userName, token string) error {
 	subject := "Confirm Your Email Change - Lihatin"
-	confirmationURL := fmt.Sprintf(config.GetRequiredEnv(config.EnvBackendURL)+`/v1/auth/verify-email?token=%s`, token)
+	confirmationURL := fmt.Sprintf(config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080")+`/v1/auth/verify-email?token=%s`, token)
 
 	htmlBody := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -71,7 +71,7 @@ func (es *EmailService) SendChangeEmailConfirmation(toEmail, userName, token str
 </body>
 </html>
 `, userName, confirmationURL, confirmationURL, confirmationURL,
-		config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL), config.GetRequiredEnv(config.EnvFrontendURL))
+		config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	textBody := fmt.Sprintf(`
 LIHATIN - EMAIL CHANGE CONFIRMATION
@@ -96,7 +96,7 @@ The Lihatin Team
 ---
 © 2025 Lihatin. All rights reserved.
 This is an automated message, please do not reply directly to this email.
-`, userName, confirmationURL, config.GetRequiredEnv(config.EnvFrontendURL))
+`, userName, confirmationURL, config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

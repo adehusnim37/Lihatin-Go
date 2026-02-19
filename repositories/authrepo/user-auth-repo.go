@@ -159,6 +159,9 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 		}, apperrors.ErrEmailAlreadyVerified
 	}
 
+	// Capture source before clearing
+	verificationSource := userAuth.EmailVerificationSource
+
 	// 4️⃣ Update kolom verifikasi secara aman (reset token juga)
 	if err = tx.Model(&userAuth).Updates(map[string]any{
 		"is_email_verified":                   true,
@@ -174,7 +177,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 	// 5️⃣ (Opsional) Insert log ke HistoryUser
 	history := user.HistoryUser{
 		UserID:     usr.ID,
-		ActionType: "email_verification",
+		ActionType: user.ActionEmailVerification,
 		OldValue:   datatypes.JSON([]byte(`{"is_email_verified": false}`)),
 		NewValue:   datatypes.JSON([]byte(`{"is_email_verified": true}`)),
 		Reason:     "User verified email successfully",
@@ -213,7 +216,7 @@ func (r *UserAuthRepository) VerifyEmail(token string) (res dto.VerifyEmailRespo
 	return dto.VerifyEmailResponse{
 		Email:    usr.Email,
 		Username: usr.Username,
-		Source:   userAuth.EmailVerificationSource,
+		Source:   verificationSource,
 		OldEmail: oldEmail,
 		Token:    revokeToken,
 	}, nil
@@ -439,7 +442,7 @@ func (r *UserAuthRepository) UndoChangeEmail(revokeToken string) (email, usernam
 	// 9️⃣ Log revoke action ke history
 	revokeHistory := user.HistoryUser{
 		UserID:     usr.ID,
-		ActionType: "email_change_revoked",
+		ActionType: user.ActionEmailChangeRevoked,
 		OldValue:   usrHistory.NewValue, // New email becomes old
 		NewValue:   usrHistory.OldValue, // Old email becomes new
 		Reason:     "User revoked email change using revoke token",
@@ -517,6 +520,7 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 			"failed_login_attempts":           0,
 			"lockout_until":                   nil,
 			"password_changed_at":             time.Now(),
+			"last_email_send_at":              nil,
 		})
 
 	if result.Error != nil {
@@ -768,5 +772,3 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 
 	return nil
 }
-
-
