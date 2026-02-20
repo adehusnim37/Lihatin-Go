@@ -17,7 +17,7 @@ import (
 )
 
 // RegisterAuthRoutes registers all authentication-related routes
-func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo userrepo.UserRepository, loginAttemptRepo authrepo.LoginAttemptRepository, emailController *email.Controller, totpController *totp.Controller, baseController *controllers.BaseController) {
+func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, userRepo userrepo.UserRepository, userAuthRepo *authrepo.UserAuthRepository, loginAttemptRepo authrepo.LoginAttemptRepository, emailController *email.Controller, totpController *totp.Controller, baseController *controllers.BaseController) {
 
 	// Create API key controller
 	apiKeyController := api.NewAPIKeyController(baseController)
@@ -62,7 +62,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 	// Protected authentication routes (require JWT auth)
 	protectedAuth := rg.Group("/auth")
-	protectedAuth.Use(middleware.AuthMiddleware(userRepo), middleware.RequireEmailVerification())
+	protectedAuth.Use(middleware.AuthMiddleware(userRepo, userAuthRepo), middleware.RequireEmailVerification())
 	{
 		// Get current user
 		protectedAuth.GET("/me", authController.GetCurrentUser)
@@ -113,7 +113,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 	// Admin-only routes (admin and super_admin access)
 	adminAuth := rg.Group("/auth/admin")
-	adminAuth.Use(middleware.AuthMiddleware(userRepo), middleware.AdminAuth())
+	adminAuth.Use(middleware.AuthMiddleware(userRepo, userAuthRepo), middleware.AdminAuth())
 	{
 		adminAuth.GET("/premium-codes", premiumController.GetAllPremiumKeys)
 		adminAuth.GET("/users", adminController.GetAllUsers)
@@ -148,7 +148,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	// API Key management
 	apiKeyGroup := rg.Group("/api-keys")
 	{
-		apiKeyGroup.Use(middleware.AuthMiddleware(userRepo), middleware.RequireEmailVerification())
+		apiKeyGroup.Use(middleware.AuthMiddleware(userRepo, userAuthRepo), middleware.RequireEmailVerification())
 		apiKeyGroup.GET("/", apiKeyController.GetAPIKeys)
 		apiKeyGroup.GET("/:id", apiKeyController.GetAPIKey)
 		apiKeyGroup.GET("/:id/usage", apiKeyController.GetAPIKeyActivityLogs)

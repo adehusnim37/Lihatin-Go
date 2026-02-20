@@ -19,7 +19,7 @@ import (
 
 // AuthMiddleware provides JWT authentication middleware
 // 🔐 SECURITY: Prioritizes HTTP-Only cookies over Authorization header for token validation
-func AuthMiddleware(userRepo userrepo.UserRepository) gin.HandlerFunc {
+func AuthMiddleware(userRepo userrepo.UserRepository, userAuthRepo *authrepo.UserAuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var token string
 
@@ -169,13 +169,30 @@ func AuthMiddleware(userRepo userrepo.UserRepository) gin.HandlerFunc {
 			c.Set("session_issued_at", time.Unix(validMetadata.IssuedAt, 0))
 		}
 
+		// Load mutable auth state from DB so values are never stale from JWT claims.
+		isVerified := claims.IsVerified
+		if userAuthRepo != nil {
+			userAuth, err := userAuthRepo.GetUserAuthByUserID(claims.UserID)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, common.APIResponse{
+					Success: false,
+					Data:    nil,
+					Message: "User authentication state not found",
+					Error:   map[string]string{"auth": "Please login again"},
+				})
+				c.Abort()
+				return
+			}
+			isVerified = userAuth.IsEmailVerified
+		}
+
 		// Set user information in context for use by handlers
 		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
-		c.Set("email", claims.Email)
-		c.Set("role", claims.Role)
-		c.Set("is_premium", claims.IsPremium)
-		c.Set("is_verified", claims.IsVerified)
+		c.Set("username", user.Username)
+		c.Set("email", user.Email)
+		c.Set("role", user.Role)
+		c.Set("is_premium", user.IsPremium)
+		c.Set("is_verified", isVerified)
 		c.Set("user", user)
 		c.Set("session_id", claims.SessionID)
 

@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo userrepo.UserRepository, authRepo *authrepo.AuthRepository) {
+func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo userrepo.UserRepository, userAuthRepo *authrepo.UserAuthRepository, authRepo *authrepo.AuthRepository) {
 	shortGroup := rg.Group("/short")
 	{
 		shortGroup.Use(middleware.RateLimitMiddleware(25))
@@ -39,7 +39,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 
 	protectedShort := rg.Group("users/me/shorts")
 	{
-		protectedShort.Use(middleware.AuthMiddleware(userRepo))
+		protectedShort.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
 		protectedShort.Use(middleware.RateLimitMiddleware(100))
 		protectedShort.POST("", shortController.Create)
 		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
@@ -57,7 +57,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	// ✅ ADMIN ROUTES: Only accessible by admin users
 	protectedAdminShort := rg.Group("admin/shorts")
 	{
-		protectedAdminShort.Use(middleware.AuthMiddleware(userRepo))
+		protectedAdminShort.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
 		protectedAdminShort.Use(middleware.RequireRole("admin")) // Ensures only admin access
 		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
 		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
