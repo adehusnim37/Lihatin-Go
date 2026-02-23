@@ -469,12 +469,6 @@ var (
 		http.StatusInternalServerError,
 		"short_code",
 	)
-	ErrInvalidPasscode = NewAppError(
-		"INVALID_PASSCODE",
-		"Invalid passcode format",
-		http.StatusBadRequest,
-		"passcode",
-	)
 	ErrInvalidClickLimit = NewAppError(
 		"INVALID_CLICK_LIMIT",
 		"Click limit must be a positive integer",
@@ -491,19 +485,19 @@ var (
 		"PASSCODE_REQUIRED",
 		"Passcode required",
 		http.StatusUnauthorized,
-		"passcode",
+		"passcode_required",
 	)
 	ErrPasscodeIncorrect = NewAppError(
 		"PASSCODE_INCORRECT",
 		"Incorrect passcode",
 		http.StatusUnauthorized,
-		"passcode",
+		"passcode_incorrect",
 	)
 	ErrClickLimitReached = NewAppError(
 		"CLICK_LIMIT_REACHED",
 		"Click limit reached",
 		http.StatusForbidden,
-		"short_link",
+		"click_limit",
 	)
 	ErrBulkCreateLimitExceeded = NewAppError(
 		"BULK_CREATE_LIMIT_EXCEEDED",
