@@ -1,6 +1,6 @@
 services:
   mariadb:
-    image: mariadb:11.4
+    image: mariadb:latest
     container_name: lihatin-mariadb
     restart: unless-stopped
     env_file:
@@ -33,7 +33,7 @@ services:
         max-file: "5"
 
   valkey:
-    image: valkey/valkey:8.1-alpine
+    image: valkey/valkey:latest
     container_name: lihatin-valkey
     restart: unless-stopped
     env_file:
