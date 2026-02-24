@@ -40,8 +40,8 @@ func (es *EmailService) SendBulkCreationSummary(toEmail, toName string, links []
 		},
 		Actions: []emailAction{
 			{Label: "View Dashboard", URL: fmt.Sprintf("%s/main", frontendURL), Variant: "primary"},
-			{Label: "Manage Links", URL: fmt.Sprintf("%s/main/links/%s", frontendURL, links[0].ShortCode), Variant: "secondary"},
-			{Label: "Analytics", URL: fmt.Sprintf("%s/main/analytics/%s", frontendURL, links[0].ShortCode), Variant: "secondary"},
+			{Label: "Manage Links", URL: fmt.Sprintf("%s/main/links", frontendURL), Variant: "secondary"},
+			{Label: "Analytics", URL: fmt.Sprintf("%s/main/analytics", frontendURL), Variant: "secondary"},
 		},
 		Notice:        "Use dashboard filters to quickly locate links from this bulk operation.",
 		FooterBaseURL: frontendURL,
@@ -105,7 +105,7 @@ func buildLinksTableHTML(links []shortlink.ShortLink, details []shortlink.ShortL
 		detailMap[detail.ShortLinkID] = detail
 	}
 
-	backendURL := config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080")
+	frontendURL := config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
 	var rows strings.Builder
 
 	for i, link := range links {
@@ -128,7 +128,7 @@ func buildLinksTableHTML(links []shortlink.ShortLink, details []shortlink.ShortL
 			displayURL = displayURL[:57] + "..."
 		}
 
-		shortURL := fmt.Sprintf("%s/s/%s", backendURL, link.ShortCode)
+		shortURL := fmt.Sprintf("%s/s/%s", frontendURL, link.ShortCode)
 		passcode := "None"
 		if detail.Passcode != 0 {
 			passcode = fmt.Sprintf("%d", detail.Passcode)
@@ -166,7 +166,7 @@ func buildLinksTableText(links []shortlink.ShortLink, details []shortlink.ShortL
 		detailMap[detail.ShortLinkID] = detail
 	}
 
-	backendURL := config.GetEnvOrDefault(config.EnvBackendURL, "http://localhost:8080")
+	frontendURL := config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
 	var result strings.Builder
 
 	for i, link := range links {
@@ -192,7 +192,7 @@ func buildLinksTableText(links []shortlink.ShortLink, details []shortlink.ShortL
    Original: %s
    Passcode: %s
    Created: %s
-`, i+1, title, backendURL, link.ShortCode, link.OriginalURL, passcode, link.CreatedAt.Format("Jan 2, 2006 15:04")))
+`, i+1, title, frontendURL, link.ShortCode, link.OriginalURL, passcode, link.CreatedAt.Format("Jan 2, 2006 15:04")))
 	}
 
 	return result.String()

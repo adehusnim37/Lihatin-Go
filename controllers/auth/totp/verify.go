@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -88,7 +88,7 @@ func (c *Controller) VerifyTOTP(ctx *gin.Context) {
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err == nil {
 		// Send TOTP setup confirmation email (async)
-		go c.emailService.SendTOTPSetupEmail(user.Email, user.FirstName)
+		go c.emailService.SendTOTPSetupEmail(user.Email, user.Username)
 	}
 
 	httputil.SendSuccessResponse(ctx, http.StatusOK, map[string]interface{}{"totp_enabled": true}, "TOTP verified and enabled successfully")

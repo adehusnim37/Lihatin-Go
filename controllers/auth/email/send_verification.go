@@ -3,10 +3,10 @@ package email
 import (
 	"net/http"
 
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +14,7 @@ import (
 func (c *Controller) SendVerificationEmails(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 	userEmail := ctx.GetString("email")
-	userFirstName := ctx.GetString("username")
+	userName := ctx.GetString("username")
 
 	// Add validation for required fields
 	if userID == "" || userEmail == "" {
@@ -44,7 +44,7 @@ func (c *Controller) SendVerificationEmails(ctx *gin.Context) {
 	}
 
 	// Send verification email using injected service
-	if err := c.emailService.SendVerificationEmail(userEmail, userFirstName, token); err != nil {
+	if err := c.emailService.SendVerificationEmail(userEmail, userName, token); err != nil {
 		logger.Logger.Error("Failed to send verification email",
 			"user_id", userID,
 			"email", userEmail,
@@ -60,7 +60,7 @@ func (c *Controller) SendVerificationEmails(ctx *gin.Context) {
 	)
 
 	// Send success response
-	httputil.SendOKResponse(ctx, map[string]interface{}{
+	httputil.SendOKResponse(ctx, map[string]any{
 		"sent_to": userEmail,
 		"message": "Please check your email and click the verification link",
 	}, "Verification email sent successfully")

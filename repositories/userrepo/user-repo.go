@@ -23,6 +23,8 @@ type UserRepository interface {
 	CreateUser(user *user.User) error
 	UpdateUser(id string, user dto.UpdateProfileRequest) error
 	SetPremium(id string, isPremium bool) error
+	CheckUsernameChangeEligibility(userID string) error
+	ChangeUsername(userID string, newUsername string) (string, error)
 }
 
 type userRepository struct {
@@ -79,7 +81,7 @@ func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (bool, er
 		return false, apperrors.ErrUserDatabaseError
 	}
 
-	return true, nil
+	return user.IsPremium, nil
 }
 
 func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {
@@ -95,6 +97,70 @@ func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, er
 	}
 
 	return &user, nil
+}
+
+func (ur *userRepository) CheckUsernameChangeEligibility(userID string) error {
+	var user user.User
+	result := ur.db.Where("id = ? AND deleted_at IS NULL", userID).First(&user)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+		logger.Logger.Error("Database error while checking username change eligibility", "user_id", userID, "error", result.Error)
+		return apperrors.ErrUserDatabaseError
+	}
+
+	if user.UsernameChanged {
+		return apperrors.ErrUsernameChangeNotAllowed
+	}
+
+	return nil
+}
+
+func (ur *userRepository) ChangeUsername(userID string, newUsername string) (string, error) {
+	var existingUser user.User
+	var taken int64
+
+	result := ur.db.Where("id = ? AND deleted_at IS NULL", userID).First(&existingUser)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return "", apperrors.ErrUserNotFound
+		}
+		logger.Logger.Error("Database error while checking username change eligibility", "user_id", userID, "error", result.Error)
+		return "", apperrors.ErrUserDatabaseError
+	}
+
+	if existingUser.UsernameChanged {
+		return "", apperrors.ErrUsernameChangeNotAllowed
+	}
+
+	if newUsername == existingUser.Username {
+		return "", apperrors.ErrUserUsernameExists
+	}
+
+	err := ur.db.Model(&user.User{}).
+		Where("username = ? AND id <> ? AND deleted_at IS NULL", newUsername, userID).
+		Count(&taken).Error
+	if err != nil {
+		logger.Logger.Error("Database error while checking username availability", "username", newUsername, "error", err)
+		return "", apperrors.ErrUserDatabaseError
+	}
+
+	if taken > 0 {
+		return "", apperrors.ErrUserUsernameExists
+	}
+
+	oldUsername := existingUser.Username
+	existingUser.Username = newUsername
+	existingUser.UsernameChanged = true
+	existingUser.UpdatedAt = time.Now()
+
+	if err := ur.db.Save(&existingUser).Error; err != nil {
+		logger.Logger.Error("Database error while changing username", "user_id", userID, "error", err)
+		return "", apperrors.ErrUserDatabaseError
+	}
+
+	return oldUsername, nil
 }
 
 func (ur *userRepository) CreateUser(user *user.User) error {
@@ -152,20 +218,9 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	if updateUser.LastName != nil {
 		currentUser.LastName = *updateUser.LastName
 	}
-	if currentUser.UsernameChanged {
-		logger.Logger.Warn("Username change attempt denied", "user_id", id, "current_username", currentUser.Username)
-		return apperrors.ErrUsernameChangeNotAllowed
+	if updateUser.Avatar != nil {
+		currentUser.Avatar = *updateUser.Avatar
 	}
-	if updateUser.Username != nil {
-		checkUsername := ur.db.Where("username = ? AND id != ? AND deleted_at IS NULL", currentUser.Username, id).First(&user.User{})
-		if checkUsername.Error == nil {
-			logger.Logger.Warn("Username already taken", "username", currentUser.Username)
-			return apperrors.ErrUserDuplicateEntry
-		}
-		currentUser.Username = *updateUser.Username
-	}
-
-	currentUser.UsernameChanged = currentUser.UsernameChanged || (updateUser.Username != nil)
 
 	// Perform the update using GORM
 	result := ur.db.Model(&user.User{}).Where("id = ?", id).Updates(currentUser)
@@ -181,7 +236,7 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	if updateUser.LastName != nil {
 		updatedFields++
 	}
-	if updateUser.Username != nil {
+	if updateUser.Avatar != nil {
 		updatedFields++
 	}
 

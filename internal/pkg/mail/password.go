@@ -16,7 +16,7 @@ func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) 
 		Badge:         "Security",
 		Title:         "Password reset request",
 		Subtitle:      "Reset your account password securely.",
-		Greeting:      fmt.Sprintf("Hi %s,", userName),
+		Greeting:      "Hi,",
 		Intro:         "We received a request to reset your password. If this was you, continue using the button below.",
 		Actions:       []emailAction{{Label: "Reset Password", URL: resetURL, Variant: "danger"}},
 		Notice:        "This reset link is valid for 1 hour and can only be used once.",
@@ -40,7 +40,7 @@ func (es *EmailService) SendPasswordResetEmail(toEmail, userName, token string) 
 	textBody := fmt.Sprintf(`
 LIHATIN - PASSWORD RESET REQUEST
 
-Hi %s,
+Hi,
 
 We received a request to reset your password.
 Use this link to continue:
@@ -55,7 +55,7 @@ Security note:
 Support: %s/support
 
 The Lihatin Security Team
-`, userName, resetURL, frontendURL)
+`, resetURL, frontendURL)
 
 	return es.sendEmail(toEmail, subject, textBody, htmlBody)
 }

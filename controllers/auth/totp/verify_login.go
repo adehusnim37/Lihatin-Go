@@ -203,7 +203,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	go func() {
 		userAgent := ctx.GetHeader("User-Agent")
 		clientIP := ctx.ClientIP()
-		c.emailService.SendLoginAlertEmail(user.Email, user.FirstName, clientIP, userAgent)
+		c.emailService.SendLoginAlertEmail(user.Email, user.Username, clientIP, userAgent)
 	}()
 
 	cookieSettings := auth.ResolveAuthCookieSettings(ctx)

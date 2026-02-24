@@ -299,9 +299,14 @@ func OptionalAuth(userRepo userrepo.UserRepository) gin.HandlerFunc {
 	}
 }
 
-// RateLimitMiddleware provides basic rate limiting
-// RateLimitMiddleware provides basic rate limiting using Redis
-func RateLimitMiddleware(limit int) gin.HandlerFunc {
+// RateLimitMiddleware provides basic rate limiting using Redis.
+// durationHours is optional and defaults to 1 hour.
+func RateLimitMiddleware(limit int, durationHours ...int) gin.HandlerFunc {
+	windowHours := 1
+	if len(durationHours) > 0 && durationHours[0] > 0 {
+		windowHours = durationHours[0]
+	}
+
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
 		key := fmt.Sprintf("rate_limit:%s", clientIP)
@@ -322,9 +327,9 @@ func RateLimitMiddleware(limit int) gin.HandlerFunc {
 
 		// 2. Set expiration on first request (start of window)
 		// If count is 1, it means the key was just created or expired.
-		// We set the TTL to 1 minute.
+		// We set the TTL based on configured hours (default 1 hour).
 		if count == 1 {
-			redisClient.Expire(c.Request.Context(), key, 1*time.Minute)
+			redisClient.Expire(c.Request.Context(), key, time.Duration(windowHours)*time.Hour)
 		}
 
 		// 3. Check limit
@@ -334,7 +339,7 @@ func RateLimitMiddleware(limit int) gin.HandlerFunc {
 				Success: false,
 				Data:    nil,
 				Message: "Rate limit exceeded",
-				Error:   map[string]string{"rate_limit": "Too many requests, please try again in a minute"},
+				Error:   map[string]string{"rate_limit": "Too many requests, please try again later"},
 			})
 			c.Abort()
 			return

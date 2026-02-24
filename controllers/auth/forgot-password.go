@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/common"
 )
 
 func (c *Controller) ForgotPassword(ctx *gin.Context) {
@@ -84,7 +84,7 @@ func (c *Controller) ForgotPassword(ctx *gin.Context) {
 	}
 
 	// Send reset email
-	if err := c.emailService.SendPasswordResetEmail(user.Email, user.FirstName, token); err != nil {
+	if err := c.emailService.SendPasswordResetEmail(user.Email, user.Username, token); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,

@@ -219,7 +219,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 	}
 
 	// Send verification email (optional, continue even if fails)
-	_ = c.emailService.SendVerificationEmail(newUser.Email, newUser.FirstName, token)
+	_ = c.emailService.SendVerificationEmail(newUser.Email, newUser.Username, token)
 
 	httputil.SendCreatedResponse(ctx, map[string]any{
 		"user_id": newUser.ID,

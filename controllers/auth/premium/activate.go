@@ -7,6 +7,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/premium"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,7 @@ func (c *Controller) ActivatePremium(ctx *gin.Context) {
 
 	userID := ctx.GetString("user_id")
 	username := ctx.GetString("username")
+	userEmail := ctx.GetString("email")
 
 	var req dto.RedeemPremiumCodeRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -54,6 +56,19 @@ func (c *Controller) ActivatePremium(ctx *gin.Context) {
 	if err := c.premiumRepo.RedeemPremiumCode(req.SecretCode, userID); err != nil {
 		httputil.HandleError(ctx, err, nil)
 		return
+	}
+
+	// 3. Send premium activation email (async, non-blocking)
+	if userEmail != "" {
+		go func(email, name, code, uid string) {
+			if err := c.emailSvc.SendPremiumRedeemedEmail(email, name, code); err != nil {
+				logger.Logger.Error("Failed to send premium redeemed email",
+					"user_id", uid,
+					"email", email,
+					"error", err.Error(),
+				)
+			}
+		}(userEmail, username, req.SecretCode, userID)
 	}
 
 	httputil.SendOKResponse(ctx, dto.RedeemPremiumCodeResponse{

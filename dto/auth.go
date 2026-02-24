@@ -66,8 +66,8 @@ type UserProfile struct {
 
 // RegisterRequest represents the user registration request payload
 type RegisterRequest struct {
-	FirstName  string `json:"first_name" binding:"required,min=2,max=50"`
-	LastName   string `json:"last_name" binding:"required,min=2,max=50"`
+	FirstName  string `json:"first_name" binding:"required,min=3,max=50"`
+	LastName   string `json:"last_name" binding:"required,min=3,max=50"`
 	Username   string `json:"username" binding:"required,min=3,max=30,alphanum"`
 	Email      string `json:"email" binding:"required,email"`
 	Password   string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
@@ -76,9 +76,8 @@ type RegisterRequest struct {
 
 // UpdateProfileRequest represents the user profile update request payload
 type UpdateProfileRequest struct {
-	FirstName *string `json:"first_name" binding:"omitempty,min=2,max=50"`
-	LastName  *string `json:"last_name" binding:"omitempty,min=2,max=50"`
-	Username  *string `json:"username" binding:"omitempty,min=3,max=30,alphanum"`
+	FirstName *string `json:"first_name" binding:"omitempty,min=3,max=50"`
+	LastName  *string `json:"last_name" binding:"omitempty,min=3,max=50"`
 	Avatar    *string `json:"avatar" binding:"omitempty,url"`
 }
 
@@ -200,3 +199,16 @@ type LoginAttemptsStatsRequest struct {
 	EmailOrUsername string `json:"email_or_username" label:"Email atau Username" binding:"required,min=3,max=100" uri:"email_or_username"`
 	Days            int    `json:"days" label:"Jumlah Hari" binding:"required,min=1,max=365" uri:"days"`
 }
+
+
+// ChangeUsernameRequest represents the request to change username
+type ChangeUsernameRequest struct {
+	NewUsername string `json:"new_username" label:"Username Baru" binding:"required,min=3,max=30,alphanum"`
+}
+
+// CheckUsernameRequest represents the request to check username availability
+type CheckUsernameRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=30,alphanum"`
+}
+
+

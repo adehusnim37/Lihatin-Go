@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +15,7 @@ import (
 func (c *Controller) ResendVerificationEmail(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 	userEmail := ctx.GetString("email")
-	userFirstName := ctx.GetString("username")
+	userName := ctx.GetString("username")
 
 	// Add validation for required fields
 	if userID == "" || userEmail == "" {
@@ -78,7 +78,7 @@ func (c *Controller) ResendVerificationEmail(ctx *gin.Context) {
 	}
 
 	// Send verification email
-	if err := c.emailService.SendVerificationEmail(userEmail, userFirstName, token); err != nil {
+	if err := c.emailService.SendVerificationEmail(userEmail, userName, token); err != nil {
 		logger.Logger.Error("Failed to resend verification email",
 			"user_id", userID,
 			"email", userEmail,

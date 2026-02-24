@@ -45,7 +45,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/verify-totp-login", totpController.VerifyTOTPLogin)
 
 		// Password reset flow
-		authGroup.Use(middleware.RateLimitMiddleware(5)) // Limit to 5 requests per minute per IP
+		authGroup.Use(middleware.RateLimitMiddleware(5)) // Limit to 5 requests per hour per IP (default window)
 		authGroup.POST("/forgot-password", authController.ForgotPassword)
 		authGroup.GET("/validate-reset", authController.ValidateResetToken) // Token passed as URL param to validate
 		authGroup.POST("/reset-password", authController.ResetPassword)
@@ -70,13 +70,13 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Account management
 		protectedAuth.GET("/premium-status", authController.GetPremiumStatus)
 		protectedAuth.GET("/profile", authController.GetProfile)
-		protectedAuth.GET("/check-email-change-eligibility", emailController.CheckEmailChangeEligibility)
+		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(1), emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
 		protectedAuth.GET("/check-verification-email", emailController.CheckVerificationEmail)
 		protectedAuth.POST("/logout", authController.Logout)
 		protectedAuth.POST("/change-password", authController.ChangePassword)
-		protectedAuth.POST("/redeem-premium-code", premiumController.ActivatePremium)
-		protectedAuth.POST("/change-email", emailController.ChangeEmail)
+		protectedAuth.POST("/redeem-premium-code", middleware.RateLimitMiddleware(5, 24), premiumController.ActivatePremium)
+		protectedAuth.POST("/change-email", middleware.RateLimitMiddleware(1, 24), emailController.ChangeEmail)
 		protectedAuth.POST("/profile", authController.UpdateProfile)
 		protectedAuth.DELETE("/delete-account", authController.DeleteAccount)
 
@@ -109,11 +109,18 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 			// historyGroup.GET("/recent-activity", historyController.GetRecentActivity)
 			// historyGroup.GET("/attempts-by-hour", historyController.GetAttemptsByHour)
 		}
+
+		// Check Username
+		usernameGroup := protectedAuth.Group("/username")
+		{
+			usernameGroup.POST("/change", authController.ChangeUsername)
+			usernameGroup.GET("/check-eligibility", middleware.RateLimitMiddleware(1), authController.CheckUsernameChangeEligibility)
+		}
 	}
 
 	// Admin-only routes (admin and super_admin access)
 	adminAuth := rg.Group("/auth/admin")
-	adminAuth.Use(middleware.AuthMiddleware(userRepo, userAuthRepo), middleware.AdminAuth())
+	adminAuth.Use(middleware.AuthMiddleware(userRepo, userAuthRepo), middleware.AdminAuth(), middleware.RequireEmailVerification())
 	{
 		adminAuth.GET("/premium-codes", premiumController.GetAllPremiumKeys)
 		adminAuth.GET("/users", adminController.GetAllUsers)

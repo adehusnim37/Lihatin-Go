@@ -9,15 +9,8 @@ import (
 )
 
 // CheckVerificationEmail checks the verification email status
-
 func (c *Controller) CheckVerificationEmail(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
-
-	// Add validation for required fields
-	if userID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", "auth", userID)
-		return
-	}
 
 	// Check if user email is already verified
 	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(userID)
