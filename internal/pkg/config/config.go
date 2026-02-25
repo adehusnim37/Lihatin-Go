@@ -116,4 +116,13 @@ const (
 
 	// Email
 	EnvEmailVerificationExpiry = "EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS"
+
+	// Object Storage (S3-compatible)
+	EnvOSSEndpoint      = "OSS_ENDPOINT"
+	EnvOSSRegion        = "OSS_REGION"
+	EnvOSSAccessKey     = "OSS_ACCESS_KEY"
+	EnvOSSSecretKey     = "OSS_SECRET_KEY"
+	EnvOSSBucket        = "OSS_BUCKET"
+	EnvOSSPathStyle     = "OSS_PATH_STYLE"
+	EnvOSSPublicBaseURL = "OSS_PUBLIC_BASE_URL"
 )

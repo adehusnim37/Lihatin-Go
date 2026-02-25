@@ -9,6 +9,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/storage"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
@@ -21,6 +22,7 @@ type Controller struct {
 	*controllers.BaseController
 	repo         *authrepo.AuthRepository
 	emailService *mail.EmailService
+	avatarStore  *storage.S3AvatarStorage
 }
 
 // NewAuthController creates a new auth controller instance
@@ -31,11 +33,16 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 
 	authRepo := authrepo.NewAuthRepository(base.GormDB)
 	emailService := mail.NewEmailService()
+	avatarStore, avatarStoreErr := storage.NewS3AvatarStorageFromEnv()
+	if avatarStoreErr != nil {
+		logger.Logger.Warn("Avatar upload storage is not configured", "error", avatarStoreErr.Error())
+	}
 
 	return &Controller{
 		BaseController: base,
 		repo:           authRepo,
 		emailService:   emailService,
+		avatarStore:    avatarStore,
 	}
 }
 

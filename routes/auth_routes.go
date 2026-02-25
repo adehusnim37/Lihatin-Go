@@ -70,7 +70,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Account management
 		protectedAuth.GET("/premium-status", authController.GetPremiumStatus)
 		protectedAuth.GET("/profile", authController.GetProfile)
-		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(1), emailController.CheckEmailChangeEligibility)
+		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(10), emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
 		protectedAuth.GET("/check-verification-email", emailController.CheckVerificationEmail)
 		protectedAuth.POST("/logout", authController.Logout)
@@ -78,6 +78,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.POST("/redeem-premium-code", middleware.RateLimitMiddleware(5, 24), premiumController.ActivatePremium)
 		protectedAuth.POST("/change-email", middleware.RateLimitMiddleware(1, 24), emailController.ChangeEmail)
 		protectedAuth.POST("/profile", authController.UpdateProfile)
+		protectedAuth.POST("/profile/avatar", authController.UploadAvatar)
 		protectedAuth.DELETE("/delete-account", authController.DeleteAccount)
 
 		// TOTP (Two-Factor Authentication) management
@@ -114,7 +115,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		usernameGroup := protectedAuth.Group("/username")
 		{
 			usernameGroup.POST("/change", authController.ChangeUsername)
-			usernameGroup.GET("/check-eligibility", middleware.RateLimitMiddleware(1), authController.CheckUsernameChangeEligibility)
+			usernameGroup.GET("/check-eligibility", middleware.RateLimitMiddleware(10), authController.CheckUsernameChangeEligibility)
 		}
 	}
 
