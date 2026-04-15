@@ -5,7 +5,7 @@ import "time"
 // CreateShortLinkRequest represents request to create short link
 type CreateShortLinkRequest struct {
 	UserID      string     `json:"user_id,omitempty"`
-	Passcode    string     `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
+	Passcode    string     `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit"`
 	OriginalURL string     `json:"original_url" label:"URL Asli" binding:"required,url"`
 	Title       string     `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255"`
 	Description string     `json:"description,omitempty" label:"Deskripsi"`
@@ -179,7 +179,7 @@ type UpdateShortLinkRequest struct {
 	ShortCode    *string    `json:"short_code,omitempty" label:"Kode Pendek" binding:"omitempty,min=3,max=100,no_space,saveurlshort"`
 	IsActive     *bool      `json:"is_active,omitempty" label:"Status Aktif" binding:"omitempty"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
-	Passcode     *string    `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
+	Passcode     *string    `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit"`
 	ClickLimit   *int       `json:"click_limit,omitempty" label:"Batas Klik" binding:"omitempty,min=0"` // 0 means unlimited
 	EnableStats  *bool      `json:"enable_stats,omitempty" label:"Aktifkan Statistik" binding:"omitempty"`
 	CustomDomain *string    `json:"custom_domain,omitempty" label:"Domain Kustom" binding:"omitempty,url"`
@@ -217,12 +217,12 @@ type BulkDeleteRequest struct {
 
 type DeleteRequest struct {
 	CodeRequest
-	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric"`
+	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit"`
 }
 
 type CodeRequest struct {
 	Code     string `json:"code" label:"Kode Short Link" binding:"required,min=1,max=100,no_space,saveurlshort" uri:"code"`
-	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric" uri:"passcode"`
+	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit" uri:"passcode"`
 }
 
 type IsActiveRequest struct {

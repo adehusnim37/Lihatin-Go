@@ -65,6 +65,7 @@ var indonesianMessages = map[string]string{
 	"map":          "%s harus berupa peta",
 	"set":          "%s harus berupa set",
 	"secret_code":  "%s harus berupa secret code yang valid",
+	"not_same_digit": "%s tidak boleh terdiri dari angka yang sama semua",
 }
 
 // Type mapping for Indonesian error messages
@@ -334,6 +335,23 @@ func validateSixDigit(fl validator.FieldLevel) bool {
 	return value >= 100000 && value <= 999999
 }
 
+// validateNotSameDigit validates that a passcode is not composed of one repeated digit.
+func validateNotSameDigit(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	if value == "" {
+		return true
+	}
+
+	first := value[0]
+	for i := 1; i < len(value); i++ {
+		if value[i] != first {
+			return true
+		}
+	}
+
+	return false
+}
+
 // validateSecretCode validates premium secret code format (base32-like, optional separator)
 func validateSecretCode(fl validator.FieldLevel) bool {
 	secretCode := fl.Field().String()
@@ -350,4 +368,5 @@ func SetupCustomValidators(v *validator.Validate) {
 	v.RegisterValidation("saveurlshort", validateSaveUrlShort)
 	v.RegisterValidation("six_digit", validateSixDigit)
 	v.RegisterValidation("secret_code", validateSecretCode)
+	v.RegisterValidation("not_same_digit", validateNotSameDigit)
 }
