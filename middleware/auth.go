@@ -300,11 +300,25 @@ func OptionalAuth(userRepo userrepo.UserRepository) gin.HandlerFunc {
 }
 
 // RateLimitMiddleware provides basic rate limiting using Redis.
-// durationHours is optional and defaults to 1 hour.
-func RateLimitMiddleware(limit int, durationHours ...int) gin.HandlerFunc {
-	windowHours := 1
-	if len(durationHours) > 0 && durationHours[0] > 0 {
-		windowHours = durationHours[0]
+// Duration is optional and defaults to 1 hour.
+// Supported forms:
+//
+//	RateLimitMiddleware(limit) -> 1 hour
+//	RateLimitMiddleware(limit, hours)
+//	RateLimitMiddleware(limit, hours, minutes)
+func RateLimitMiddleware(limit int, duration ...int) gin.HandlerFunc {
+	windowDuration := time.Hour
+
+	if len(duration) > 0 {
+		hours := duration[0]
+		minutes := 0
+		if len(duration) > 1 {
+			minutes = duration[1]
+		}
+
+		if hours > 0 || minutes > 0 {
+			windowDuration = time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute
+		}
 	}
 
 	return func(c *gin.Context) {
@@ -327,9 +341,9 @@ func RateLimitMiddleware(limit int, durationHours ...int) gin.HandlerFunc {
 
 		// 2. Set expiration on first request (start of window)
 		// If count is 1, it means the key was just created or expired.
-		// We set the TTL based on configured hours (default 1 hour).
+		// We set the TTL based on configured duration (default 1 hour).
 		if count == 1 {
-			redisClient.Expire(c.Request.Context(), key, time.Duration(windowHours)*time.Hour)
+			redisClient.Expire(c.Request.Context(), key, windowDuration)
 		}
 
 		// 3. Check limit

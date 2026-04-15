@@ -38,8 +38,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	authGroup := rg.Group("/auth")
 	{
 		// Basic authentication
-		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(5), authController.Login)
-		authGroup.POST("/register", middleware.RateLimitMiddleware(5), authController.Register)
+		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(5, 0, 10), authController.Login)
+		authGroup.POST("/register", middleware.RateLimitMiddleware(5, 0, 10), authController.Register)
 
 		// TOTP Login verification (no auth required - this IS the auth step)
 		authGroup.POST("/verify-totp-login", totpController.VerifyTOTPLogin)
