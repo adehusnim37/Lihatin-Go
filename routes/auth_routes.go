@@ -37,22 +37,30 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	// Public authentication routes (no auth required)
 	authGroup := rg.Group("/auth")
 	{
+		// Email-first signup with OTP
+		authGroup.POST("/signup/start", middleware.RateLimitMiddleware(5, 0, 10), authController.SignupStart)
+		authGroup.POST("/signup/resend-otp", middleware.RateLimitMiddleware(20, 0, 10), authController.SignupResendOTP)
+		authGroup.POST("/signup/verify-otp", middleware.RateLimitMiddleware(20, 0, 10), authController.SignupVerifyOTP)
+		authGroup.POST("/signup/complete", middleware.RateLimitMiddleware(5, 0, 10), authController.SignupComplete)
+
 		// Basic authentication
-		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(5, 0, 10), authController.Login)
+		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(20, 0, 10), authController.Login)
+		authGroup.POST("/login/email-otp/verify", middleware.RateLimitMiddleware(20, 0, 10), authController.VerifyLoginEmailOTP)
+		authGroup.POST("/login/email-otp/resend", middleware.RateLimitMiddleware(20, 0, 10), authController.ResendLoginEmailOTP)
 		authGroup.POST("/register", middleware.RateLimitMiddleware(5, 0, 10), authController.Register)
 
 		// TOTP Login verification (no auth required - this IS the auth step)
 		authGroup.POST("/verify-totp-login", totpController.VerifyTOTPLogin)
 
 		// Password reset flow
-		authGroup.Use(middleware.RateLimitMiddleware(5)) // Limit to 5 requests per hour per IP (default window)
-		authGroup.POST("/forgot-password", authController.ForgotPassword)
-		authGroup.GET("/validate-reset", authController.ValidateResetToken) // Token passed as URL param to validate
-		authGroup.POST("/reset-password", authController.ResetPassword)
+		authGroup.POST("/forgot-password", middleware.RateLimitMiddleware(5), authController.ForgotPassword)
+		authGroup.GET("/validate-reset", middleware.RateLimitMiddleware(5), authController.ValidateResetToken) // Token passed as URL param to validate
+		authGroup.POST("/reset-password", middleware.RateLimitMiddleware(5), authController.ResetPassword)
 
 		// Email verification
 		authGroup.GET("/verify-email", emailController.VerifyEmail) // Token passed as query param
 		authGroup.POST("/resend-verification-email", emailController.ResendVerificationEmail)
+		authGroup.GET("/check-verification-status", middleware.RateLimitMiddleware(60, 0, 10), emailController.CheckVerificationStatusByIdentifier)
 		authGroup.GET("/revoke-email-change", emailController.UndoChangeEmail) // Token passed as query param
 		authGroup.POST("/send-verification-email", emailController.SendVerificationEmails)
 
@@ -70,13 +78,13 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Account management
 		protectedAuth.GET("/premium-status", authController.GetPremiumStatus)
 		protectedAuth.GET("/profile", authController.GetProfile)
-		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(10), emailController.CheckEmailChangeEligibility)
+		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(10, 0, 10), emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
 		protectedAuth.GET("/check-verification-email", emailController.CheckVerificationEmail)
 		protectedAuth.POST("/logout", authController.Logout)
 		protectedAuth.POST("/change-password", authController.ChangePassword)
-		protectedAuth.POST("/redeem-premium-code", middleware.RateLimitMiddleware(5, 24), premiumController.ActivatePremium)
-		protectedAuth.POST("/change-email", middleware.RateLimitMiddleware(1, 24), emailController.ChangeEmail)
+		protectedAuth.POST("/redeem-premium-code", middleware.RateLimitMiddleware(5, 0, 10), premiumController.ActivatePremium)
+		protectedAuth.POST("/change-email", middleware.RateLimitMiddleware(1, 0, 10), emailController.ChangeEmail)
 		protectedAuth.POST("/profile", authController.UpdateProfile)
 		protectedAuth.POST("/profile/avatar", authController.UploadAvatar)
 		protectedAuth.DELETE("/delete-account", authController.DeleteAccount)
@@ -115,7 +123,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		usernameGroup := protectedAuth.Group("/username")
 		{
 			usernameGroup.POST("/change", authController.ChangeUsername)
-			usernameGroup.GET("/check-eligibility", middleware.RateLimitMiddleware(10), authController.CheckUsernameChangeEligibility)
+			usernameGroup.GET("/check-eligibility", middleware.RateLimitMiddleware(10, 0, 10), authController.CheckUsernameChangeEligibility)
 		}
 	}
 

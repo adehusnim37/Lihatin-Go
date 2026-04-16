@@ -323,7 +323,11 @@ func RateLimitMiddleware(limit int, duration ...int) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		key := fmt.Sprintf("rate_limit:%s", clientIP)
+		route := c.FullPath()
+		if route == "" {
+			route = c.Request.URL.Path
+		}
+		key := fmt.Sprintf("rate_limit:%s:%s:%s", clientIP, c.Request.Method, route)
 
 		// Get Redis via SessionManager
 		redisClient := GetSessionManager().GetRedisClient()

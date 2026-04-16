@@ -43,6 +43,12 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 			// Public Auth Endpoints (no session yet)
 			"/v1/auth/register",
 			"/v1/auth/login",
+			"/v1/auth/signup/start",
+			"/v1/auth/signup/resend-otp",
+			"/v1/auth/signup/verify-otp",
+			"/v1/auth/signup/complete",
+			"/v1/auth/login/email-otp/verify",
+			"/v1/auth/login/email-otp/resend",
 			"/v1/auth/forgot-password",
 			"/v1/auth/reset-password",
 			"/v1/auth/verify-email",

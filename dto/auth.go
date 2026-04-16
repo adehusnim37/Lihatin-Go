@@ -14,6 +14,50 @@ type LoginRequest struct {
 	Password        string `json:"password" label:"Kata Sandi" binding:"required,min=8,max=50,pwdcomplex"`
 }
 
+// SignupStartRequest represents the initial email-only signup payload.
+type SignupStartRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// SignupStartResponse returns either OTP challenge or existing signup token.
+type SignupStartResponse struct {
+	ChallengeToken            string `json:"challenge_token,omitempty"`
+	CooldownSeconds           int    `json:"cooldown_seconds,omitempty"`
+	SignupToken               string `json:"signup_token,omitempty"`
+	RequiresProfileCompletion bool   `json:"requires_profile_completion,omitempty"`
+}
+
+// SignupVerifyOTPRequest validates OTP from signup flow.
+type SignupVerifyOTPRequest struct {
+	ChallengeToken string `json:"challenge_token" binding:"required,min=10,max=255,no_space"`
+	OTPCode        string `json:"otp_code" binding:"required,len=6,numeric"`
+}
+
+// SignupVerifyOTPResponse returns one-time token for profile completion.
+type SignupVerifyOTPResponse struct {
+	SignupToken string `json:"signup_token"`
+}
+
+// SignupResendOTPRequest triggers OTP resend for pending signup challenge.
+type SignupResendOTPRequest struct {
+	ChallengeToken string `json:"challenge_token" binding:"required,min=10,max=255,no_space"`
+}
+
+// SignupCompleteRequest finalizes signup after OTP verification.
+type SignupCompleteRequest struct {
+	SignupToken string `json:"signup_token" binding:"required,min=10,max=255,no_space"`
+	FirstName   string `json:"first_name" binding:"required,min=3,max=50"`
+	LastName    string `json:"last_name" binding:"required,min=3,max=50"`
+	Username    string `json:"username" binding:"required,min=3,max=30,alphanum"`
+	Password    string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
+	SecretCode  string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
+}
+
+// ResendVerificationRequest represents request payload to resend email verification link
+type ResendVerificationRequest struct {
+	Identifier string `json:"identifier" label:"Identifier (Base64URL)" binding:"required,min=4,max=512"`
+}
+
 // LoginResponse represents the successful login response
 type LoginResponse struct {
 	// Token TokenResponse    `json:"token"`
@@ -29,10 +73,36 @@ type PendingTOTPResponse struct {
 	User             UserProfile `json:"user"`               // Basic user info for display
 }
 
+// PendingEmailOTPResponse represents login response when email OTP verification is required.
+type PendingEmailOTPResponse struct {
+	RequiresEmailOTP bool        `json:"requires_email_otp"`
+	ChallengeToken   string      `json:"challenge_token"`
+	CooldownSeconds  int         `json:"cooldown_seconds,omitempty"`
+	Email            string      `json:"email"`
+	User             UserProfile `json:"user"`
+}
+
 // VerifyTOTPLoginRequest represents the request to verify TOTP during login
 type VerifyTOTPLoginRequest struct {
 	PendingAuthToken string `json:"pending_auth_token" binding:"required" label:"Token Autentikasi"`
 	TOTPCode         string `json:"totp_code" binding:"required,len=6,numeric" label:"Kode TOTP"`
+}
+
+// VerifyEmailOTPLoginRequest validates login email OTP challenge.
+type VerifyEmailOTPLoginRequest struct {
+	ChallengeToken string `json:"challenge_token" binding:"required,min=10,max=255,no_space"`
+	OTPCode        string `json:"otp_code" binding:"required,len=6,numeric"`
+}
+
+// ResendEmailOTPLoginRequest triggers OTP resend during login challenge.
+type ResendEmailOTPLoginRequest struct {
+	ChallengeToken string `json:"challenge_token" binding:"required,min=10,max=255,no_space"`
+}
+
+// ResendOTPResponse contains cooldown payload for resend operations.
+type ResendOTPResponse struct {
+	CooldownSeconds          int `json:"cooldown_seconds,omitempty"`
+	CooldownRemainingSeconds int `json:"cooldown_remaining_seconds,omitempty"`
 }
 
 type ProfileAuthResponse struct {
@@ -200,7 +270,6 @@ type LoginAttemptsStatsRequest struct {
 	Days            int    `json:"days" label:"Jumlah Hari" binding:"required,min=1,max=365" uri:"days"`
 }
 
-
 // ChangeUsernameRequest represents the request to change username
 type ChangeUsernameRequest struct {
 	NewUsername string `json:"new_username" label:"Username Baru" binding:"required,min=3,max=30,alphanum"`
@@ -210,5 +279,3 @@ type ChangeUsernameRequest struct {
 type CheckUsernameRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=30,alphanum"`
 }
-
-
