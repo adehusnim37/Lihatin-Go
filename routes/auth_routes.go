@@ -47,7 +47,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(20, 0, 10), authController.Login)
 		authGroup.POST("/login/email-otp/verify", middleware.RateLimitMiddleware(20, 0, 10), authController.VerifyLoginEmailOTP)
 		authGroup.POST("/login/email-otp/resend", middleware.RateLimitMiddleware(20, 0, 10), authController.ResendLoginEmailOTP)
-		authGroup.POST("/register", middleware.RateLimitMiddleware(5, 0, 10), authController.Register)
 
 		// TOTP Login verification (no auth required - this IS the auth step)
 		authGroup.POST("/verify-totp-login", totpController.VerifyTOTPLogin)
@@ -58,11 +57,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/reset-password", middleware.RateLimitMiddleware(5), authController.ResetPassword)
 
 		// Email verification
-		authGroup.GET("/verify-email", emailController.VerifyEmail) // Token passed as query param
-		authGroup.POST("/resend-verification-email", emailController.ResendVerificationEmail)
-		authGroup.GET("/check-verification-status", middleware.RateLimitMiddleware(60, 0, 10), emailController.CheckVerificationStatusByIdentifier)
+		authGroup.GET("/verify-email", emailController.VerifyEmail)            // Token passed as query param
 		authGroup.GET("/revoke-email-change", emailController.UndoChangeEmail) // Token passed as query param
-		authGroup.POST("/send-verification-email", emailController.SendVerificationEmails)
 
 		// Token refresh
 		authGroup.POST("/refresh-token", authController.RefreshToken)
@@ -80,7 +76,6 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.GET("/profile", authController.GetProfile)
 		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(10, 0, 10), emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
-		protectedAuth.GET("/check-verification-email", emailController.CheckVerificationEmail)
 		protectedAuth.POST("/logout", authController.Logout)
 		protectedAuth.POST("/change-password", authController.ChangePassword)
 		protectedAuth.POST("/redeem-premium-code", middleware.RateLimitMiddleware(5, 0, 10), premiumController.ActivatePremium)

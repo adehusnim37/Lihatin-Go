@@ -48,11 +48,6 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
-	if !userAuth.IsEmailVerified {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "Your email address is not verified. Please verify your email to proceed.", "email")
-		return
-	}
-
 	if err := auth.CheckPassword(userAuth.PasswordHash, loginReq.Password); err != nil {
 		c.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)
 		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email/username or password", "auth")

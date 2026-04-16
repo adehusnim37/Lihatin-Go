@@ -79,8 +79,8 @@ func (c *Controller) VerifyEmail(ctx *gin.Context) {
 	logger.Logger.Info("Email verified successfully", "token", token)
 	clearResendStage(ctx, response.Email)
 
-	// Redirect to frontend success page
-	redirectURL := frontendURL + "/auth/success-verify-email"
+	// Redirect to login page with success flag.
+	redirectURL := frontendURL + "/auth/login?email_verified=1"
 
 	logger.Logger.Info("Redirecting to success page", "redirect_url", redirectURL)
 	ctx.Redirect(http.StatusFound, redirectURL)
