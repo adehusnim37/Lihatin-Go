@@ -14,6 +14,23 @@ type LoginRequest struct {
 	Password        string `json:"password" label:"Kata Sandi" binding:"required,min=8,max=50,pwdcomplex"`
 }
 
+// GoogleOAuthStartRequest starts OAuth flow with explicit intent.
+type GoogleOAuthStartRequest struct {
+	Intent string `json:"intent,omitempty" binding:"omitempty,oneof=login signup"`
+}
+
+// GoogleOAuthStartResponse returns authorization URL and state token.
+type GoogleOAuthStartResponse struct {
+	AuthorizationURL string `json:"authorization_url"`
+	State            string `json:"state"`
+}
+
+// GoogleOAuthCallbackRequest exchanges Google code and state after redirect.
+type GoogleOAuthCallbackRequest struct {
+	Code  string `json:"code" binding:"required,min=10,max=4096,no_space"`
+	State string `json:"state" binding:"required,min=10,max=255,no_space"`
+}
+
 // SignupStartRequest represents the initial email-only signup payload.
 type SignupStartRequest struct {
 	Email string `json:"email" binding:"required,email"`

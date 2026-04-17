@@ -63,6 +63,18 @@ func (r *AuthMethodRepository) GetAuthMethodByType(userAuthID string, methodType
 	return &authMethod, nil
 }
 
+// GetAuthMethodByProviderUserID retrieves auth method by provider-specific user ID.
+func (r *AuthMethodRepository) GetAuthMethodByProviderUserID(methodType user.AuthMethodType, providerUserID string) (*user.AuthMethod, error) {
+	var authMethod user.AuthMethod
+	if err := r.db.Where("type = ? AND provider_user_id = ?", methodType, providerUserID).First(&authMethod).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, sql.ErrNoRows
+		}
+		return nil, errors.ErrAuthMethodFindFailed
+	}
+	return &authMethod, nil
+}
+
 // UpdateAuthMethod updates an auth method
 func (r *AuthMethodRepository) UpdateAuthMethod(authMethod *user.AuthMethod) error {
 	if err := r.db.Save(authMethod).Error; err != nil {

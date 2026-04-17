@@ -42,6 +42,8 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 			"/v1/health",
 			// Public Auth Endpoints (no session yet)
 			"/v1/auth/login",
+			"/v1/auth/oauth/google/start",
+			"/v1/auth/oauth/google/callback",
 			"/v1/auth/signup/start",
 			"/v1/auth/signup/resend-otp",
 			"/v1/auth/signup/verify-otp",

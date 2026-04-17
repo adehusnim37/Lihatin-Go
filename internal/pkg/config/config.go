@@ -125,4 +125,10 @@ const (
 	EnvOSSBucket        = "OSS_BUCKET"
 	EnvOSSPathStyle     = "OSS_PATH_STYLE"
 	EnvOSSPublicBaseURL = "OSS_PUBLIC_BASE_URL"
+
+	// OAuth (Google)
+	EnvGoogleOAuthClientID     = "GOOGLE_OAUTH_CLIENT_ID"
+	EnvGoogleOAuthClientSecret = "GOOGLE_OAUTH_CLIENT_SECRET"
+	EnvGoogleOAuthRedirectURI  = "GOOGLE_OAUTH_REDIRECT_URI"
+	EnvGoogleOAuthScopes       = "GOOGLE_OAUTH_SCOPES"
 )

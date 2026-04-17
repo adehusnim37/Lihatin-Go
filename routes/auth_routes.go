@@ -45,6 +45,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 		// Basic authentication
 		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(20, 0, 10), authController.Login)
+		authGroup.POST("/oauth/google/start", middleware.RateLimitMiddleware(20, 0, 10), authController.StartGoogleOAuth)
+		authGroup.POST("/oauth/google/callback", middleware.RateLimitMiddleware(20, 0, 10), authController.GoogleOAuthCallback)
 		authGroup.POST("/login/email-otp/verify", middleware.RateLimitMiddleware(20, 0, 10), authController.VerifyLoginEmailOTP)
 		authGroup.POST("/login/email-otp/resend", middleware.RateLimitMiddleware(20, 0, 10), authController.ResendLoginEmailOTP)
 
