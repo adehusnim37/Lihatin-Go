@@ -133,6 +133,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		adminAuth.GET("/users/:id", adminController.GetUserByID)
 		adminAuth.POST("/users/:id/lock", adminController.LockUser)
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
+		adminAuth.GET("/security/disposable-email", adminController.GetDisposableEmailPolicy)
+		adminAuth.PUT("/security/disposable-email", adminController.UpdateDisposableEmailPolicy)
 		adminAuth.POST("/premium-codes", premiumController.GeneratePremiumCode)
 
 		// Admin can access all login attempts (not filtered by user)

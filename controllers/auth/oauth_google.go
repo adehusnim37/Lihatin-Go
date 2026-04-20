@@ -17,6 +17,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/disposable"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -214,6 +215,16 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 
 	usr, userAuth, err := c.resolveGoogleOAuthIdentity(ctx.Request.Context(), email, sub, tokenInfo, allowCreate)
 	if err != nil {
+		if errors.Is(err, disposable.ErrDisposableEmailBlocked) {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusBadRequest,
+				"DISPOSABLE_EMAIL_BLOCKED",
+				"Disposable email addresses are not allowed. Please use a permanent email address.",
+				"email",
+			)
+			return
+		}
 		if errors.Is(err, apperrors.ErrUserNotFound) {
 			httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "ACCOUNT_NOT_REGISTERED", "Account not found. Please sign up first.", "auth")
 			return
@@ -424,6 +435,19 @@ func (c *Controller) resolveGoogleOAuthIdentity(ctx context.Context, email, prov
 
 	if !allowCreate {
 		return nil, nil, apperrors.ErrUserNotFound
+	}
+
+	if policy := disposable.Global(); policy != nil {
+		blocked, policyErr := policy.ShouldBlockEmail(ctx, email)
+		if policyErr != nil {
+			logger.Logger.Warn("Disposable email policy check failed for Google OAuth signup",
+				"email", email,
+				"error", policyErr.Error(),
+			)
+		}
+		if blocked {
+			return nil, nil, disposable.ErrDisposableEmailBlocked
+		}
 	}
 
 	// 3) Create new OAuth user if no existing account.

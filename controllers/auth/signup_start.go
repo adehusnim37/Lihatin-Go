@@ -6,6 +6,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/disposable"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
@@ -18,6 +19,26 @@ func (c *Controller) SignupStart(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		validator.SendValidationError(ctx, err, &req)
 		return
+	}
+
+	if policy := disposable.Global(); policy != nil {
+		blocked, err := policy.ShouldBlockEmail(ctx.Request.Context(), req.Email)
+		if err != nil {
+			logger.Logger.Warn("Disposable email policy check failed for signup",
+				"email", req.Email,
+				"error", err.Error(),
+			)
+		}
+		if blocked {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusBadRequest,
+				"DISPOSABLE_EMAIL_BLOCKED",
+				"Disposable email addresses are not allowed. Please use a permanent email address.",
+				"email",
+			)
+			return
+		}
 	}
 
 	existingUser, _ := c.repo.GetUserRepository().GetUserByEmailOrUsername(req.Email)

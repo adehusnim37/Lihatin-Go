@@ -131,4 +131,7 @@ const (
 	EnvGoogleOAuthClientSecret = "GOOGLE_OAUTH_CLIENT_SECRET"
 	EnvGoogleOAuthRedirectURI  = "GOOGLE_OAUTH_REDIRECT_URI"
 	EnvGoogleOAuthScopes       = "GOOGLE_OAUTH_SCOPES"
+
+	// Disposable email policy
+	EnvDisposableEmailListURL = "DISPOSABLE_EMAIL_LIST_URL"
 )

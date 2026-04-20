@@ -7,6 +7,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/internal/jobs"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/disposable"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/migrations"
 	appvalidator "github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
@@ -59,11 +60,19 @@ func main() {
 		log.Println("✅ Session manager initialized successfully!")
 	}
 
+	log.Println("📧 Initializing disposable email policy...")
+	if err := disposable.InitGlobal(gormDB, middleware.GetSessionManager().GetRedisClient()); err != nil {
+		log.Printf("Failed to initialize disposable email policy: %v", err)
+		panic(err)
+	}
+	log.Println("✅ Disposable email policy initialized")
+
 	log.Println("🔁 Initializing scheduler...")
 	scheduler := jobs.NewScheduler(gormDB)
 	log.Println("⬇️ Registering jobs...")
 	scheduler.Register(jobs.NewDeactivateExpiredLinksJob(gormDB))
 	scheduler.Register(jobs.NewCleanupLoginAttemptsJob(gormDB))
+	scheduler.Register(jobs.NewRefreshDisposableDomainsJob())
 	log.Println("⬇ Starting scheduler...")
 	scheduler.Start()
 	log.Println("✅ Scheduler started successfully!")

@@ -8,13 +8,14 @@ import (
 
 // AuthRepository handles authentication-related database operations
 type AuthRepository struct {
-	db               *gorm.DB
-	userAuthRepo     *UserAuthRepository
-	authMethodRepo   *AuthMethodRepository
-	apiKeyRepo       *apikeyrepo.APIKeyRepository
-	loginAttemptRepo *LoginAttemptRepository
-	userAdminRepo    userrepo.UserAdminRepository
-	historyUserRepo  *HistoryUserRepository
+	db                *gorm.DB
+	userAuthRepo      *UserAuthRepository
+	authMethodRepo    *AuthMethodRepository
+	apiKeyRepo        *apikeyrepo.APIKeyRepository
+	loginAttemptRepo  *LoginAttemptRepository
+	userAdminRepo     userrepo.UserAdminRepository
+	systemSettingRepo userrepo.SystemSettingRepository
+	historyUserRepo   *HistoryUserRepository
 
 	// Public accessors for commonly used repositories
 	APIKeyRepo       *apikeyrepo.APIKeyRepository
@@ -32,16 +33,18 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 	apiKeyRepo := apikeyrepo.NewAPIKeyRepository(gormDB)
 	loginAttemptRepo := NewLoginAttemptRepository(gormDB)
 	userAdminRepo := userrepo.NewUserAdminRepository(gormDB)
+	systemSettingRepo := userrepo.NewSystemSettingRepository(gormDB)
 	historyUserRepo := NewHistoryUserRepository(gormDB)
 
 	return &AuthRepository{
-		db:               gormDB,
-		userAuthRepo:     NewUserAuthRepository(gormDB),
-		authMethodRepo:   NewAuthMethodRepository(gormDB),
-		apiKeyRepo:       apiKeyRepo,
-		loginAttemptRepo: loginAttemptRepo,
-		userAdminRepo:    userAdminRepo,
-		historyUserRepo:  historyUserRepo,
+		db:                gormDB,
+		userAuthRepo:      NewUserAuthRepository(gormDB),
+		authMethodRepo:    NewAuthMethodRepository(gormDB),
+		apiKeyRepo:        apiKeyRepo,
+		loginAttemptRepo:  loginAttemptRepo,
+		userAdminRepo:     userAdminRepo,
+		systemSettingRepo: systemSettingRepo,
+		historyUserRepo:   historyUserRepo,
 
 		// Public accessors
 		APIKeyRepo:       apiKeyRepo,
@@ -79,8 +82,12 @@ func (r *AuthRepository) GetUserAdminRepository() userrepo.UserAdminRepository {
 	return r.userAdminRepo
 }
 
+// GetSystemSettingRepository returns the system setting repository.
+func (r *AuthRepository) GetSystemSettingRepository() userrepo.SystemSettingRepository {
+	return r.systemSettingRepo
+}
+
 // GetHistoryUserRepository returns the history user repository
 func (r *AuthRepository) GetHistoryUserRepository() *HistoryUserRepository {
 	return r.historyUserRepo
 }
-

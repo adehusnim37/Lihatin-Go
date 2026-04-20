@@ -267,6 +267,19 @@ type PaginatedUsersResponse struct {
 	TotalPages int                 `json:"total_pages"`
 }
 
+// AdminDisposableEmailPolicyResponse represents disposable email policy state.
+type AdminDisposableEmailPolicyResponse struct {
+	Enabled               bool       `json:"enabled"`
+	EffectiveInCurrentEnv bool       `json:"effective_in_current_env"`
+	LastUpdatedBy         *string    `json:"last_updated_by,omitempty"`
+	LastUpdatedAt         *time.Time `json:"last_updated_at,omitempty"`
+}
+
+// UpdateAdminDisposableEmailPolicyRequest updates disposable email policy state.
+type UpdateAdminDisposableEmailPolicyRequest struct {
+	Enabled *bool `json:"enabled" binding:"required"`
+}
+
 // VerifyEmailResponse represents the response after verifying an email
 type VerifyEmailResponse struct {
 	Email    string                       `json:"email"`

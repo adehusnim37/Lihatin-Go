@@ -38,6 +38,10 @@ func RunMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate APIKey model: %w", err)
 	}
 
+	if err := db.AutoMigrate(&user.SystemSetting{}); err != nil {
+		return fmt.Errorf("failed to migrate SystemSetting model: %w", err)
+	}
+
 	// Migrate ShortLink models
 	if err := db.AutoMigrate(&shortlink.ShortLink{}); err != nil {
 		return fmt.Errorf("failed to migrate ShortLink model: %w", err)
