@@ -87,7 +87,10 @@ func (r *AuthMethodRepository) UpdateAuthMethod(authMethod *user.AuthMethod) err
 func (r *AuthMethodRepository) EnableAuthMethod(id string) error {
 	err := r.db.Model(&user.AuthMethod{}).
 		Where("id = ?", id).
-		Update("is_enabled", true).Error
+		Updates(map[string]any{
+			"is_enabled":  true,
+			"disabled_at": nil,
+		}).Error
 
 	if err != nil {
 		return errors.ErrAuthMethodUpdateFailed
@@ -103,6 +106,9 @@ func (r *AuthMethodRepository) DisableAuthMethod(id string) error {
 		Updates(map[string]any{
 			"is_enabled":  false,
 			"disabled_at": &now,
+			"is_verified": false,
+			"secret":      "",
+			"recovery_codes": nil,
 		}).Error; err != nil {
 		return errors.ErrAuthMethodUpdateFailed
 	}
@@ -287,6 +293,7 @@ func (r *AuthMethodRepository) SetupTOTP(userAuthID, encryptedSecret string, rec
 			FriendlyName:  friendlyName,
 			IsEnabled:     true,
 			IsVerified:    false,
+			DisabledAt:    nil,
 		}
 		return r.CreateAuthMethod(authMethod)
 	} else if err != nil {
@@ -299,6 +306,7 @@ func (r *AuthMethodRepository) SetupTOTP(userAuthID, encryptedSecret string, rec
 	existing.FriendlyName = friendlyName
 	existing.IsEnabled = true
 	existing.IsVerified = false
+	existing.DisabledAt = nil
 
 	return r.UpdateAuthMethod(&existing)
 }

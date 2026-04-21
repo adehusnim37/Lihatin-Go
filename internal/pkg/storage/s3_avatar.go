@@ -113,16 +113,15 @@ func (s *S3AvatarStorage) buildObjectURL(objectKey string) string {
 
 	baseURL, err := url.Parse(s.publicBaseURL)
 	if err != nil || baseURL.Host == "" {
-		return fmt.Sprintf("%s/%s/%s", s.publicBaseURL, s.bucket, encodedKey)
+		// Fallback: publicBaseURL is not a valid URL, construct manually.
+		return fmt.Sprintf("%s/%s", strings.TrimRight(s.publicBaseURL, "/"), encodedKey)
 	}
 
-	if s.usePathStyle {
-		baseURL.Path = strings.TrimSuffix(baseURL.Path, "/") + "/" + s.bucket + "/" + encodedKey
-		return baseURL.String()
-	}
-
-	baseURL.Host = s.bucket + "." + baseURL.Host
-	baseURL.Path = "/" + encodedKey
+	// publicBaseURL is always treated as the root for public access.
+	// The bucket name is NOT appended here — OSS_PUBLIC_BASE_URL should
+	// already reflect the correct root (e.g. custom domain that maps to
+	// the bucket, or the raw endpoint without /bucket suffix).
+	baseURL.Path = strings.TrimSuffix(baseURL.Path, "/") + "/" + encodedKey
 	return baseURL.String()
 }
 

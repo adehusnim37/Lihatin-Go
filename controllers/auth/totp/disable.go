@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +17,7 @@ import (
 func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 	username := ctx.GetString("username")
+	userEmail := ctx.GetString("email")
 
 	// Bind request
 	var req dto.DisableTOTPRequest
@@ -119,6 +120,25 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 		"user_id", userID,
 		"username", username,
 	)
+
+	// Send TOTP disabled security email asynchronously.
+	if userEmail != "" {
+		clientIP := ctx.ClientIP()
+		userAgent := ctx.GetHeader("User-Agent")
+		go func(email, name, ipAddress, agent string) {
+			if err := c.emailService.SendTOTPDisabledEmail(email, name, ipAddress, agent); err != nil {
+				logger.Logger.Warn("Failed to send TOTP disabled email",
+					"user_id", userID,
+					"email", email,
+					"error", err.Error(),
+				)
+			}
+		}(userEmail, username, clientIP, userAgent)
+	} else {
+		logger.Logger.Warn("Skipped TOTP disabled email because user email is empty",
+			"user_id", userID,
+		)
+	}
 
 	httputil.SendOKResponse(ctx, map[string]any{
 		"user_id": userID,
