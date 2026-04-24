@@ -223,6 +223,36 @@ var (
 		http.StatusBadRequest,
 		"user",
 	)
+	ErrPremiumAlreadyRevoked = NewAppError(
+		"PREMIUM_ALREADY_REVOKED",
+		"Premium access already revoked",
+		http.StatusBadRequest,
+		"premium",
+	)
+	ErrPremiumNotRevoked = NewAppError(
+		"PREMIUM_NOT_REVOKED",
+		"Premium access is not revoked",
+		http.StatusBadRequest,
+		"premium",
+	)
+	ErrPermanentRevokeCannotReactivate = NewAppError(
+		"PERMANENT_REVOKE_CANNOT_REACTIVATE",
+		"Permanently revoked premium cannot be reactivated by current role",
+		http.StatusBadRequest,
+		"premium",
+	)
+	ErrPermanentRevokeOverrideRequired = NewAppError(
+		"PERMANENT_REVOKE_OVERRIDE_REQUIRED",
+		"Permanent revoke requires explicit override",
+		http.StatusBadRequest,
+		"premium",
+	)
+	ErrInvalidPremiumRevokeType = NewAppError(
+		"INVALID_PREMIUM_REVOKE_TYPE",
+		"Invalid premium revoke type",
+		http.StatusBadRequest,
+		"premium",
+	)
 )
 
 // User Auth Errors

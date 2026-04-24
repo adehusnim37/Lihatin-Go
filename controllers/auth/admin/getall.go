@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	// Get pagination parameters from query string
 	pageStr := ctx.DefaultQuery("page", "1")
@@ -47,20 +46,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	// Convert to admin response format (remove passwords)
 	adminUsers := make([]dto.AdminUserResponse, len(users))
 	for i, u := range users {
-		adminUsers[i] = dto.AdminUserResponse{
-			ID:           u.ID,
-			Username:     u.Username,
-			FirstName:    u.FirstName,
-			LastName:     u.LastName,
-			Email:        u.Email,
-			CreatedAt:    u.CreatedAt,
-			UpdatedAt:    u.UpdatedAt,
-			IsPremium:    u.IsPremium,
-			IsLocked:     u.IsLocked,
-			LockedAt:     u.LockedAt,
-			LockedReason: u.LockedReason,
-			Role:         u.Role,
-		}
+		adminUsers[i] = toAdminUserResponse(u)
 	}
 
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))

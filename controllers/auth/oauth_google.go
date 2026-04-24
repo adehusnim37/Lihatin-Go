@@ -237,6 +237,11 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		return
 	}
 
+	if usr.IsLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
+		return
+	}
+
 	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(usr.ID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")

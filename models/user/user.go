@@ -8,28 +8,37 @@ import (
 )
 
 type User struct {
-	ID              string     `json:"id" gorm:"primaryKey"`
-	Username        string     `json:"username" gorm:"uniqueIndex;size:50;not null" validate:"required,min=3,max=50"`
-	FirstName       string     `json:"first_name" gorm:"size:50" validate:"required,min=3,max=50"`
-	LastName        string     `json:"last_name" gorm:"size:50" validate:"required,min=3,max=50"`
-	Email           string     `json:"email" gorm:"uniqueIndex;size:100;not null" validate:"required,email"`
-	Password        string     `json:"password" gorm:"size:255" validate:"required,min=8,max=50,pwdcomplex"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	DeletedAt       *time.Time `json:"deleted_at,omitempty" gorm:"index"`
-	UsernameChanged bool       `json:"username_changed,omitempty" gorm:"default:false"`
-	IsPremium       bool       `json:"is_premium" gorm:"default:false"`
-	Avatar          string     `json:"avatar" gorm:"size:255"`
-	IsLocked        bool       `json:"is_locked" gorm:"default:false"`
-	LockedAt        *time.Time `json:"locked_at,omitempty"`
-	LockedReason    string     `json:"locked_reason,omitempty" gorm:"size:500"`
-	Role            string     `json:"role" gorm:"size:20;default:user"` // user, admin, super_admin
+	ID                       string     `json:"id" gorm:"primaryKey"`
+	Username                 string     `json:"username" gorm:"uniqueIndex;size:50;not null" validate:"required,min=3,max=50"`
+	FirstName                string     `json:"first_name" gorm:"size:50" validate:"required,min=3,max=50"`
+	LastName                 string     `json:"last_name" gorm:"size:50" validate:"required,min=3,max=50"`
+	Email                    string     `json:"email" gorm:"uniqueIndex;size:100;not null" validate:"required,email"`
+	Password                 string     `json:"password" gorm:"size:255" validate:"required,min=8,max=50,pwdcomplex"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
+	DeletedAt                *time.Time `json:"deleted_at,omitempty" gorm:"index"`
+	UsernameChanged          bool       `json:"username_changed,omitempty" gorm:"default:false"`
+	IsPremium                bool       `json:"is_premium" gorm:"default:false"`
+	Avatar                   string     `json:"avatar" gorm:"size:255"`
+	IsLocked                 bool       `json:"is_locked" gorm:"default:false"`
+	LockedAt                 *time.Time `json:"locked_at,omitempty"`
+	LockedReason             string     `json:"locked_reason,omitempty" gorm:"size:500"`
+	Role                     string     `json:"role" gorm:"size:20;default:user"`                   // user, admin, super_admin
+	PremiumStatus            string     `json:"premium_status" gorm:"size:20;default:active;index"` // active, revoked
+	PremiumRevokeType        string     `json:"premium_revoke_type,omitempty" gorm:"size:20"`       // temporary, permanent
+	PremiumRevokedAt         *time.Time `json:"premium_revoked_at,omitempty"`
+	PremiumRevokedBy         *string    `json:"premium_revoked_by,omitempty" gorm:"size:50;index"`
+	PremiumRevokedReason     string     `json:"premium_revoked_reason,omitempty" gorm:"size:500"`
+	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
+	PremiumReactivatedBy     *string    `json:"premium_reactivated_by,omitempty" gorm:"size:50;index"`
+	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty" gorm:"size:500"`
 
 	// Relationships
-	UserAuth        []UserAuth        `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
-	APIKeys         []APIKey          `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
-	HistoryUsers    []HistoryUser     `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
-	PremiumKeyUsage []PremiumKeyUsage `json:"premium_key_usage,omitempty" gorm:"foreignKey:UserID"`
+	UserAuth            []UserAuth           `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
+	APIKeys             []APIKey             `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
+	HistoryUsers        []HistoryUser        `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
+	PremiumKeyUsage     []PremiumKeyUsage    `json:"premium_key_usage,omitempty" gorm:"foreignKey:UserID"`
+	PremiumStatusEvents []PremiumStatusEvent `json:"premium_status_events,omitempty" gorm:"foreignKey:UserID"`
 }
 
 // TableName specifies the table name for GORM
@@ -41,15 +50,15 @@ type HistoryUser struct {
 	ID            uint              `json:"id" gorm:"primaryKey"`
 	UserID        string            `json:"user_id" gorm:"index:idx_user_action,priority:1;not null"`
 	ActionType    ActionHistoryUser `json:"action_type" gorm:"index:idx_user_action,priority:2;type:varchar(50);not null"` // e.g. email_change, password_change
-	OldValue      datatypes.JSON    `json:"old_value" gorm:"type:jsonb"`                                                 // JSON snapshot before change
-	NewValue      datatypes.JSON    `json:"new_value" gorm:"type:jsonb"`                                                 // JSON snapshot after change
-	Reason        string            `json:"reason" gorm:"type:varchar(255)"`                                          // Reason for change (user/admin/system)
-	ChangedBy     *string           `json:"changed_by" gorm:"type:varchar(50)"`                                           // Who made the change (userID/adminID/system)
-	RevokeToken   string            `json:"revoke_token" gorm:"type:varchar(100);index"`                                    // Token to revoke sessions if needed
-	RevokeExpires *time.Time        `json:"revoke_expires" gorm:""`                                                           // Expiry for the revoke token
-	IPAddress     *string           `json:"ip_address" gorm:"type:varchar(45)"`                                           // IPv4/IPv6
-	UserAgent     *string           `json:"user_agent" gorm:"type:text"`                                                  // User agent string
-	ChangedAt     time.Time         `json:"changed_at" gorm:"autoCreateTime;index"`                                       // Timestamp of change
+	OldValue      datatypes.JSON    `json:"old_value" gorm:"type:jsonb"`                                                   // JSON snapshot before change
+	NewValue      datatypes.JSON    `json:"new_value" gorm:"type:jsonb"`                                                   // JSON snapshot after change
+	Reason        string            `json:"reason" gorm:"type:varchar(255)"`                                               // Reason for change (user/admin/system)
+	ChangedBy     *string           `json:"changed_by" gorm:"type:varchar(50)"`                                            // Who made the change (userID/adminID/system)
+	RevokeToken   string            `json:"revoke_token" gorm:"type:varchar(100);index"`                                   // Token to revoke sessions if needed
+	RevokeExpires *time.Time        `json:"revoke_expires" gorm:""`                                                        // Expiry for the revoke token
+	IPAddress     *string           `json:"ip_address" gorm:"type:varchar(45)"`                                            // IPv4/IPv6
+	UserAgent     *string           `json:"user_agent" gorm:"type:text"`                                                   // User agent string
+	ChangedAt     time.Time         `json:"changed_at" gorm:"autoCreateTime;index"`                                        // Timestamp of change
 	DeletedAt     gorm.DeletedAt    `json:"deleted_at" gorm:"index"`
 }
 

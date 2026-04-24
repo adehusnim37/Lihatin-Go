@@ -57,6 +57,8 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 			"/v1/auth/refresh-token",
 			"/v1/auth/verify-totp-login",
 			"/v1/auth/validate-reset",
+			"/v1/support/tickets",
+			"/v1/support/track",
 		}
 		r.Use(csrf.Middleware(csrfOpts))
 	}
@@ -105,6 +107,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	})
 
 	RegisterAuthRoutes(v1, authController, userRepo, userAuthRepo, *loginAttemptRepo, emailController, totpController, baseController)
+	RegisterSupportRoutes(v1, userRepo, userAuthRepo, baseController)
 	RegisterLoggerRoutes(v1, userRepo, userAuthRepo, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, userAuthRepo, authRepo)
 

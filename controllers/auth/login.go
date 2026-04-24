@@ -30,6 +30,11 @@ func (c *Controller) Login(ctx *gin.Context) {
 		return
 	}
 
+	if user.IsLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
+		return
+	}
+
 	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(user.ID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")

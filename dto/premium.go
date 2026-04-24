@@ -32,6 +32,10 @@ type PremiumKeyUsageResponse struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type PremiumCodeIDRequest struct {
+	ID int `uri:"id" binding:"required,min=1"`
+}
+
 type PaginatedPremiumKeyResponse struct {
 	Keys       []GeneratePremiumCodeResponse `json:"keys"`
 	Page       int                           `json:"page"`
@@ -43,12 +47,27 @@ type PaginatedPremiumKeyResponse struct {
 }
 
 type GeneratePremiumCodeListResponse struct {
-	IsBulk bool `json:"is_bulk"`
-	Total  int  `json:"total"`
+	IsBulk bool                          `json:"is_bulk"`
+	Total  int                           `json:"total"`
 	Items  []GeneratePremiumCodeResponse `json:"items"`
 }
 
 type RedeemPremiumCodeResponse struct {
 	SecretCode string    `json:"secret_code"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type SendPremiumCodeEmailRequest struct {
+	UserID         string `json:"user_id" binding:"omitempty"`
+	RecipientEmail string `json:"recipient_email" binding:"omitempty,email" label:"Recipient Email"`
+	RecipientName  string `json:"recipient_name" binding:"omitempty,max=120" label:"Recipient Name"`
+	Note           string `json:"note" binding:"omitempty,max=500" label:"Note"`
+}
+
+type SendPremiumCodeEmailResponse struct {
+	PremiumKeyID    int       `json:"premium_key_id"`
+	RecipientEmail  string    `json:"recipient_email"`
+	RecipientName   string    `json:"recipient_name"`
+	DeliveredSecret string    `json:"delivered_secret"`
+	SentAt          time.Time `json:"sent_at"`
 }

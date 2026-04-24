@@ -6,6 +6,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
+	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/gorm"
 )
@@ -67,6 +68,15 @@ func RunMigrations(db *gorm.DB) error {
 
 	if err := db.AutoMigrate(&user.PremiumKeyUsage{}); err != nil {
 		return fmt.Errorf("failed to migrate PremiumKeyUsage model: %w", err)
+	}
+
+	if err := db.AutoMigrate(&user.PremiumStatusEvent{}); err != nil {
+		return fmt.Errorf("failed to migrate PremiumStatusEvent model: %w", err)
+	}
+
+	// Migrate Support models
+	if err := db.AutoMigrate(&supportmodel.SupportTicket{}); err != nil {
+		return fmt.Errorf("failed to migrate SupportTicket model: %w", err)
 	}
 
 	log.Println("✅ All models migrated successfully!")

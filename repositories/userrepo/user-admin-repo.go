@@ -2,19 +2,25 @@ package userrepo
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
 
 // UserAdminRepository defines the methods for admin-related user operations
 type UserAdminRepository interface {
 	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
 	LockUser(userID, reason string) error
 	UnlockUser(userID, reason string) error
+	RevokePremiumAccess(userID, reason, revokeType, changedBy, changedByRole string) (*user.User, error)
+	ReactivatePremiumAccess(userID, reason, changedBy, changedByRole string, overridePermanent bool) (*user.User, error)
+	GetPremiumStatusEvents(userID string, limit int) ([]user.PremiumStatusEvent, error)
 	IsUserLocked(userID string) (bool, error)
 	DeleteUserPermanent(userID string) error
 }
@@ -111,6 +117,213 @@ func (uar *userAdminRepository) UnlockUser(userID, reason string) error {
 	return nil
 }
 
+// RevokePremiumAccess revokes premium access, demotes role to user, and writes audit event.
+func (uar *userAdminRepository) RevokePremiumAccess(userID, reason, revokeType, changedBy, changedByRole string) (*user.User, error) {
+	normalizedRevokeType, err := normalizeRevokeType(revokeType)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedRole := normalizeRole(changedByRole)
+	changedBy = strings.TrimSpace(changedBy)
+	reason = strings.TrimSpace(reason)
+
+	var updatedUser *user.User
+	err = uar.db.Transaction(func(tx *gorm.DB) error {
+		var target user.User
+		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND deleted_at IS NULL", userID).
+			First(&target).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.ErrUserNotFound
+			}
+			logger.Logger.Error("Failed to select user for premium revoke", "user_id", userID, "error", err)
+			return apperrors.ErrUserDatabaseError
+		}
+
+		currentStatus := resolveCurrentPremiumStatus(target.PremiumStatus)
+		if currentStatus == string(user.PremiumStatusRevoked) {
+			return apperrors.ErrPremiumAlreadyRevoked
+		}
+
+		oldRole := normalizeRole(target.Role)
+		now := time.Now()
+		changedByPtr := nullableString(changedBy)
+
+		updates := map[string]any{
+			"is_premium":                 false,
+			"premium_status":             string(user.PremiumStatusRevoked),
+			"premium_revoke_type":        normalizedRevokeType,
+			"premium_revoked_at":         &now,
+			"premium_revoked_by":         changedByPtr,
+			"premium_revoked_reason":     reason,
+			"premium_reactivated_at":     nil,
+			"premium_reactivated_by":     nil,
+			"premium_reactivated_reason": "",
+			"updated_at":                 now,
+		}
+
+		if err := tx.Model(&user.User{}).
+			Where("id = ? AND deleted_at IS NULL", userID).
+			Updates(updates).Error; err != nil {
+			logger.Logger.Error("Failed to update user for premium revoke", "user_id", userID, "error", err)
+			return apperrors.ErrUserUpdateFailed
+		}
+
+		event := user.PremiumStatusEvent{
+			UserID:      userID,
+			Action:      user.PremiumStatusEventActionRevoke,
+			OldStatus:   currentStatus,
+			NewStatus:   string(user.PremiumStatusRevoked),
+			OldRole:     oldRole,
+			NewRole:     "user",
+			RevokeType:  normalizedRevokeType,
+			Reason:      reason,
+			ChangedBy:   changedByPtr,
+			ChangedRole: normalizedRole,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		if err := tx.Create(&event).Error; err != nil {
+			logger.Logger.Error("Failed to create premium revoke event", "user_id", userID, "error", err)
+			return apperrors.ErrUserHistoryCreateFailed
+		}
+
+		var refreshed user.User
+		if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&refreshed).Error; err != nil {
+			logger.Logger.Error("Failed to reload user after premium revoke", "user_id", userID, "error", err)
+			return apperrors.ErrUserDatabaseError
+		}
+		updatedUser = &refreshed
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedUser, nil
+}
+
+// ReactivatePremiumAccess restores premium status and writes audit event.
+func (uar *userAdminRepository) ReactivatePremiumAccess(userID, reason, changedBy, changedByRole string, overridePermanent bool) (*user.User, error) {
+	normalizedRole := normalizeRole(changedByRole)
+	changedBy = strings.TrimSpace(changedBy)
+	reason = strings.TrimSpace(reason)
+
+	var updatedUser *user.User
+	err := uar.db.Transaction(func(tx *gorm.DB) error {
+		var target user.User
+		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND deleted_at IS NULL", userID).
+			First(&target).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperrors.ErrUserNotFound
+			}
+			logger.Logger.Error("Failed to select user for premium reactivate", "user_id", userID, "error", err)
+			return apperrors.ErrUserDatabaseError
+		}
+
+		currentStatus := resolveCurrentPremiumStatus(target.PremiumStatus)
+		if currentStatus != string(user.PremiumStatusRevoked) {
+			return apperrors.ErrPremiumNotRevoked
+		}
+
+		targetRevokeType := normalizeRevokeTypeOrDefault(target.PremiumRevokeType)
+		if targetRevokeType == string(user.PremiumRevokeTypePermanent) {
+			if normalizedRole != "admin" {
+				return apperrors.ErrPermanentRevokeCannotReactivate
+			}
+			if !overridePermanent {
+				return apperrors.ErrPermanentRevokeOverrideRequired
+			}
+		}
+
+		oldRole := normalizeRole(target.Role)
+		now := time.Now()
+		changedByPtr := nullableString(changedBy)
+
+		updates := map[string]any{
+			"is_premium":                 true,
+			"premium_status":             string(user.PremiumStatusActive),
+			"premium_reactivated_at":     &now,
+			"premium_reactivated_by":     changedByPtr,
+			"premium_reactivated_reason": reason,
+			"updated_at":                 now,
+			"premium_revoked_at":         nil,
+			"premium_revoked_by":         nil,
+			"premium_revoked_reason":     "",
+			"premium_revoke_type":        nil,
+		}
+
+		if err := tx.Model(&user.User{}).
+			Where("id = ? AND deleted_at IS NULL", userID).
+			Updates(updates).Error; err != nil {
+			logger.Logger.Error("Failed to update user for premium reactivate", "user_id", userID, "error", err)
+			return apperrors.ErrUserUpdateFailed
+		}
+
+		event := user.PremiumStatusEvent{
+			UserID:      userID,
+			Action:      user.PremiumStatusEventActionReactivate,
+			OldStatus:   string(user.PremiumStatusRevoked),
+			NewStatus:   string(user.PremiumStatusActive),
+			OldRole:     oldRole,
+			NewRole:     oldRole,
+			RevokeType:  targetRevokeType,
+			Reason:      reason,
+			ChangedBy:   changedByPtr,
+			ChangedRole: normalizedRole,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		if err := tx.Create(&event).Error; err != nil {
+			logger.Logger.Error("Failed to create premium reactivate event", "user_id", userID, "error", err)
+			return apperrors.ErrUserHistoryCreateFailed
+		}
+
+		var refreshed user.User
+		if err := tx.Where("id = ? AND deleted_at IS NULL", userID).First(&refreshed).Error; err != nil {
+			logger.Logger.Error("Failed to reload user after premium reactivation", "user_id", userID, "error", err)
+			return apperrors.ErrUserDatabaseError
+		}
+		updatedUser = &refreshed
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedUser, nil
+}
+
+// GetPremiumStatusEvents returns latest premium status events for specific user.
+func (uar *userAdminRepository) GetPremiumStatusEvents(userID string, limit int) ([]user.PremiumStatusEvent, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var events []user.PremiumStatusEvent
+	result := uar.db.
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&events)
+
+	if result.Error != nil {
+		logger.Logger.Error("Failed to get premium status events", "user_id", userID, "error", result.Error)
+		return nil, apperrors.ErrUserDatabaseError
+	}
+
+	return events, nil
+}
+
 // IsUserLocked checks if a user account is locked
 func (uar *userAdminRepository) IsUserLocked(userID string) (bool, error) {
 	var user user.User
@@ -149,4 +362,44 @@ func (uar *userAdminRepository) DeleteUserPermanent(userID string) error {
 
 	logger.Logger.Info("User permanently deleted", "user_id", userID)
 	return nil
+}
+
+func normalizeRevokeType(raw string) (string, error) {
+	normalized := normalizeRevokeTypeOrDefault(raw)
+	if normalized == string(user.PremiumRevokeTypeTemporary) || normalized == string(user.PremiumRevokeTypePermanent) {
+		return normalized, nil
+	}
+	return "", apperrors.ErrInvalidPremiumRevokeType
+}
+
+func normalizeRevokeTypeOrDefault(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	if normalized == "" {
+		return string(user.PremiumRevokeTypeTemporary)
+	}
+	return normalized
+}
+
+func resolveCurrentPremiumStatus(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	if normalized == "" {
+		return string(user.PremiumStatusActive)
+	}
+	return normalized
+}
+
+func normalizeRole(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	if normalized == "" {
+		return "user"
+	}
+	return normalized
+}
+
+func nullableString(raw string) *string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }

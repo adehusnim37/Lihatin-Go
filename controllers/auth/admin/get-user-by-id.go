@@ -2,7 +2,7 @@ package admin
 
 import (
 	"net/http"
-	
+
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -28,21 +28,5 @@ func (c *Controller) GetUserByID(ctx *gin.Context) {
 		return
 	}
 
-	// Convert to admin response format (remove password)
-	adminUser := dto.AdminUserResponse{
-		ID:           user.ID,
-		Username:     user.Username,
-		Email:        user.Email,
-		FirstName:    user.FirstName,
-		LastName:     user.LastName,
-		Role:         user.Role,
-		IsPremium:    user.IsPremium,
-		IsLocked:     user.IsLocked,
-		LockedAt:     user.LockedAt,
-		LockedReason: user.LockedReason,
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
-	}
-
-	httputil.SendOKResponse(ctx, adminUser, "User retrieved successfully")
+	httputil.SendOKResponse(ctx, toAdminUserResponse(*user), "User retrieved successfully")
 }

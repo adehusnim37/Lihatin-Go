@@ -242,20 +242,71 @@ type AdminUnlockUserRequest struct {
 	Reason string `json:"reason,omitempty" validate:"max=500"`
 }
 
+// AdminRevokePremiumRequest represents revoke premium payload.
+type AdminRevokePremiumRequest struct {
+	Reason     string `json:"reason" binding:"required,min=10,max=500"`
+	RevokeType string `json:"revoke_type" binding:"required,oneof=temporary permanent"`
+}
+
+// AdminReactivatePremiumRequest represents reactivate premium payload.
+type AdminReactivatePremiumRequest struct {
+	Reason            string `json:"reason" binding:"required,min=5,max=500"`
+	OverridePermanent bool   `json:"override_permanent,omitempty"`
+}
+
 // AdminUserResponse represents the response format for admin user data
 type AdminUserResponse struct {
-	ID           string     `json:"id"`
-	Username     string     `json:"username"`
-	FirstName    string     `json:"first_name"`
-	LastName     string     `json:"last_name"`
-	Email        string     `json:"email"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	IsPremium    bool       `json:"is_premium"`
-	IsLocked     bool       `json:"is_locked"`
-	LockedAt     *time.Time `json:"locked_at,omitempty"`
-	LockedReason string     `json:"locked_reason,omitempty"`
-	Role         string     `json:"role"`
+	ID                       string     `json:"id"`
+	Username                 string     `json:"username"`
+	FirstName                string     `json:"first_name"`
+	LastName                 string     `json:"last_name"`
+	Email                    string     `json:"email"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
+	IsPremium                bool       `json:"is_premium"`
+	IsLocked                 bool       `json:"is_locked"`
+	LockedAt                 *time.Time `json:"locked_at,omitempty"`
+	LockedReason             string     `json:"locked_reason,omitempty"`
+	Role                     string     `json:"role"`
+	PremiumRevokeType        string     `json:"premium_revoke_type,omitempty"`
+	PremiumRevokedAt         *time.Time `json:"premium_revoked_at,omitempty"`
+	PremiumRevokedBy         *string    `json:"premium_revoked_by,omitempty"`
+	PremiumRevokedReason     string     `json:"premium_revoked_reason,omitempty"`
+	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
+	PremiumReactivatedBy     *string    `json:"premium_reactivated_by,omitempty"`
+	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty"`
+}
+
+type AdminPremiumStatusMutationResponse struct {
+	UserID                   string     `json:"user_id"`
+	IsPremium                bool       `json:"is_premium"`
+	Role                     string     `json:"role"`
+	PremiumRevokeType        string     `json:"premium_revoke_type,omitempty"`
+	PremiumRevokedAt         *time.Time `json:"premium_revoked_at,omitempty"`
+	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
+	PremiumRevokedReason     string     `json:"premium_revoked_reason,omitempty"`
+	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty"`
+}
+
+type AdminPremiumStatusEventResponse struct {
+	ID          uint      `json:"id"`
+	UserID      string    `json:"user_id"`
+	Action      string    `json:"action"`
+	OldStatus   string    `json:"old_status"`
+	NewStatus   string    `json:"new_status"`
+	OldRole     string    `json:"old_role"`
+	NewRole     string    `json:"new_role"`
+	RevokeType  string    `json:"revoke_type,omitempty"`
+	Reason      string    `json:"reason"`
+	ChangedBy   *string   `json:"changed_by,omitempty"`
+	ChangedRole string    `json:"changed_role"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type AdminPremiumStatusEventsListResponse struct {
+	UserID string                            `json:"user_id"`
+	Total  int                               `json:"total"`
+	Items  []AdminPremiumStatusEventResponse `json:"items"`
 }
 
 // PaginatedUsersResponse represents paginated user results

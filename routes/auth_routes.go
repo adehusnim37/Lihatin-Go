@@ -47,7 +47,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/login", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(20, 0, 10), authController.Login)
 		authGroup.POST("/oauth/google/start", middleware.RateLimitMiddleware(20, 0, 10), authController.StartGoogleOAuth)
 		authGroup.POST("/oauth/google/callback", middleware.RateLimitMiddleware(20, 0, 10), authController.GoogleOAuthCallback)
-		authGroup.POST("/login/email-otp/verify", middleware.RateLimitMiddleware(20, 0, 10), authController.VerifyLoginEmailOTP)
+		authGroup.POST("/login/email-otp/verify", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(20, 0, 10), authController.VerifyLoginEmailOTP)
 		authGroup.POST("/login/email-otp/resend", middleware.RateLimitMiddleware(20, 0, 10), authController.ResendLoginEmailOTP)
 
 		// TOTP Login verification (no auth required - this IS the auth step)
@@ -133,9 +133,13 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		adminAuth.GET("/users/:id", adminController.GetUserByID)
 		adminAuth.POST("/users/:id/lock", adminController.LockUser)
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
+		adminAuth.POST("/users/:id/revoke-premium", adminController.RevokePremiumAccess)
+		adminAuth.POST("/users/:id/reactivate-premium", adminController.ReactivatePremiumAccess)
+		adminAuth.GET("/users/:id/premium-status-events", adminController.GetPremiumStatusEvents)
 		adminAuth.GET("/security/disposable-email", adminController.GetDisposableEmailPolicy)
 		adminAuth.PUT("/security/disposable-email", adminController.UpdateDisposableEmailPolicy)
 		adminAuth.POST("/premium-codes", premiumController.GeneratePremiumCode)
+		adminAuth.POST("/premium-codes/:id/send-email", premiumController.SendPremiumCodeEmail)
 
 		// Admin can access all login attempts (not filtered by user)
 		adminLoginAttemptsGroup := adminAuth.Group("/login-attempts")

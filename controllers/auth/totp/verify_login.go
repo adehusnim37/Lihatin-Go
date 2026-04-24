@@ -57,6 +57,31 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
+	if user.IsLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
+		return
+	}
+
+	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(userID)
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
+		return
+	}
+	if isLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account is locked. Please try again later.", "auth")
+		return
+	}
+
+	if !userAuth.IsActive {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
+		return
+	}
+
+	if !userAuth.IsEmailVerified {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "Your email is not verified. Please verify your email first.", "email")
+		return
+	}
+
 	// Get TOTP secret
 	encryptedSecret, err := c.repo.GetAuthMethodRepository().GetTOTPSecret(userAuth.ID)
 	if err != nil {

@@ -134,4 +134,9 @@ const (
 
 	// Disposable email policy
 	EnvDisposableEmailListURL = "DISPOSABLE_EMAIL_LIST_URL"
+
+	// Support + captcha
+	EnvTurnstileSecretKey = "TURNSTILE_SECRET_KEY"
+	EnvTurnstileSiteKey   = "TURNSTILE_SITE_KEY"
+	EnvSupportAlertEmails = "SUPPORT_ALERT_EMAILS"
 )

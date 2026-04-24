@@ -9,6 +9,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
+	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
@@ -90,6 +91,7 @@ func runMigrations(db *gorm.DB) {
 		&user.HistoryUser{},
 		&user.PremiumKey{},
 		&user.PremiumKeyUsage{},
+		&user.PremiumStatusEvent{},
 
 		// ShortLink models
 		&shortlink.ShortLink{},
@@ -98,6 +100,9 @@ func runMigrations(db *gorm.DB) {
 
 		// Logging models
 		&logging.ActivityLog{},
+
+		// Support models
+		&supportmodel.SupportTicket{},
 	}
 
 	for _, model := range models {
@@ -126,6 +131,8 @@ func dropAllTables(db *gorm.DB) {
 		&user.User{},
 		&user.PremiumKey{},
 		&user.PremiumKeyUsage{},
+		&user.PremiumStatusEvent{},
+		&supportmodel.SupportTicket{},
 	}
 
 	for _, table := range tables {
@@ -161,6 +168,8 @@ func showMigrationStatus(db *gorm.DB) {
 		&logging.ActivityLog{},
 		&user.PremiumKey{},
 		&user.PremiumKeyUsage{},
+		&user.PremiumStatusEvent{},
+		&supportmodel.SupportTicket{},
 	}
 
 	for _, model := range models {

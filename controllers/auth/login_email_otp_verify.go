@@ -28,7 +28,62 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 		return
 	}
 
-	challenge, err := auth.VerifyEmailOTPChallenge(ctx.Request.Context(), req.ChallengeToken, otpCode, auth.EmailOTPPurposeLogin)
+	challenge, err := auth.GetEmailOTPChallenge(ctx.Request.Context(), req.ChallengeToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, auth.ErrEmailOTPChallengeNotFound), errors.Is(err, auth.ErrEmailOTPChallengeExpired):
+			httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "CHALLENGE_EXPIRED", "Verification session expired. Please login again.", "challenge_token")
+			return
+		default:
+			logger.Logger.Error("Failed to get login email OTP challenge", "error", err.Error())
+			httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "OTP_VERIFICATION_FAILED", "Failed to verify code", "otp_code")
+			return
+		}
+	}
+
+	if challenge.Purpose != auth.EmailOTPPurposeLogin || challenge.UserID == "" {
+		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_CHALLENGE", "Invalid login verification session", "challenge_token")
+		return
+	}
+
+	user, err := c.repo.GetUserRepository().GetUserByID(challenge.UserID)
+	if err != nil {
+		httputil.HandleError(ctx, err, challenge.UserID)
+		return
+	}
+
+	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(challenge.UserID)
+	if err != nil {
+		httputil.HandleError(ctx, err, challenge.UserID)
+		return
+	}
+
+	if user.IsLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
+		return
+	}
+
+	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(user.ID)
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
+		return
+	}
+	if isLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account is locked. Please try again later.", "auth")
+		return
+	}
+
+	if !userAuth.IsActive {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
+		return
+	}
+
+	if !userAuth.IsEmailVerified {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "Your email is not verified. Please verify your email first.", "email")
+		return
+	}
+
+	_, err = auth.VerifyEmailOTPChallenge(ctx.Request.Context(), req.ChallengeToken, otpCode, auth.EmailOTPPurposeLogin)
 	if err != nil {
 		var invalidCodeErr *auth.EmailOTPInvalidCodeError
 		switch {
@@ -55,23 +110,6 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 			httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "OTP_VERIFICATION_FAILED", "Failed to verify code", "otp_code")
 			return
 		}
-	}
-
-	user, err := c.repo.GetUserRepository().GetUserByID(challenge.UserID)
-	if err != nil {
-		httputil.HandleError(ctx, err, challenge.UserID)
-		return
-	}
-
-	userAuth, err := c.repo.GetUserAuthRepository().GetUserAuthByUserID(challenge.UserID)
-	if err != nil {
-		httputil.HandleError(ctx, err, challenge.UserID)
-		return
-	}
-
-	if !userAuth.IsActive {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
-		return
 	}
 
 	// If TOTP was enabled after OTP challenge issued, enforce TOTP as final factor.

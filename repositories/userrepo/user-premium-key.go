@@ -72,6 +72,20 @@ func (r *UserPremiumKeyRepository) GetUserPremiumKeyByCode(code string) (*user.P
 }
 
 /**
+ * Get a premium key by id
+ */
+func (r *UserPremiumKeyRepository) GetUserPremiumKeyByID(id int) (*user.PremiumKey, error) {
+	var userPremiumKey user.PremiumKey
+	if err := r.db.Preload("Usage").Where("id = ?", id).First(&userPremiumKey).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrPremiumCodeNotFound
+		}
+		return nil, apperrors.ErrUserFindFailed
+	}
+	return &userPremiumKey, nil
+}
+
+/**
  * Redeem a premium key
  */
 func (r *UserPremiumKeyRepository) RedeemPremiumCode(code string, userID string) error {
