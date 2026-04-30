@@ -61,6 +61,27 @@ func (s *S3SupportAttachmentStorage) UploadAttachment(
 	return s.base.buildObjectURL(objectKey), objectKey, nil
 }
 
+func (s *S3SupportAttachmentStorage) DeleteAttachment(ctx context.Context, objectKey string) error {
+	if s == nil || s.base == nil || s.base.client == nil {
+		return fmt.Errorf("support attachment storage not configured")
+	}
+
+	normalizedKey := strings.TrimSpace(objectKey)
+	if normalizedKey == "" {
+		return nil
+	}
+
+	_, err := s.base.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: awsv2.String(s.base.bucket),
+		Key:    awsv2.String(normalizedKey),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete support attachment: %w", err)
+	}
+
+	return nil
+}
+
 func (s *S3SupportAttachmentStorage) buildObjectKey(ticketID, messageID, fileName, contentType string) string {
 	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(fileName)))
 	if ext == "" {

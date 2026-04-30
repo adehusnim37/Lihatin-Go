@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/migrations"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/shortlink"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
@@ -80,38 +81,8 @@ func ensureDatabase(dsn string) {
 // runMigrations creates/updates all tables
 func runMigrations(db *gorm.DB) {
 	fmt.Println("🚀 Running database migrations...")
-
-	models := []interface{}{
-		// User models
-		&user.User{},
-		&user.UserAuth{},
-		&user.AuthMethod{},
-		&user.LoginAttempt{},
-		&user.APIKey{},
-		&user.HistoryUser{},
-		&user.PremiumKey{},
-		&user.PremiumKeyUsage{},
-		&user.PremiumStatusEvent{},
-
-		// ShortLink models
-		&shortlink.ShortLink{},
-		&shortlink.ShortLinkDetail{},
-		&shortlink.ViewLinkDetail{},
-
-		// Logging models
-		&logging.ActivityLog{},
-
-		// Support models
-		&supportmodel.SupportTicket{},
-		&supportmodel.SupportMessage{},
-		&supportmodel.SupportAttachment{},
-	}
-
-	for _, model := range models {
-		if err := db.AutoMigrate(model); err != nil {
-			log.Fatalf("❌ Failed to migrate %T: %v", model, err)
-		}
-		fmt.Printf("✅ Migrated: %T\n", model)
+	if err := migrations.RunMigrations(db); err != nil {
+		log.Fatalf("❌ Migration failed: %v", err)
 	}
 
 	fmt.Println("🎉 All migrations completed successfully!")

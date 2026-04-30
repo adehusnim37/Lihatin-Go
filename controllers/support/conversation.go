@@ -12,6 +12,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/repositories/supportrepo"
@@ -265,6 +266,7 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 	}
 
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
+		c.cleanupUploadedAttachments(ctx, attachments)
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGE_CREATE_FAILED", "Failed to send message", "message")
 		return
 	}
@@ -394,6 +396,7 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 	}
 
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
+		c.cleanupUploadedAttachments(ctx, attachments)
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGE_CREATE_FAILED", "Failed to send message", "message")
 		return
 	}
@@ -508,6 +511,7 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 	}
 
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
+		c.cleanupUploadedAttachments(ctx, attachments)
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGE_CREATE_FAILED", "Failed to send message", "message")
 		return
 	}
@@ -757,21 +761,21 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 			return nil, fmt.Errorf("failed to read attachment")
 		}
 
-		blobData, err := io.ReadAll(io.LimitReader(opened, maxSupportAttachmentSizeBytes+1))
+		fileData, err := io.ReadAll(io.LimitReader(opened, maxSupportAttachmentSizeBytes+1))
 		_ = opened.Close()
 		if err != nil {
 			return nil, fmt.Errorf("failed to process attachment")
 		}
-		if int64(len(blobData)) > maxSupportAttachmentSizeBytes {
+		if int64(len(fileData)) > maxSupportAttachmentSizeBytes {
 			return nil, fmt.Errorf("each file must be <= %d MB", maxSupportAttachmentSizeBytes/(1024*1024))
 		}
-		if len(blobData) == 0 {
+		if len(fileData) == 0 {
 			return nil, fmt.Errorf("attachment file cannot be empty")
 		}
 
 		contentType := strings.TrimSpace(header.Header.Get("Content-Type"))
 		if contentType == "" {
-			contentType = http.DetectContentType(blobData)
+			contentType = http.DetectContentType(fileData)
 		}
 		if len(contentType) > 100 {
 			contentType = contentType[:100]
@@ -784,9 +788,18 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 			messageID,
 			fileName,
 			contentType,
-			blobData,
+			fileData,
 		)
 		if uploadErr != nil {
+			logger.Logger.Error(
+				"Failed uploading support attachment to object storage",
+				"ticket_id", ticketID,
+				"message_id", messageID,
+				"file_name", fileName,
+				"content_type", contentType,
+				"size_bytes", len(fileData),
+				"error", uploadErr.Error(),
+			)
 			return nil, fmt.Errorf("failed to upload attachment")
 		}
 
@@ -796,7 +809,7 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 			MessageID:   messageID,
 			FileName:    fileName,
 			ContentType: contentType,
-			SizeBytes:   int64(len(blobData)),
+			SizeBytes:   int64(len(fileData)),
 			ObjectKey:   objectKey,
 			ObjectURL:   objectURL,
 			CreatedAt:   now,
@@ -805,6 +818,25 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 	}
 
 	return attachments, nil
+}
+
+func (c *Controller) cleanupUploadedAttachments(ctx *gin.Context, attachments []supportmodel.SupportAttachment) {
+	if c == nil || c.attachmentStore == nil || len(attachments) == 0 {
+		return
+	}
+
+	for _, attachment := range attachments {
+		if err := c.attachmentStore.DeleteAttachment(ctx.Request.Context(), attachment.ObjectKey); err != nil {
+			logger.Logger.Error(
+				"Failed deleting orphaned support attachment from object storage",
+				"attachment_id", attachment.ID,
+				"ticket_id", attachment.TicketID,
+				"message_id", attachment.MessageID,
+				"object_key", attachment.ObjectKey,
+				"error", err.Error(),
+			)
+		}
+	}
 }
 
 func sanitizeSupportFileName(raw string) string {

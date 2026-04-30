@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -53,9 +55,14 @@ func ActivityLogger(loggerRepo *loggerrepo.LoggerRepository) gin.HandlerFunc {
 		// Capture request body for POST, PUT, PATCH requests
 		var requestBody string
 		if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH" || c.Request.Method == "DELETE" {
-			bodyBytes, err := captureRequestBody(c)
-			if err == nil {
-				requestBody = sanitizeRequestBody(string(bodyBytes))
+			contentType := strings.ToLower(strings.TrimSpace(c.ContentType()))
+			if shouldOmitRequestBody(contentType) {
+				requestBody = summarizeOmittedRequestBody(contentType, c.Request.ContentLength)
+			} else {
+				bodyBytes, err := captureRequestBody(c)
+				if err == nil {
+					requestBody = sanitizeRequestBody(bodyBytes, contentType)
+				}
 			}
 		}
 
@@ -185,16 +192,26 @@ func captureRequestBody(c *gin.Context) ([]byte, error) {
 }
 
 // sanitizeRequestBody removes sensitive information from request body
-func sanitizeRequestBody(body string) string {
+func sanitizeRequestBody(body []byte, contentType string) string {
+	if len(body) == 0 {
+		return "{}"
+	}
+
+	if shouldOmitRequestBody(contentType) || !utf8.Valid(body) {
+		return summarizeOmittedRequestBody(contentType, int64(len(body)))
+	}
+
+	bodyText := string(body)
+
 	// Limit body size to prevent huge logs
 	const maxBodySize = 1000
-	if len(body) > maxBodySize {
-		body = body[:maxBodySize] + "... [truncated]"
+	if len(bodyText) > maxBodySize {
+		bodyText = bodyText[:maxBodySize] + "... [truncated]"
 	}
 
 	// Try to parse as JSON and remove sensitive fields
 	var jsonData map[string]interface{}
-	if err := json.Unmarshal([]byte(body), &jsonData); err == nil {
+	if err := json.Unmarshal([]byte(bodyText), &jsonData); err == nil {
 		// Remove sensitive fields
 		sensitiveFields := []string{"password", "token", "secret", "key", "auth", "authorization"}
 		for _, field := range sensitiveFields {
@@ -211,7 +228,58 @@ func sanitizeRequestBody(body string) string {
 		}
 	}
 
-	return body
+	return bodyText
+}
+
+func shouldOmitRequestBody(contentType string) bool {
+	if contentType == "" {
+		return false
+	}
+
+	if contentType == "multipart/form-data" {
+		return true
+	}
+
+	if strings.HasPrefix(contentType, "image/") ||
+		strings.HasPrefix(contentType, "video/") ||
+		strings.HasPrefix(contentType, "audio/") ||
+		contentType == "application/octet-stream" ||
+		contentType == "application/pdf" ||
+		contentType == "application/zip" {
+		return true
+	}
+
+	return false
+}
+
+func summarizeOmittedRequestBody(contentType string, size int64) string {
+	summary := map[string]interface{}{
+		"omitted":      true,
+		"content_type": normalizeRequestContentType(contentType),
+	}
+
+	if size >= 0 {
+		summary["size_bytes"] = size
+	}
+
+	if summaryBytes, err := json.Marshal(summary); err == nil {
+		return string(summaryBytes)
+	}
+
+	return `{"omitted":true}`
+}
+
+func normalizeRequestContentType(contentType string) string {
+	if contentType == "" {
+		return "unknown"
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err == nil && mediaType != "" {
+		return mediaType
+	}
+
+	return contentType
 }
 
 // captureQueryParams captures all query parameters as JSON string

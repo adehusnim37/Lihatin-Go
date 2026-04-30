@@ -84,7 +84,29 @@ func RunMigrations(db *gorm.DB) error {
 	if err := db.AutoMigrate(&supportmodel.SupportAttachment{}); err != nil {
 		return fmt.Errorf("failed to migrate SupportAttachment model: %w", err)
 	}
+	if err := normalizeSupportAttachmentSchema(db); err != nil {
+		return err
+	}
 
 	log.Println("✅ All models migrated successfully!")
+	return nil
+}
+
+func normalizeSupportAttachmentSchema(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("gorm DB is required")
+	}
+
+	if !db.Migrator().HasTable(&supportmodel.SupportAttachment{}) {
+		return nil
+	}
+
+	if db.Migrator().HasColumn(&supportmodel.SupportAttachment{}, "blob_data") {
+		log.Println("ℹ️ Dropping legacy support_attachments.blob_data column")
+		if err := db.Migrator().DropColumn(&supportmodel.SupportAttachment{}, "blob_data"); err != nil {
+			return fmt.Errorf("failed to drop legacy support_attachments.blob_data column: %w", err)
+		}
+	}
+
 	return nil
 }
