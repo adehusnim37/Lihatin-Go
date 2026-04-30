@@ -3,6 +3,7 @@ package support
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/storage"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/supportrepo"
@@ -27,10 +29,11 @@ const (
 
 type Controller struct {
 	*controllers.BaseController
-	repo       *supportrepo.SupportTicketRepository
-	authRepo   *authrepo.AuthRepository
-	emailSvc   *mail.EmailService
-	httpClient *http.Client
+	repo            *supportrepo.SupportTicketRepository
+	authRepo        *authrepo.AuthRepository
+	emailSvc        *mail.EmailService
+	attachmentStore *storage.S3SupportAttachmentStorage
+	httpClient      *http.Client
 }
 
 type turnstileVerifyResponse struct {
@@ -43,11 +46,17 @@ func NewController(base *controllers.BaseController) *Controller {
 		panic("GormDB is required for SupportController")
 	}
 
+	attachmentStore, attachmentStoreErr := storage.NewS3SupportAttachmentStorageFromEnv()
+	if attachmentStoreErr != nil {
+		logger.Logger.Warn("Support attachment storage is not configured", "error", attachmentStoreErr.Error())
+	}
+
 	return &Controller{
-		BaseController: base,
-		repo:           supportrepo.NewSupportTicketRepository(base.GormDB),
-		authRepo:       authrepo.NewAuthRepository(base.GormDB),
-		emailSvc:       mail.NewEmailService(),
+		BaseController:  base,
+		repo:            supportrepo.NewSupportTicketRepository(base.GormDB),
+		authRepo:        authrepo.NewAuthRepository(base.GormDB),
+		emailSvc:        mail.NewEmailService(),
+		attachmentStore: attachmentStore,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -173,4 +182,29 @@ func buildCategoryLabel(category string) string {
 	default:
 		return "Other"
 	}
+}
+
+func hashSupportAccessCode(raw string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(raw)))
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func (c *Controller) frontendURL() string {
+	return strings.TrimRight(
+		strings.TrimSpace(config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")),
+		"/",
+	)
+}
+
+func supportMessagePreview(raw string) string {
+	preview := strings.TrimSpace(raw)
+	if preview == "" {
+		return "New support message."
+	}
+	preview = strings.ReplaceAll(preview, "\n", " ")
+	preview = strings.Join(strings.Fields(preview), " ")
+	if len(preview) > 220 {
+		return preview[:220] + "..."
+	}
+	return preview
 }

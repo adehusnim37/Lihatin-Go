@@ -23,16 +23,19 @@ const (
 	EmailOTPChallengeTTL        = 10 * time.Minute
 	EmailOTPMaxAttempts         = 5
 	SignupCompletionTokenTTL    = 20 * time.Minute
+	SupportAccessTokenTTL       = 24 * time.Hour
 	emailOTPChallengePrefix     = "email_otp_challenge:"
 	signupCompletionTokenPrefix = "signup_completion_token:"
 	signupCompletionEmailPrefix = "signup_completion_email:"
+	supportAccessTokenPrefix    = "support_access_token:"
 )
 
 type EmailOTPPurpose string
 
 const (
-	EmailOTPPurposeSignup EmailOTPPurpose = "signup"
-	EmailOTPPurposeLogin  EmailOTPPurpose = "login"
+	EmailOTPPurposeSignup        EmailOTPPurpose = "signup"
+	EmailOTPPurposeLogin         EmailOTPPurpose = "login"
+	EmailOTPPurposeSupportAccess EmailOTPPurpose = "support_access"
 )
 
 var (
@@ -43,6 +46,7 @@ var (
 	ErrEmailOTPAttemptsExceeded     = errors.New("email otp attempts exceeded")
 	ErrEmailOTPPurposeMismatch      = errors.New("email otp purpose mismatch")
 	ErrSignupCompletionTokenInvalid = errors.New("signup completion token invalid")
+	ErrSupportAccessTokenInvalid    = errors.New("support access token invalid")
 )
 
 type EmailOTPCooldownError struct {
@@ -72,6 +76,13 @@ type EmailOTPChallenge struct {
 	Attempts    int             `json:"attempts"`
 }
 
+type SupportAccessTokenPayload struct {
+	TicketID   string `json:"ticket_id"`
+	TicketCode string `json:"ticket_code"`
+	Email      string `json:"email"`
+	ExpiresAt  int64  `json:"expires_at"`
+}
+
 func emailOTPClient() (*redis.Client, error) {
 	if pendingAuthRedisClient == nil {
 		return nil, ErrEmailOTPServiceUnavailable
@@ -93,6 +104,10 @@ func normalizeEmailForKey(email string) string {
 
 func signupCompletionEmailKey(email string) string {
 	return signupCompletionEmailPrefix + normalizeEmailForKey(email)
+}
+
+func supportAccessTokenKey(token string) string {
+	return supportAccessTokenPrefix + token
 }
 
 func HashEmailOTPCode(code string) string {
@@ -408,6 +423,63 @@ func ConsumeSignupCompletionToken(ctx context.Context, token string) (string, er
 	}
 
 	return email, nil
+}
+
+func CreateSupportAccessToken(ctx context.Context, ticketID, ticketCode, email string) (string, *SupportAccessTokenPayload, error) {
+	client, err := emailOTPClient()
+	if err != nil {
+		return "", nil, err
+	}
+
+	token, err := GenerateSecureToken(24)
+	if err != nil {
+		return "", nil, err
+	}
+
+	payload := &SupportAccessTokenPayload{
+		TicketID:   strings.TrimSpace(ticketID),
+		TicketCode: strings.TrimSpace(ticketCode),
+		Email:      normalizeEmailForKey(email),
+		ExpiresAt:  time.Now().Add(SupportAccessTokenTTL).Unix(),
+	}
+
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if err := client.Set(ctx, supportAccessTokenKey(token), raw, SupportAccessTokenTTL).Err(); err != nil {
+		return "", nil, err
+	}
+
+	return token, payload, nil
+}
+
+func GetSupportAccessToken(ctx context.Context, token string) (*SupportAccessTokenPayload, error) {
+	client, err := emailOTPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := client.Get(ctx, supportAccessTokenKey(strings.TrimSpace(token))).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, ErrSupportAccessTokenInvalid
+		}
+		return nil, err
+	}
+
+	var payload SupportAccessTokenPayload
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return nil, err
+	}
+
+	if payload.ExpiresAt <= time.Now().Unix() {
+		_ = client.Del(ctx, supportAccessTokenKey(strings.TrimSpace(token))).Err()
+		return nil, ErrSupportAccessTokenInvalid
+	}
+
+	return &payload, nil
 }
 
 func CooldownSecondsForNextResend(challenge *EmailOTPChallenge) int {

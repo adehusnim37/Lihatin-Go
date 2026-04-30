@@ -103,6 +103,8 @@ func runMigrations(db *gorm.DB) {
 
 		// Support models
 		&supportmodel.SupportTicket{},
+		&supportmodel.SupportMessage{},
+		&supportmodel.SupportAttachment{},
 	}
 
 	for _, model := range models {
@@ -132,6 +134,8 @@ func dropAllTables(db *gorm.DB) {
 		&user.PremiumKey{},
 		&user.PremiumKeyUsage{},
 		&user.PremiumStatusEvent{},
+		&supportmodel.SupportAttachment{},
+		&supportmodel.SupportMessage{},
 		&supportmodel.SupportTicket{},
 	}
 
@@ -170,6 +174,8 @@ func showMigrationStatus(db *gorm.DB) {
 		&user.PremiumKeyUsage{},
 		&user.PremiumStatusEvent{},
 		&supportmodel.SupportTicket{},
+		&supportmodel.SupportMessage{},
+		&supportmodel.SupportAttachment{},
 	}
 
 	for _, model := range models {

@@ -13,6 +13,7 @@ func (es *EmailService) SendSupportTicketConfirmationEmail(
 	toName,
 	ticketCode,
 	categoryLabel,
+	accessCode,
 	frontendURL string,
 	createdAt time.Time,
 ) error {
@@ -27,7 +28,7 @@ func (es *EmailService) SendSupportTicketConfirmationEmail(
 		recipientName = "there"
 	}
 
-	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s", baseURL, ticketCode, toEmail)
+	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s&code=%s", baseURL, ticketCode, toEmail, accessCode)
 
 	htmlBody := renderEmailTemplate(emailTemplate{
 		Badge:    "Support",

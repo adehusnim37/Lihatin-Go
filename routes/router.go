@@ -59,6 +59,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 			"/v1/auth/validate-reset",
 			"/v1/support/tickets",
 			"/v1/support/track",
+			"/v1/support/access",
 		}
 		r.Use(csrf.Middleware(csrfOpts))
 	}

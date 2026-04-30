@@ -78,6 +78,12 @@ func RunMigrations(db *gorm.DB) error {
 	if err := db.AutoMigrate(&supportmodel.SupportTicket{}); err != nil {
 		return fmt.Errorf("failed to migrate SupportTicket model: %w", err)
 	}
+	if err := db.AutoMigrate(&supportmodel.SupportMessage{}); err != nil {
+		return fmt.Errorf("failed to migrate SupportMessage model: %w", err)
+	}
+	if err := db.AutoMigrate(&supportmodel.SupportAttachment{}); err != nil {
+		return fmt.Errorf("failed to migrate SupportAttachment model: %w", err)
+	}
 
 	log.Println("✅ All models migrated successfully!")
 	return nil

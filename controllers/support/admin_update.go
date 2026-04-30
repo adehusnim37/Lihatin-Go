@@ -66,6 +66,8 @@ func (c *Controller) UpdateTicket(ctx *gin.Context) {
 	shouldSendResolvedEmail := ticket.ResolvedAt == nil && (updatedTicket.Status == string(supportmodel.TicketStatusResolved) || updatedTicket.Status == string(supportmodel.TicketStatusClosed))
 	if shouldSendResolvedEmail {
 		go c.sendResolvedTicketEmail(updatedTicket)
+	} else {
+		go c.sendTicketUpdatedEmail(updatedTicket, actionResult)
 	}
 
 	httputil.SendOKResponse(ctx, dto.AdminUpdateSupportTicketResponse{
@@ -178,5 +180,37 @@ func (c *Controller) sendResolvedTicketEmail(ticket *supportmodel.SupportTicket)
 		resolutionMessage,
 	); err != nil {
 		logger.Logger.Error("Failed sending support resolved email", "ticket_code", ticket.TicketCode, "error", err.Error())
+	}
+}
+
+func (c *Controller) sendTicketUpdatedEmail(ticket *supportmodel.SupportTicket, actionResult string) {
+	if ticket == nil {
+		return
+	}
+	if strings.TrimSpace(ticket.Email) == "" {
+		return
+	}
+
+	adminSummary := ""
+	if ticket.AdminNotes != nil && strings.TrimSpace(*ticket.AdminNotes) != "" {
+		adminSummary = strings.TrimSpace(*ticket.AdminNotes)
+	}
+	if strings.TrimSpace(actionResult) != "" {
+		actionText := "Action applied: " + strings.TrimSpace(actionResult)
+		if adminSummary == "" {
+			adminSummary = actionText
+		} else {
+			adminSummary = adminSummary + "\n\n" + actionText
+		}
+	}
+
+	if err := c.emailSvc.SendSupportTicketUpdatedEmail(
+		ticket.Email,
+		ticket.TicketCode,
+		ticket.Status,
+		adminSummary,
+		c.frontendURL(),
+	); err != nil {
+		logger.Logger.Error("Failed sending support updated email", "ticket_code", ticket.TicketCode, "error", err.Error())
 	}
 }

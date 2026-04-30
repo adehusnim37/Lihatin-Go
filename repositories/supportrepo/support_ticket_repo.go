@@ -23,6 +23,10 @@ type Pagination struct {
 	Limit int
 }
 
+type MessageListFilters struct {
+	IncludeInternal bool
+}
+
 type SupportTicketRepository struct {
 	db *gorm.DB
 }
@@ -36,6 +40,29 @@ func (r *SupportTicketRepository) CreateTicket(ticket *supportmodel.SupportTicke
 		return apperrors.ErrUserDatabaseError.WithError(err)
 	}
 	return nil
+}
+
+func (r *SupportTicketRepository) CreateMessage(message *supportmodel.SupportMessage) error {
+	if err := r.db.Create(message).Error; err != nil {
+		return apperrors.ErrUserDatabaseError.WithError(err)
+	}
+	return nil
+}
+
+func (r *SupportTicketRepository) CreateMessageWithAttachments(message *supportmodel.SupportMessage, attachments []supportmodel.SupportAttachment) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(message).Error; err != nil {
+			return apperrors.ErrUserDatabaseError.WithError(err)
+		}
+
+		if len(attachments) > 0 {
+			if err := tx.Create(&attachments).Error; err != nil {
+				return apperrors.ErrUserDatabaseError.WithError(err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func (r *SupportTicketRepository) GetTicketByCode(code string) (*supportmodel.SupportTicket, error) {
@@ -130,6 +157,77 @@ func (r *SupportTicketRepository) ListTickets(filters TicketListFilters, paginat
 	return items, total, nil
 }
 
+func (r *SupportTicketRepository) ListTicketsForUser(userID, email string, pagination Pagination) ([]supportmodel.SupportTicket, int64, error) {
+	query := r.db.Model(&supportmodel.SupportTicket{})
+
+	normalizedUserID := strings.TrimSpace(userID)
+	normalizedEmail := strings.TrimSpace(email)
+	if normalizedUserID != "" {
+		query = query.Where("user_id = ? OR LOWER(email) = LOWER(?)", normalizedUserID, normalizedEmail)
+	} else {
+		query = query.Where("LOWER(email) = LOWER(?)", normalizedEmail)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.ErrUserDatabaseError.WithError(err)
+	}
+
+	if pagination.Page < 1 {
+		pagination.Page = 1
+	}
+	if pagination.Limit < 1 {
+		pagination.Limit = 20
+	}
+	if pagination.Limit > 100 {
+		pagination.Limit = 100
+	}
+
+	offset := (pagination.Page - 1) * pagination.Limit
+	items := make([]supportmodel.SupportTicket, 0)
+	if err := query.
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(pagination.Limit).
+		Find(&items).Error; err != nil {
+		return nil, 0, apperrors.ErrUserDatabaseError.WithError(err)
+	}
+
+	return items, total, nil
+}
+
+func (r *SupportTicketRepository) ListMessagesByTicketID(ticketID string, filters MessageListFilters) ([]supportmodel.SupportMessage, error) {
+	query := r.db.Model(&supportmodel.SupportMessage{}).
+		Where("ticket_id = ?", strings.TrimSpace(ticketID))
+
+	if !filters.IncludeInternal {
+		query = query.Where("is_internal = ?", false)
+	}
+
+	items := make([]supportmodel.SupportMessage, 0)
+	if err := query.
+		Preload("Attachments", func(db *gorm.DB) *gorm.DB {
+			return db.Order("created_at ASC")
+		}).
+		Order("created_at ASC").
+		Find(&items).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+	}
+
+	return items, nil
+}
+
+func (r *SupportTicketRepository) GetAttachmentByID(id string) (*supportmodel.SupportAttachment, error) {
+	var item supportmodel.SupportAttachment
+	if err := r.db.Where("id = ?", strings.TrimSpace(id)).First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrUserNotFound
+		}
+		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+	}
+	return &item, nil
+}
+
 func (r *SupportTicketRepository) UpdateTicketStatus(id, status, priority string, adminNotes *string, resolvedBy *string) error {
 	updates := map[string]any{
 		"status":      strings.TrimSpace(status),
@@ -173,4 +271,30 @@ func (r *SupportTicketRepository) CountTicketsByEmailToday(email string) (int64,
 	}
 
 	return count, nil
+}
+
+func (r *SupportTicketRepository) MarkTicketAsActiveByReply(ticketID string) error {
+	normalizedID := strings.TrimSpace(ticketID)
+	now := time.Now()
+
+	updates := map[string]any{
+		"updated_at": now,
+	}
+
+	var ticket supportmodel.SupportTicket
+	if err := r.db.Where("id = ?", normalizedID).First(&ticket).Error; err != nil {
+		return apperrors.ErrUserDatabaseError.WithError(err)
+	}
+
+	if ticket.Status == string(supportmodel.TicketStatusResolved) || ticket.Status == string(supportmodel.TicketStatusClosed) {
+		updates["status"] = string(supportmodel.TicketStatusInProgress)
+		updates["resolved_at"] = nil
+		updates["resolved_by"] = nil
+	}
+
+	if err := r.db.Model(&supportmodel.SupportTicket{}).Where("id = ?", normalizedID).Updates(updates).Error; err != nil {
+		return apperrors.ErrUserDatabaseError.WithError(err)
+	}
+
+	return nil
 }

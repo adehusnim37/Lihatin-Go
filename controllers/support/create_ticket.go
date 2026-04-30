@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -58,6 +59,12 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 
 	ticketID := uuid.NewString()
 	now := time.Now()
+	accessCode, err := auth.GenerateSecureToken(24)
+	if err != nil {
+		logger.Logger.Error("Failed generating support public access code", "error", err.Error())
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_CREATE_FAILED", "Failed to create support ticket", "ticket")
+		return
+	}
 
 	var linkedUserID *string
 	var linkedUser user.User
@@ -69,25 +76,41 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 	}
 
 	ticket := supportmodel.SupportTicket{
-		ID:          ticketID,
-		TicketCode:  ticketCode,
-		Email:       req.Email,
-		Category:    req.Category,
-		Subject:     req.Subject,
-		Description: req.Description,
-		Status:      string(supportmodel.TicketStatusOpen),
-		Priority:    "normal",
-		UserID:      linkedUserID,
-		IPAddress:   ctx.ClientIP(),
-		UserAgent:   strings.TrimSpace(ctx.GetHeader("User-Agent")),
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:                   ticketID,
+		TicketCode:           ticketCode,
+		Email:                req.Email,
+		Category:             req.Category,
+		Subject:              req.Subject,
+		Description:          req.Description,
+		Status:               string(supportmodel.TicketStatusOpen),
+		Priority:             "normal",
+		UserID:               linkedUserID,
+		PublicAccessCodeHash: hashSupportAccessCode(accessCode),
+		IPAddress:            ctx.ClientIP(),
+		UserAgent:            strings.TrimSpace(ctx.GetHeader("User-Agent")),
+		CreatedAt:            now,
+		UpdatedAt:            now,
 	}
 
 	if err := c.repo.CreateTicket(&ticket); err != nil {
 		logger.Logger.Error("Failed creating support ticket", "error", err.Error(), "email", req.Email)
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_CREATE_FAILED", "Failed to create support ticket", "ticket")
 		return
+	}
+
+	senderEmail := req.Email
+	initialMessage := supportmodel.SupportMessage{
+		ID:          uuid.NewString(),
+		TicketID:    ticket.ID,
+		SenderType:  string(supportmodel.SupportMessageSenderPublic),
+		SenderEmail: &senderEmail,
+		Body:        req.Description,
+		IsInternal:  false,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := c.repo.CreateMessage(&initialMessage); err != nil {
+		logger.Logger.Warn("Failed creating initial support message", "ticket_code", ticket.TicketCode, "error", err.Error())
 	}
 
 	frontendURL := strings.TrimRight(config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), "/")
@@ -107,6 +130,7 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 			displayName,
 			t.TicketCode,
 			buildCategoryLabel(t.Category),
+			accessCode,
 			frontendURL,
 			t.CreatedAt,
 		); sendErr != nil {

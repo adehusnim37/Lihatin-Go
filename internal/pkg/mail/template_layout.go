@@ -79,19 +79,19 @@ func renderEmailTemplate(t emailTemplate) string {
     .greeting { margin: 0 0 10px; color: #111827; }
     .intro { margin: 0 0 16px; color: #334155; }
     .summary { background: #f8fafc; border: 1px solid #e5eaf2; border-radius: 10px; padding: 12px 14px; margin: 0 0 16px; }
-    .summary-row { margin: 0 0 8px; }
-    .summary-row:last-child { margin-bottom: 0; }
-    .summary-label { display: inline-block; min-width: 120px; color: #64748b; font-size: 13px; }
-    .summary-value { color: #111827; font-weight: 600; word-break: break-word; }
+    .summary-table { width: 100%%; border-collapse: collapse; table-layout: fixed; }
+    .summary-label { width: 44%%; color: #64748b; font-size: 13px; line-height: 1.5; vertical-align: top; padding: 0 12px 8px 0; white-space: normal; }
+    .summary-value { color: #111827; font-weight: 600; line-height: 1.5; word-break: break-word; vertical-align: top; padding: 0 0 8px; }
+    .summary-table tr:last-child td { padding-bottom: 0; }
     .section { background: #f8fafc; border: 1px solid #e5eaf2; border-radius: 10px; padding: 12px 14px; margin: 0 0 16px; color: #334155; }
     .section h3 { margin: 0 0 8px; font-size: 14px; color: #111827; }
     .section p { margin: 0; font-size: 14px; }
     .section ul { margin: 0; padding-left: 18px; }
     .section li { margin: 4px 0; font-size: 14px; }
     .button-group { margin: 18px 0 14px; text-align: center; }
-    .button-table { margin: 0 auto; border-collapse: collapse; }
-    .btn-cell { padding: 0 6px; }
-    .btn { display: inline-block; width: 190px; box-sizing: border-box; padding: 12px 14px; border-radius: 10px; text-decoration: none !important; text-align: center; font-size: 14px; font-weight: 600; margin: 0; -webkit-text-size-adjust: none; mso-line-height-rule: exactly; }
+    .button-table { margin: 0 auto; border-collapse: separate; border-spacing: 0 10px; width: 100%%; max-width: 100%%; }
+    .btn-cell { padding: 0; display: block; width: 100%%; }
+    .btn { display: block; width: 100%%; box-sizing: border-box; padding: 12px 14px; border-radius: 10px; text-decoration: none !important; text-align: center; font-size: 14px; font-weight: 600; margin: 0; -webkit-text-size-adjust: none; mso-line-height-rule: exactly; }
     .btn, .btn:visited, .btn:hover, .btn:active { text-decoration: none !important; }
     .btn-primary, .btn-primary:visited { background: #2563eb !important; border: 1px solid #2563eb !important; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
     .btn-secondary, .btn-secondary:visited { background: #f8fafc !important; border: 1px solid #d7e0eb !important; color: #1f2937 !important; -webkit-text-fill-color: #1f2937 !important; }
@@ -106,8 +106,10 @@ func renderEmailTemplate(t emailTemplate) string {
     @media (max-width: 600px) {
       .shell { padding: 16px 8px; }
       .header, .content, .footer { padding-left: 16px; padding-right: 16px; }
-      .btn-cell { padding: 0 4px; }
-      .btn { width: 146px; font-size: 13px; padding: 10px 8px; }
+      .button-table, .button-table tbody, .button-table tr, .btn-cell { display: block !important; width: 100%% !important; }
+      .btn-cell { padding: 0 !important; }
+      .btn { width: 100%% !important; font-size: 14px; padding: 11px 10px; }
+      .summary-label { width: 42%%; }
     }
   </style>
 </head>
@@ -161,13 +163,13 @@ func renderDetailsSection(details []emailDetail) string {
 	var rows strings.Builder
 	for _, detail := range details {
 		rows.WriteString(fmt.Sprintf(
-			`<p class="summary-row"><span class="summary-label">%s</span><span class="summary-value">%s</span></p>`,
+			`<tr><td class="summary-label">%s:&nbsp;</td><td class="summary-value">%s</td></tr>`,
 			html.EscapeString(detail.Label),
 			html.EscapeString(detail.Value),
 		))
 	}
 
-	return fmt.Sprintf(`<div class="summary">%s</div>`, rows.String())
+	return fmt.Sprintf(`<div class="summary"><table role="presentation" class="summary-table" cellspacing="0" cellpadding="0" border="0">%s</table></div>`, rows.String())
 }
 
 func renderActionsSection(actions []emailAction) string {
@@ -175,12 +177,12 @@ func renderActionsSection(actions []emailAction) string {
 		return ""
 	}
 
-	var cells strings.Builder
+	var rows strings.Builder
 	for _, action := range actions {
 		variant, inlineStyle := resolveButtonVariant(action.Variant)
 
-		cells.WriteString(fmt.Sprintf(
-			`<td class="btn-cell"><a href="%s" class="btn %s" style="%s">%s</a></td>`,
+		rows.WriteString(fmt.Sprintf(
+			`<tr><td class="btn-cell"><a href="%s" class="btn %s" style="%s">%s</a></td></tr>`,
 			html.EscapeString(action.URL),
 			variant,
 			inlineStyle,
@@ -189,8 +191,8 @@ func renderActionsSection(actions []emailAction) string {
 	}
 
 	return fmt.Sprintf(
-		`<div class="button-group"><table role="presentation" class="button-table" cellspacing="0" cellpadding="0" border="0"><tr>%s</tr></table></div>`,
-		cells.String(),
+		`<div class="button-group"><table role="presentation" class="button-table" cellspacing="0" cellpadding="0" border="0">%s</table></div>`,
+		rows.String(),
 	)
 }
 
