@@ -1,7 +1,6 @@
 package support
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -21,8 +20,8 @@ func (c *Controller) TrackTicket(ctx *gin.Context) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	ticket, err := c.repo.GetTicketByCodeAndEmail(req.Ticket, req.Email)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Ticket not found for provided email", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
 		return
 	}
 

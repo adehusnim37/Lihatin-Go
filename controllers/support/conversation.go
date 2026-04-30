@@ -3,6 +3,7 @@ package support
 import (
 	"errors"
 	"fmt"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -37,9 +38,40 @@ func (c *Controller) RequestAccessOTP(ctx *gin.Context) {
 	req.Ticket = strings.ToUpper(strings.TrimSpace(req.Ticket))
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
+	captchaOK, err := c.verifyCaptcha(strings.TrimSpace(req.CaptchaToken), ctx.ClientIP())
+	if err != nil {
+		logger.Logger.Warn("Support access OTP captcha validation error", "error", err.Error(), "ip", ctx.ClientIP(), "email", req.Email)
+		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
+		return
+	}
+	if !captchaOK {
+		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
+		return
+	}
+
 	ticket, err := c.repo.GetTicketByCodeAndEmail(req.Ticket, req.Email)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Ticket not found for provided email", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found for provided email", http.StatusNotFound, "ticket"), nil)
+		return
+	}
+
+	blocked, rateLimitErr := c.enforceSupportAccessRateLimit(
+		ctx.Request.Context(),
+		"request_otp",
+		ticket.TicketCode,
+		req.Email,
+		supportAccessOTPRequestLimit,
+		supportAccessOTPRequestWindow,
+	)
+	if rateLimitErr != nil {
+		logger.Logger.Warn("Support access OTP rate limit check failed", "error", rateLimitErr.Error(), "ticket_code", ticket.TicketCode)
+	}
+	if blocked {
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_RATE_LIMIT", "Too many verification code requests for this ticket. Please try again later.", http.StatusTooManyRequests, "ticket"), nil)
 		return
 	}
 
@@ -50,13 +82,13 @@ func (c *Controller) RequestAccessOTP(ctx *gin.Context) {
 		ticket.ID,
 	)
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_ACCESS_OTP_FAILED", "Failed to create verification challenge", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_FAILED", "Failed to create verification challenge", http.StatusInternalServerError, "ticket"), nil)
 		return
 	}
 
 	if err := c.emailSvc.SendSupportAccessOTPEmail(req.Email, ticket.TicketCode, otpCode); err != nil {
 		_ = auth.DeleteEmailOTPChallenge(ctx.Request.Context(), challengeToken)
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_ACCESS_OTP_EMAIL_FAILED", "Failed to send verification code", "email")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_EMAIL_FAILED", "Failed to send verification code", http.StatusInternalServerError, "email"), nil)
 		return
 	}
 
@@ -73,26 +105,31 @@ func (c *Controller) ResendAccessOTP(ctx *gin.Context) {
 		return
 	}
 
-	challenge, otpCode, err := auth.ResendEmailOTPChallenge(ctx.Request.Context(), req.ChallengeToken)
+	captchaOK, err := c.verifyCaptcha(strings.TrimSpace(req.CaptchaToken), ctx.ClientIP())
 	if err != nil {
-		var cooldownErr *auth.EmailOTPCooldownError
+		logger.Logger.Warn("Support resend OTP captcha validation error", "error", err.Error(), "ip", ctx.ClientIP())
+		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
+		return
+	}
+	if !captchaOK {
+		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
+		return
+	}
+
+	challenge, err := auth.GetEmailOTPChallenge(ctx.Request.Context(), req.ChallengeToken)
+	if err != nil {
 		switch {
-		case errors.As(err, &cooldownErr):
-			httputil.SendOKResponse(ctx, dto.ResendOTPResponse{
-				CooldownRemainingSeconds: cooldownErr.RemainingSeconds,
-			}, "Please wait before requesting another code")
-			return
 		case errors.Is(err, auth.ErrEmailOTPChallengeNotFound), errors.Is(err, auth.ErrEmailOTPChallengeExpired):
-			httputil.SendErrorResponse(ctx, http.StatusGone, "SUPPORT_ACCESS_CHALLENGE_EXPIRED", "Verification session expired. Please request a new code.", "challenge_token")
+			httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_CHALLENGE_EXPIRED", "Verification session expired. Please request a new code.", http.StatusGone, "challenge_token"), nil)
 			return
 		default:
-			httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_ACCESS_OTP_RESEND_FAILED", "Failed to resend verification code", "challenge_token")
+			httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_RESEND_FAILED", "Failed to resend verification code", http.StatusInternalServerError, "challenge_token"), nil)
 			return
 		}
 	}
 
 	if challenge.Purpose != auth.EmailOTPPurposeSupportAccess {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ACCESS_CHALLENGE_INVALID", "Invalid verification challenge", "challenge_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_CHALLENGE_INVALID", "Invalid verification challenge", http.StatusBadRequest, "challenge_token"), nil)
 		return
 	}
 
@@ -101,14 +138,50 @@ func (c *Controller) ResendAccessOTP(ctx *gin.Context) {
 		ticketCode = ticket.TicketCode
 	}
 
-	if err := c.emailSvc.SendSupportAccessOTPEmail(challenge.Email, ticketCode, otpCode); err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_ACCESS_OTP_EMAIL_FAILED", "Failed to resend verification code", "email")
+	blocked, rateLimitErr := c.enforceSupportAccessRateLimit(
+		ctx.Request.Context(),
+		"resend_otp",
+		ticketCode,
+		challenge.Email,
+		supportAccessOTPResendLimit,
+		supportAccessOTPResendWindow,
+	)
+	if rateLimitErr != nil {
+		logger.Logger.Warn("Support resend OTP rate limit check failed", "error", rateLimitErr.Error(), "ticket_code", ticketCode)
+	}
+	if blocked {
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_RESEND_RATE_LIMIT", "Too many resend attempts for this ticket. Please try again later.", http.StatusTooManyRequests, "challenge_token"), nil)
 		return
 	}
 
-	httputil.SendOKResponse(ctx, dto.ResendOTPResponse{
+	challenge, otpCode, err := auth.ResendEmailOTPChallenge(ctx.Request.Context(), req.ChallengeToken)
+	if err != nil {
+		var cooldownErr *auth.EmailOTPCooldownError
+		switch {
+		case errors.As(err, &cooldownErr):
+			httputil.SendOKResponse(ctx, dto.SupportOTPChallengeResponse{
+				ChallengeToken:  req.ChallengeToken,
+				CooldownSeconds: cooldownErr.RemainingSeconds,
+			}, "Please wait before requesting another code")
+			return
+		case errors.Is(err, auth.ErrEmailOTPChallengeNotFound), errors.Is(err, auth.ErrEmailOTPChallengeExpired):
+			httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_CHALLENGE_EXPIRED", "Verification session expired. Please request a new code.", http.StatusGone, "challenge_token"), nil)
+			return
+		default:
+			httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_RESEND_FAILED", "Failed to resend verification code", http.StatusInternalServerError, "challenge_token"), nil)
+			return
+		}
+	}
+
+	if err := c.emailSvc.SendSupportAccessOTPEmail(challenge.Email, ticketCode, otpCode); err != nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_OTP_EMAIL_FAILED", "Failed to resend verification code", http.StatusInternalServerError, "email"), nil)
+		return
+	}
+
+	httputil.SendOKResponse(ctx, dto.SupportOTPChallengeResponse{
+		ChallengeToken:  req.ChallengeToken,
 		CooldownSeconds: auth.CooldownSecondsForNextResend(challenge),
-	}, "Verification code sent")
+	}, "Support access verification code sent")
 }
 
 func (c *Controller) VerifyAccessOTP(ctx *gin.Context) {
@@ -120,7 +193,7 @@ func (c *Controller) VerifyAccessOTP(ctx *gin.Context) {
 
 	otpCode := auth.ParseOTPCode(strings.TrimSpace(req.OTPCode))
 	if otpCode == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_OTP", "Verification code must be a 6-digit number", "otp_code")
+		httputil.HandleError(ctx, apperrors.NewAppError("INVALID_OTP", "Verification code must be a 6-digit number", http.StatusBadRequest, "otp_code"), nil)
 		return
 	}
 
@@ -134,37 +207,41 @@ func (c *Controller) VerifyAccessOTP(ctx *gin.Context) {
 			})
 			return
 		case errors.Is(err, auth.ErrEmailOTPAttemptsExceeded):
-			httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "OTP_ATTEMPTS_EXCEEDED", "Too many invalid attempts. Request a new code.", "otp_code")
+			httputil.HandleError(ctx, apperrors.NewAppError("OTP_ATTEMPTS_EXCEEDED", "Too many invalid attempts. Request a new code.", http.StatusTooManyRequests, "otp_code"), nil)
 			return
 		case errors.Is(err, auth.ErrEmailOTPChallengeNotFound), errors.Is(err, auth.ErrEmailOTPChallengeExpired):
-			httputil.SendErrorResponse(ctx, http.StatusGone, "SUPPORT_ACCESS_CHALLENGE_EXPIRED", "Verification session expired. Request a new code.", "challenge_token")
+			httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_CHALLENGE_EXPIRED", "Verification session expired. Request a new code.", http.StatusGone, "challenge_token"), nil)
 			return
 		default:
-			httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "OTP_VERIFICATION_FAILED", "Failed to verify code", "otp_code")
+			httputil.HandleError(ctx, apperrors.NewAppError("OTP_VERIFICATION_FAILED", "Failed to verify code", http.StatusInternalServerError, "otp_code"), nil)
 			return
 		}
 	}
 
 	ticketID := strings.TrimSpace(challenge.UserID)
 	if ticketID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ACCESS_CHALLENGE_INVALID", "Invalid support verification challenge", "challenge_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_CHALLENGE_INVALID", "Invalid support verification challenge", http.StatusBadRequest, "challenge_token"), nil)
 		return
 	}
 
 	ticket, err := c.repo.GetTicketByID(ticketID)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Ticket not found", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found", http.StatusNotFound, "ticket"), nil)
 		return
 	}
 
 	if !strings.EqualFold(strings.TrimSpace(ticket.Email), strings.TrimSpace(challenge.Email)) {
-		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "SUPPORT_ACCESS_DENIED", "Ticket ownership verification failed", "email")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_DENIED", "Ticket ownership verification failed", http.StatusUnauthorized, "email"), nil)
 		return
 	}
 
 	accessToken, _, err := auth.CreateSupportAccessToken(ctx.Request.Context(), ticket.ID, ticket.TicketCode, ticket.Email)
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_ACCESS_TOKEN_FAILED", "Failed to create support access token", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_TOKEN_FAILED", "Failed to create support access token", http.StatusInternalServerError, "ticket"), nil)
 		return
 	}
 
@@ -187,19 +264,23 @@ func (c *Controller) VerifyAccessCode(ctx *gin.Context) {
 	req.Code = strings.TrimSpace(req.Code)
 
 	ticket, err := c.repo.GetTicketByCodeAndEmail(req.Ticket, req.Email)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Ticket not found for provided email", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found for provided email", http.StatusNotFound, "ticket"), nil)
 		return
 	}
 
 	if hashSupportAccessCode(req.Code) != strings.TrimSpace(ticket.PublicAccessCodeHash) {
-		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "SUPPORT_ACCESS_DENIED", "Invalid support access code", "code")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_DENIED", "Invalid support access code", http.StatusUnauthorized, "code"), nil)
 		return
 	}
 
 	accessToken, _, err := auth.CreateSupportAccessToken(ctx.Request.Context(), ticket.ID, ticket.TicketCode, ticket.Email)
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_ACCESS_TOKEN_FAILED", "Failed to create support access token", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_TOKEN_FAILED", "Failed to create support access token", http.StatusInternalServerError, "ticket"), nil)
 		return
 	}
 
@@ -218,7 +299,7 @@ func (c *Controller) ListPublicConversation(ctx *gin.Context) {
 
 	messages, err := c.repo.ListMessagesByTicketID(ticket.ID, supportrepo.MessageListFilters{IncludeInternal: false})
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGES_LIST_FAILED", "Failed to load conversation", "ticket")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -233,7 +314,7 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 
 	body := strings.TrimSpace(ctx.PostForm("body"))
 	if len(body) > maxSupportMessageBodyLength {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", "body")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
 		return
 	}
 
@@ -245,7 +326,7 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 	}
 
 	if body == "" && len(attachments) == 0 {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_MESSAGE_REQUIRED", "Message body or attachment is required", "body")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_REQUIRED", "Message body or attachment is required", http.StatusBadRequest, "body"), nil)
 		return
 	}
 	if body == "" {
@@ -267,7 +348,7 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
 		c.cleanupUploadedAttachments(ctx, attachments)
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGE_CREATE_FAILED", "Failed to send message", "message")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -291,7 +372,7 @@ func (c *Controller) ListUserTickets(ctx *gin.Context) {
 	userID := strings.TrimSpace(ctx.GetString("user_id"))
 	email := strings.ToLower(strings.TrimSpace(ctx.GetString("email")))
 	if userID == "" || email == "" {
-		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "AUTH_REQUIRED", "Authentication required", "auth")
+		httputil.HandleError(ctx, apperrors.NewAppError("AUTH_REQUIRED", "Authentication required", http.StatusUnauthorized, "auth"), nil)
 		return
 	}
 
@@ -303,7 +384,7 @@ func (c *Controller) ListUserTickets(ctx *gin.Context) {
 
 	items, total, err := c.repo.ListTicketsForUser(userID, email, supportrepo.Pagination{Page: page, Limit: limit})
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_LIST_FAILED", "Failed to retrieve tickets", "ticket")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -345,7 +426,7 @@ func (c *Controller) ListUserConversation(ctx *gin.Context) {
 
 	messages, err := c.repo.ListMessagesByTicketID(ticket.ID, supportrepo.MessageListFilters{IncludeInternal: false})
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGES_LIST_FAILED", "Failed to load conversation", "ticket")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -360,7 +441,7 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 
 	body := strings.TrimSpace(ctx.PostForm("body"))
 	if len(body) > maxSupportMessageBodyLength {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", "body")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
 		return
 	}
 
@@ -372,7 +453,7 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 	}
 
 	if body == "" && len(attachments) == 0 {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_MESSAGE_REQUIRED", "Message body or attachment is required", "body")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_REQUIRED", "Message body or attachment is required", http.StatusBadRequest, "body"), nil)
 		return
 	}
 	if body == "" {
@@ -397,7 +478,7 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
 		c.cleanupUploadedAttachments(ctx, attachments)
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGE_CREATE_FAILED", "Failed to send message", "message")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -420,13 +501,17 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 func (c *Controller) DownloadUserAttachment(ctx *gin.Context) {
 	attachmentID := strings.TrimSpace(ctx.Param("attachmentID"))
 	if attachmentID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "ATTACHMENT_ID_REQUIRED", "Attachment ID is required", "attachment")
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_ID_REQUIRED", "Attachment ID is required", http.StatusBadRequest, "attachment"), nil)
 		return
 	}
 
 	attachment, err := c.repo.GetAttachmentByID(attachmentID)
-	if err != nil || attachment == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "ATTACHMENT_NOT_FOUND", "Attachment not found", "attachment")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if attachment == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_NOT_FOUND", "Attachment not found", http.StatusNotFound, "attachment"), nil)
 		return
 	}
 
@@ -441,19 +526,23 @@ func (c *Controller) DownloadUserAttachment(ctx *gin.Context) {
 func (c *Controller) ListAdminConversation(ctx *gin.Context) {
 	ticketID := strings.TrimSpace(ctx.Param("id"))
 	if ticketID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "TICKET_ID_REQUIRED", "Ticket ID is required", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_ID_REQUIRED", "Ticket ID is required", http.StatusBadRequest, "ticket"), nil)
 		return
 	}
 
 	ticket, err := c.repo.GetTicketByID(ticketID)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Support ticket not found", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Support ticket not found", http.StatusNotFound, "ticket"), nil)
 		return
 	}
 
 	messages, err := c.repo.ListMessagesByTicketID(ticket.ID, supportrepo.MessageListFilters{IncludeInternal: true})
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGES_LIST_FAILED", "Failed to load conversation", "ticket")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -463,19 +552,23 @@ func (c *Controller) ListAdminConversation(ctx *gin.Context) {
 func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 	ticketID := strings.TrimSpace(ctx.Param("id"))
 	if ticketID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "TICKET_ID_REQUIRED", "Ticket ID is required", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_ID_REQUIRED", "Ticket ID is required", http.StatusBadRequest, "ticket"), nil)
 		return
 	}
 
 	ticket, err := c.repo.GetTicketByID(ticketID)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Support ticket not found", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Support ticket not found", http.StatusNotFound, "ticket"), nil)
 		return
 	}
 
 	body := strings.TrimSpace(ctx.PostForm("body"))
 	if len(body) > maxSupportMessageBodyLength {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", "body")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
 		return
 	}
 
@@ -487,7 +580,7 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 	}
 
 	if body == "" && len(attachments) == 0 {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_MESSAGE_REQUIRED", "Message body or attachment is required", "body")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_REQUIRED", "Message body or attachment is required", http.StatusBadRequest, "body"), nil)
 		return
 	}
 	if body == "" {
@@ -512,7 +605,7 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
 		c.cleanupUploadedAttachments(ctx, attachments)
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SUPPORT_MESSAGE_CREATE_FAILED", "Failed to send message", "message")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -537,13 +630,17 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 func (c *Controller) DownloadAdminAttachment(ctx *gin.Context) {
 	attachmentID := strings.TrimSpace(ctx.Param("attachmentID"))
 	if attachmentID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "ATTACHMENT_ID_REQUIRED", "Attachment ID is required", "attachment")
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_ID_REQUIRED", "Attachment ID is required", http.StatusBadRequest, "attachment"), nil)
 		return
 	}
 
 	attachment, err := c.repo.GetAttachmentByID(attachmentID)
-	if err != nil || attachment == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "ATTACHMENT_NOT_FOUND", "Attachment not found", "attachment")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if attachment == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_NOT_FOUND", "Attachment not found", http.StatusNotFound, "attachment"), nil)
 		return
 	}
 
@@ -558,18 +655,22 @@ func (c *Controller) DownloadPublicAttachment(ctx *gin.Context) {
 
 	attachmentID := strings.TrimSpace(ctx.Param("attachmentID"))
 	if attachmentID == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "ATTACHMENT_ID_REQUIRED", "Attachment ID is required", "attachment")
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_ID_REQUIRED", "Attachment ID is required", http.StatusBadRequest, "attachment"), nil)
 		return
 	}
 
 	attachment, err := c.repo.GetAttachmentByID(attachmentID)
-	if err != nil || attachment == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "ATTACHMENT_NOT_FOUND", "Attachment not found", "attachment")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if attachment == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_NOT_FOUND", "Attachment not found", http.StatusNotFound, "attachment"), nil)
 		return
 	}
 
 	if strings.TrimSpace(attachment.TicketID) != strings.TrimSpace(ticket.ID) {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "SUPPORT_ATTACHMENT_ACCESS_DENIED", "Attachment does not belong to ticket", "attachment")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ATTACHMENT_ACCESS_DENIED", "Attachment does not belong to ticket", http.StatusForbidden, "attachment"), nil)
 		return
 	}
 
@@ -595,30 +696,34 @@ func (c *Controller) authorizePublicConversation(ctx *gin.Context) (*supportmode
 	}
 
 	if ticketCode == "" || email == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ACCESS_REQUIRED", "Ticket and email are required", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_REQUIRED", "Ticket and email are required", http.StatusBadRequest, "ticket"), nil)
 		return nil, "", false
 	}
 	if accessToken == "" {
-		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "SUPPORT_ACCESS_REQUIRED", "Support access token is required", "access_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_REQUIRED", "Support access token is required", http.StatusUnauthorized, "access_token"), nil)
 		return nil, "", false
 	}
 
 	ticket, err := c.repo.GetTicketByCodeAndEmail(ticketCode, email)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Ticket not found for provided email", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return nil, "", false
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found for provided email", http.StatusNotFound, "ticket"), nil)
 		return nil, "", false
 	}
 
 	tokenPayload, err := auth.GetSupportAccessToken(ctx.Request.Context(), accessToken)
 	if err != nil || tokenPayload == nil {
-		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "SUPPORT_ACCESS_INVALID", "Support access token is invalid or expired", "access_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_INVALID", "Support access token is invalid or expired", http.StatusUnauthorized, "access_token"), nil)
 		return nil, "", false
 	}
 
 	if strings.TrimSpace(tokenPayload.TicketID) != strings.TrimSpace(ticket.ID) ||
 		!strings.EqualFold(strings.TrimSpace(tokenPayload.TicketCode), strings.TrimSpace(ticket.TicketCode)) ||
 		!strings.EqualFold(strings.TrimSpace(tokenPayload.Email), strings.TrimSpace(email)) {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "SUPPORT_ACCESS_DENIED", "Support access token does not match this ticket", "access_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_DENIED", "Support access token does not match this ticket", http.StatusForbidden, "access_token"), nil)
 		return nil, "", false
 	}
 
@@ -627,13 +732,17 @@ func (c *Controller) authorizePublicConversation(ctx *gin.Context) (*supportmode
 
 func (c *Controller) resolveOwnedTicket(ctx *gin.Context, ticketID string) (*supportmodel.SupportTicket, bool) {
 	if strings.TrimSpace(ticketID) == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "TICKET_ID_REQUIRED", "Ticket ID is required", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_ID_REQUIRED", "Ticket ID is required", http.StatusBadRequest, "ticket"), nil)
 		return nil, false
 	}
 
 	ticket, err := c.repo.GetTicketByID(ticketID)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Support ticket not found", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return nil, false
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Support ticket not found", http.StatusNotFound, "ticket"), nil)
 		return nil, false
 	}
 
@@ -643,7 +752,7 @@ func (c *Controller) resolveOwnedTicket(ctx *gin.Context, ticketID string) (*sup
 	isOwnerByEmail := email != "" && strings.EqualFold(strings.TrimSpace(ticket.Email), email)
 
 	if !isOwnerByID && !isOwnerByEmail {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "SUPPORT_TICKET_ACCESS_DENIED", "You do not have access to this ticket", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_TICKET_ACCESS_DENIED", "You do not have access to this ticket", http.StatusForbidden, "ticket"), nil)
 		return nil, false
 	}
 
@@ -854,7 +963,7 @@ func sanitizeSupportFileName(raw string) string {
 func sendAttachment(ctx *gin.Context, attachment *supportmodel.SupportAttachment) {
 	objectURL := strings.TrimSpace(attachment.ObjectURL)
 	if objectURL == "" {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "ATTACHMENT_URL_NOT_AVAILABLE", "Attachment file URL is not available", "attachment")
+		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_URL_NOT_AVAILABLE", "Attachment file URL is not available", http.StatusNotFound, "attachment"), nil)
 		return
 	}
 	ctx.Redirect(http.StatusTemporaryRedirect, objectURL)

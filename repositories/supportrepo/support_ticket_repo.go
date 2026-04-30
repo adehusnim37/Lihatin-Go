@@ -35,16 +35,30 @@ func NewSupportTicketRepository(db *gorm.DB) *SupportTicketRepository {
 	return &SupportTicketRepository{db: db}
 }
 
+func supportTicketNotFound(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.ErrSupportTicketNotFound.WithError(err)
+	}
+	return apperrors.ErrSupportTicketFindFailed.WithError(err)
+}
+
+func supportAttachmentNotFound(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.ErrSupportAttachmentNotFound.WithError(err)
+	}
+	return apperrors.ErrSupportAttachmentFindFailed.WithError(err)
+}
+
 func (r *SupportTicketRepository) CreateTicket(ticket *supportmodel.SupportTicket) error {
 	if err := r.db.Create(ticket).Error; err != nil {
-		return apperrors.ErrUserDatabaseError.WithError(err)
+		return apperrors.ErrSupportTicketCreateFailed.WithError(err)
 	}
 	return nil
 }
 
 func (r *SupportTicketRepository) CreateMessage(message *supportmodel.SupportMessage) error {
 	if err := r.db.Create(message).Error; err != nil {
-		return apperrors.ErrUserDatabaseError.WithError(err)
+		return apperrors.ErrSupportMessageCreateFailed.WithError(err)
 	}
 	return nil
 }
@@ -52,12 +66,12 @@ func (r *SupportTicketRepository) CreateMessage(message *supportmodel.SupportMes
 func (r *SupportTicketRepository) CreateMessageWithAttachments(message *supportmodel.SupportMessage, attachments []supportmodel.SupportAttachment) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(message).Error; err != nil {
-			return apperrors.ErrUserDatabaseError.WithError(err)
+			return apperrors.ErrSupportMessageCreateFailed.WithError(err)
 		}
 
 		if len(attachments) > 0 {
 			if err := tx.Create(&attachments).Error; err != nil {
-				return apperrors.ErrUserDatabaseError.WithError(err)
+				return apperrors.ErrSupportAttachmentCreateFailed.WithError(err)
 			}
 		}
 
@@ -68,10 +82,7 @@ func (r *SupportTicketRepository) CreateMessageWithAttachments(message *supportm
 func (r *SupportTicketRepository) GetTicketByCode(code string) (*supportmodel.SupportTicket, error) {
 	var ticket supportmodel.SupportTicket
 	if err := r.db.Where("ticket_code = ?", strings.TrimSpace(code)).First(&ticket).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound
-		}
-		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, supportTicketNotFound(err)
 	}
 	return &ticket, nil
 }
@@ -79,7 +90,7 @@ func (r *SupportTicketRepository) GetTicketByCode(code string) (*supportmodel.Su
 func (r *SupportTicketRepository) TicketCodeExists(code string) (bool, error) {
 	var count int64
 	if err := r.db.Model(&supportmodel.SupportTicket{}).Where("ticket_code = ?", strings.TrimSpace(code)).Count(&count).Error; err != nil {
-		return false, apperrors.ErrUserDatabaseError.WithError(err)
+		return false, apperrors.ErrSupportTicketCheckFailed.WithError(err)
 	}
 	return count > 0, nil
 }
@@ -87,10 +98,7 @@ func (r *SupportTicketRepository) TicketCodeExists(code string) (bool, error) {
 func (r *SupportTicketRepository) GetTicketByID(id string) (*supportmodel.SupportTicket, error) {
 	var ticket supportmodel.SupportTicket
 	if err := r.db.Where("id = ?", strings.TrimSpace(id)).First(&ticket).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound
-		}
-		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, supportTicketNotFound(err)
 	}
 	return &ticket, nil
 }
@@ -101,10 +109,7 @@ func (r *SupportTicketRepository) GetTicketByCodeAndEmail(code, email string) (*
 		Where("ticket_code = ? AND LOWER(email) = LOWER(?)", strings.TrimSpace(code), strings.TrimSpace(email)).
 		First(&ticket).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound
-		}
-		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, supportTicketNotFound(err)
 	}
 	return &ticket, nil
 }
@@ -131,7 +136,7 @@ func (r *SupportTicketRepository) ListTickets(filters TicketListFilters, paginat
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, 0, apperrors.ErrSupportTicketCountFailed.WithError(err)
 	}
 
 	if pagination.Page < 1 {
@@ -151,7 +156,7 @@ func (r *SupportTicketRepository) ListTickets(filters TicketListFilters, paginat
 		Offset(offset).
 		Limit(pagination.Limit).
 		Find(&items).Error; err != nil {
-		return nil, 0, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, 0, apperrors.ErrSupportTicketListFailed.WithError(err)
 	}
 
 	return items, total, nil
@@ -170,7 +175,7 @@ func (r *SupportTicketRepository) ListTicketsForUser(userID, email string, pagin
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, 0, apperrors.ErrSupportTicketCountFailed.WithError(err)
 	}
 
 	if pagination.Page < 1 {
@@ -190,7 +195,7 @@ func (r *SupportTicketRepository) ListTicketsForUser(userID, email string, pagin
 		Offset(offset).
 		Limit(pagination.Limit).
 		Find(&items).Error; err != nil {
-		return nil, 0, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, 0, apperrors.ErrSupportTicketListFailed.WithError(err)
 	}
 
 	return items, total, nil
@@ -211,7 +216,7 @@ func (r *SupportTicketRepository) ListMessagesByTicketID(ticketID string, filter
 		}).
 		Order("created_at ASC").
 		Find(&items).Error; err != nil {
-		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, apperrors.ErrSupportMessageListFailed.WithError(err)
 	}
 
 	return items, nil
@@ -220,10 +225,7 @@ func (r *SupportTicketRepository) ListMessagesByTicketID(ticketID string, filter
 func (r *SupportTicketRepository) GetAttachmentByID(id string) (*supportmodel.SupportAttachment, error) {
 	var item supportmodel.SupportAttachment
 	if err := r.db.Where("id = ?", strings.TrimSpace(id)).First(&item).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound
-		}
-		return nil, apperrors.ErrUserDatabaseError.WithError(err)
+		return nil, supportAttachmentNotFound(err)
 	}
 	return &item, nil
 }
@@ -249,7 +251,7 @@ func (r *SupportTicketRepository) UpdateTicketStatus(id, status, priority string
 	}
 
 	if err := r.db.Model(&supportmodel.SupportTicket{}).Where("id = ?", strings.TrimSpace(id)).Updates(updates).Error; err != nil {
-		return apperrors.ErrUserDatabaseError.WithError(err)
+		return apperrors.ErrSupportTicketUpdateFailed.WithError(err)
 	}
 
 	return nil
@@ -267,7 +269,7 @@ func (r *SupportTicketRepository) CountTicketsByEmailToday(email string) (int64,
 		Where("created_at >= ? AND created_at < ?", start, end).
 		Count(&count).Error
 	if err != nil {
-		return 0, apperrors.ErrUserDatabaseError.WithError(err)
+		return 0, apperrors.ErrSupportTicketCountFailed.WithError(err)
 	}
 
 	return count, nil
@@ -283,7 +285,7 @@ func (r *SupportTicketRepository) MarkTicketAsActiveByReply(ticketID string) err
 
 	var ticket supportmodel.SupportTicket
 	if err := r.db.Where("id = ?", normalizedID).First(&ticket).Error; err != nil {
-		return apperrors.ErrUserDatabaseError.WithError(err)
+		return supportTicketNotFound(err)
 	}
 
 	if ticket.Status == string(supportmodel.TicketStatusResolved) || ticket.Status == string(supportmodel.TicketStatusClosed) {
@@ -293,7 +295,7 @@ func (r *SupportTicketRepository) MarkTicketAsActiveByReply(ticketID string) err
 	}
 
 	if err := r.db.Model(&supportmodel.SupportTicket{}).Where("id = ?", normalizedID).Updates(updates).Error; err != nil {
-		return apperrors.ErrUserDatabaseError.WithError(err)
+		return apperrors.ErrSupportTicketUpdateFailed.WithError(err)
 	}
 
 	return nil

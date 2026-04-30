@@ -88,8 +88,19 @@ type Options struct {
 	// Error handler kustom
 	ErrorHandler gin.HandlerFunc
 
-	// Skip CSRF check untuk path tertentu
+	// Skip CSRF check untuk path tertentu (legacy exact-path matching).
 	SkipPaths []string
+
+	// SkipRules mendefinisikan route dan method yang boleh bypass CSRF.
+	// Path dapat berupa raw URL path ("/v1/auth/login") atau gin full path
+	// pattern ("/v1/support/tickets/:ticketCode/messages").
+	SkipRules []SkipRule
+}
+
+// SkipRule mendefinisikan satu rule bypass CSRF yang explicit.
+type SkipRule struct {
+	Method string
+	Path   string
 }
 
 // ===========================================================================
@@ -141,7 +152,7 @@ func Middleware(opts Options) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// 1. Check if path should be skipped
-		if shouldSkipPath(c.Request.URL.Path, opts.SkipPaths) {
+		if shouldSkipRequest(c, opts.SkipRules, opts.SkipPaths) {
 			c.Next()
 			return
 		}
@@ -570,10 +581,31 @@ func isSafeMethod(method string) bool {
 	return false
 }
 
-// shouldSkipPath checks if path should skip CSRF
-func shouldSkipPath(path string, skipPaths []string) bool {
+// shouldSkipRequest checks if request should skip CSRF.
+func shouldSkipRequest(c *gin.Context, skipRules []SkipRule, skipPaths []string) bool {
+	return shouldSkipRoute(
+		c.Request.Method,
+		c.Request.URL.Path,
+		c.FullPath(),
+		skipRules,
+		skipPaths,
+	)
+}
+
+func shouldSkipRoute(method, requestPath, fullPath string, skipRules []SkipRule, skipPaths []string) bool {
+	requestMethod := strings.ToUpper(method)
+
+	for _, rule := range skipRules {
+		if strings.ToUpper(rule.Method) != requestMethod {
+			continue
+		}
+		if rule.Path == requestPath || (fullPath != "" && rule.Path == fullPath) {
+			return true
+		}
+	}
+
 	for _, skip := range skipPaths {
-		if strings.HasPrefix(path, skip) {
+		if skip == requestPath || (fullPath != "" && skip == fullPath) {
 			return true
 		}
 	}
@@ -599,7 +631,7 @@ func GetToken(c *gin.Context) string {
 	if token, exists := c.Get("csrf_token"); exists {
 		return token.(string)
 	}
-	return "Kosong/Dalam tahap pengembangan"
+	return ""
 }
 
 // GetMaskedToken returns a masked version of the token (for forms/headers)
@@ -644,7 +676,7 @@ func DefaultOptions() Options {
 		CookiePath:   "/",
 		MaxAge:       DefaultMaxAge,
 		Secure:       config.GetEnvOrDefault(config.Env, "development") == "production",
-		HttpOnly:     false, // Must be false for JS to read
+		HttpOnly:     true,
 		SameSite:     http.SameSiteLaxMode,
 		HeaderName:   DefaultHeaderName,
 		FormField:    DefaultFormField,

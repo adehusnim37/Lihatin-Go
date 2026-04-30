@@ -1,6 +1,7 @@
 package support
 
 import (
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func (c *Controller) ListTickets(ctx *gin.Context) {
 		Limit: limit,
 	})
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_LIST_FAILED", "Failed to retrieve tickets", "ticket")
+		c.handleAppError(ctx, err)
 		return
 	}
 
@@ -68,13 +69,17 @@ func (c *Controller) ListTickets(ctx *gin.Context) {
 func (c *Controller) GetTicket(ctx *gin.Context) {
 	id := strings.TrimSpace(ctx.Param("id"))
 	if id == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "TICKET_ID_REQUIRED", "Ticket ID is required", "id")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_ID_REQUIRED", "Ticket ID is required", http.StatusBadRequest, "id"), nil)
 		return
 	}
 
 	ticket, err := c.repo.GetTicketByID(id)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Support ticket not found", "id")
+	if err != nil {
+		c.handleAppErrorAs(ctx, err, "id")
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Support ticket not found", http.StatusNotFound, "id"), nil)
 		return
 	}
 

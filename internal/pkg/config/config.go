@@ -133,7 +133,7 @@ const (
 	EnvGoogleOAuthScopes       = "GOOGLE_OAUTH_SCOPES"
 
 	// Disposable email policy
-	EnvDisposableEmailListURL = "DISPOSABLE_EMAIL_LIST_URL"
+	EnvDisposableEmailBlockListURL = "DISPOSABLE_EMAIL_BLOCK_LIST_URL"
 
 	// Support + captcha
 	EnvTurnstileSecretKey = "TURNSTILE_SECRET_KEY"

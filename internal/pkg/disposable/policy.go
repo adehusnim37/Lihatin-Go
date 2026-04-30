@@ -76,7 +76,7 @@ func InitGlobal(gormDB *gorm.DB, redisClient *redis.Client) error {
 	}
 
 	env := config.GetEnvOrDefault(config.Env, "development")
-	sourceURL := config.GetEnvOrDefault(config.EnvDisposableEmailListURL, defaultSourceURL)
+	sourceURL := config.GetEnvOrDefault(config.EnvDisposableEmailBlockListURL, defaultSourceURL)
 	repo := userrepo.NewSystemSettingRepository(gormDB)
 
 	policy := NewPolicy(repo, redisClient, env, sourceURL, nil)

@@ -1,6 +1,7 @@
 package support
 
 import (
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"net/http"
 	"strings"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/disposable"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
@@ -28,32 +30,51 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 	req.Subject = strings.TrimSpace(req.Subject)
 	req.Description = strings.TrimSpace(req.Description)
 	req.Category = normalizeTicketCategory(req.Category)
+	senderEmail := req.Email
+
+	if policy := disposable.Global(); policy != nil {
+		blocked, err := policy.ShouldBlockEmail(ctx.Request.Context(), senderEmail)
+		if err != nil {
+			logger.Logger.Warn("Disposable email policy check failed for support ticket",
+				"email", senderEmail,
+				"error", err.Error(),
+			)
+		}
+		if blocked {
+			httputil.HandleError(
+				ctx,
+				apperrors.NewAppError("DISPOSABLE_EMAIL_BLOCKED", "Disposable email addresses are not allowed. Please use a permanent email address.", http.StatusBadRequest, "email"),
+				nil,
+			)
+			return
+		}
+	}
 
 	todayCount, err := c.repo.CountTicketsByEmailToday(req.Email)
 	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_CREATE_FAILED", "Failed to process support ticket", "email")
+		c.handleAppErrorAs(ctx, err, "email")
 		return
 	}
 	if todayCount >= 3 {
-		httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "SUPPORT_EMAIL_RATE_LIMIT", "You can only submit 3 tickets per email each day", "email")
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_EMAIL_RATE_LIMIT", "You can only submit 3 tickets per email each day", http.StatusTooManyRequests, "email"), nil)
 		return
 	}
 
 	captchaOK, err := c.verifyCaptcha(strings.TrimSpace(req.CaptchaToken), ctx.ClientIP())
 	if err != nil {
 		logger.Logger.Warn("Captcha validation error", "error", err.Error(), "ip", ctx.ClientIP(), "email", req.Email)
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", "captcha_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
 		return
 	}
 	if !captchaOK {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", "captcha_token")
+		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
 		return
 	}
 
 	ticketCode, err := c.generateTicketCode()
 	if err != nil {
 		logger.Logger.Error("Failed generating support ticket code", "error", err.Error())
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_CODE_GENERATION_FAILED", "Failed to create support ticket", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CODE_GENERATION_FAILED", "Failed to create support ticket", http.StatusInternalServerError, "ticket"), nil)
 		return
 	}
 
@@ -62,17 +83,15 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 	accessCode, err := auth.GenerateSecureToken(24)
 	if err != nil {
 		logger.Logger.Error("Failed generating support public access code", "error", err.Error())
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_CREATE_FAILED", "Failed to create support ticket", "ticket")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CREATE_FAILED", "Failed to create support ticket", http.StatusInternalServerError, "ticket"), nil)
 		return
 	}
 
 	var linkedUserID *string
-	var linkedUser user.User
 	var linkedUserPtr *user.User
-	if err := c.GormDB.Where("LOWER(email) = LOWER(?) AND deleted_at IS NULL", req.Email).First(&linkedUser).Error; err == nil {
-		linkedUserID = &linkedUser.ID
-		linkedUserCopy := linkedUser
-		linkedUserPtr = &linkedUserCopy
+	if linked, err := c.authRepo.GetUserRepository().GetUserByEmail(req.Email); err == nil && linked != nil {
+		linkedUserID = &linked.ID
+		linkedUserPtr = linked
 	}
 
 	ticket := supportmodel.SupportTicket{
@@ -94,11 +113,10 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 
 	if err := c.repo.CreateTicket(&ticket); err != nil {
 		logger.Logger.Error("Failed creating support ticket", "error", err.Error(), "email", req.Email)
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_CREATE_FAILED", "Failed to create support ticket", "ticket")
+		c.handleAppError(ctx, err)
 		return
 	}
 
-	senderEmail := req.Email
 	initialMessage := supportmodel.SupportMessage{
 		ID:          uuid.NewString(),
 		TicketID:    ticket.ID,

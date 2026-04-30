@@ -18,6 +18,7 @@ import (
 type UserRepository interface {
 	GetAllUsers() ([]user.User, error)
 	GetUserByID(id string) (*user.User, error)
+	GetUserByEmail(email string) (*user.User, error)
 	GetUserByEmailOrUsername(input string) (*user.User, error)
 	CheckPremiumByUsernameOrEmail(inputs string) (bool, error)
 	CreateUser(user *user.User) error
@@ -37,13 +38,20 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 	}
 }
 
+func userFindError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.ErrUserNotFound.WithError(err)
+	}
+	return apperrors.ErrUserFindFailed.WithError(err)
+}
+
 func (ur *userRepository) GetAllUsers() ([]user.User, error) {
 	var users []user.User
 
 	result := ur.db.Where("deleted_at IS NULL").Find(&users)
 	if result.Error != nil {
 		logger.Logger.Error("Failed to get all users", "error", result.Error)
-		return nil, apperrors.ErrUserDatabaseError
+		return nil, apperrors.ErrUserFindFailed.WithError(result.Error)
 	}
 
 	logger.Logger.Info("Successfully retrieved users", "count", len(users))
@@ -59,10 +67,9 @@ func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			logger.Logger.Warn("User not found", "user_id", id)
-			return nil, apperrors.ErrUserNotFound
 		}
 		logger.Logger.Error("Database error while getting user", "user_id", id, "error", result.Error)
-		return nil, apperrors.ErrUserDatabaseError
+		return nil, userFindError(result.Error)
 	}
 
 	logger.Logger.Info("User found successfully", "user_id", user.ID, "username", user.Username)
@@ -75,13 +82,28 @@ func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (bool, er
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return false, apperrors.ErrUserNotFound
+			return false, apperrors.ErrUserNotFound.WithError(result.Error)
 		}
 		logger.Logger.Error("Database error while checking premium status", "input", inputs, "error", result.Error)
-		return false, apperrors.ErrUserDatabaseError
+		return false, apperrors.ErrUserFindFailed.WithError(result.Error)
 	}
 
 	return user.IsPremium, nil
+}
+
+func (ur *userRepository) GetUserByEmail(email string) (*user.User, error) {
+	var user user.User
+	result := ur.db.Where("LOWER(email) = LOWER(?) AND deleted_at IS NULL", email).First(&user)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrUserNotFound.WithError(result.Error)
+		}
+		logger.Logger.Error("Database error while getting user by email", "email", email, "error", result.Error)
+		return nil, apperrors.ErrUserFindFailed.WithError(result.Error)
+	}
+
+	return &user, nil
 }
 
 func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {
@@ -90,10 +112,10 @@ func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, er
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound.WithError(result.Error)
 		}
 		logger.Logger.Error("Database error while getting user by email/username", "input", input, "error", result.Error)
-		return nil, apperrors.ErrUserDatabaseError
+		return nil, apperrors.ErrUserFindFailed.WithError(result.Error)
 	}
 
 	return &user, nil
@@ -104,10 +126,10 @@ func (ur *userRepository) CheckUsernameChangeEligibility(userID string) error {
 	result := ur.db.Where("id = ? AND deleted_at IS NULL", userID).First(&user)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return apperrors.ErrUserNotFound
+			return apperrors.ErrUserNotFound.WithError(result.Error)
 		}
 		logger.Logger.Error("Database error while checking username change eligibility", "user_id", userID, "error", result.Error)
-		return apperrors.ErrUserDatabaseError
+		return apperrors.ErrUserFindFailed.WithError(result.Error)
 	}
 
 	if user.UsernameChanged {
@@ -124,10 +146,10 @@ func (ur *userRepository) ChangeUsername(userID string, newUsername string) (str
 	result := ur.db.Where("id = ? AND deleted_at IS NULL", userID).First(&existingUser)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return "", apperrors.ErrUserNotFound
+			return "", apperrors.ErrUserNotFound.WithError(result.Error)
 		}
 		logger.Logger.Error("Database error while checking username change eligibility", "user_id", userID, "error", result.Error)
-		return "", apperrors.ErrUserDatabaseError
+		return "", apperrors.ErrUserFindFailed.WithError(result.Error)
 	}
 
 	if existingUser.UsernameChanged {
@@ -143,7 +165,7 @@ func (ur *userRepository) ChangeUsername(userID string, newUsername string) (str
 		Count(&taken).Error
 	if err != nil {
 		logger.Logger.Error("Database error while checking username availability", "username", newUsername, "error", err)
-		return "", apperrors.ErrUserDatabaseError
+		return "", apperrors.ErrUserFindFailed.WithError(err)
 	}
 
 	if taken > 0 {
@@ -157,7 +179,7 @@ func (ur *userRepository) ChangeUsername(userID string, newUsername string) (str
 
 	if err := ur.db.Save(&existingUser).Error; err != nil {
 		logger.Logger.Error("Database error while changing username", "user_id", userID, "error", err)
-		return "", apperrors.ErrUserDatabaseError
+		return "", apperrors.ErrUserUpdateFailed.WithError(err)
 	}
 
 	return oldUsername, nil
@@ -195,9 +217,9 @@ func (ur *userRepository) CreateUser(user *user.User) error {
 		if fmt.Sprintf("%v", result.Error) == "Error 1062 (23000): Duplicate entry" ||
 			result.Error.Error() == "UNIQUE constraint failed: users.email" ||
 			result.Error.Error() == "UNIQUE constraint failed: users.username" {
-			return apperrors.ErrUserDuplicateEntry
+			return apperrors.ErrUserDuplicateEntry.WithError(result.Error)
 		}
-		return apperrors.ErrUserCreationFailed
+		return apperrors.ErrUserCreationFailed.WithError(result.Error)
 	}
 
 	logger.Logger.Info("User created successfully", "user_id", user.ID, "email", user.Email)
@@ -209,7 +231,7 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	currentUser, err := ur.GetUserByID(id)
 	if err != nil {
 		logger.Logger.Error("Error getting current user for update", "user_id", id, "error", err)
-		return apperrors.ErrUserNotFound
+		return err
 	}
 
 	if updateUser.FirstName != nil {
@@ -226,7 +248,7 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	result := ur.db.Model(&user.User{}).Where("id = ?", id).Updates(currentUser)
 	if result.Error != nil {
 		logger.Logger.Error("Failed to update user", "user_id", id, "error", result.Error)
-		return apperrors.ErrUserUpdateFailed
+		return apperrors.ErrUserUpdateFailed.WithError(result.Error)
 	}
 
 	updatedFields := 0
@@ -251,7 +273,7 @@ func (ur *userRepository) SetPremium(id string, isPremium bool) error {
 
 	if result.Error != nil {
 		logger.Logger.Error("Failed to update premium status", "user_id", id, "error", result.Error)
-		return apperrors.ErrUserUpdateFailed
+		return apperrors.ErrUserUpdateFailed.WithError(result.Error)
 	}
 
 	if result.RowsAffected == 0 {

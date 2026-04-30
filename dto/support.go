@@ -82,8 +82,9 @@ type AdminUpdateSupportTicketResponse struct {
 }
 
 type SupportRequestAccessOTPRequest struct {
-	Ticket string `json:"ticket" binding:"required,min=6,max=20"`
-	Email  string `json:"email" binding:"required,email,max=255"`
+	Ticket       string `json:"ticket" binding:"required,min=6,max=20"`
+	Email        string `json:"email" binding:"required,email,max=255"`
+	CaptchaToken string `json:"captcha_token" binding:"required,min=10,max=4096"`
 }
 
 type SupportVerifyAccessCodeRequest struct {
@@ -99,6 +100,7 @@ type SupportVerifyAccessOTPRequest struct {
 
 type SupportResendAccessOTPRequest struct {
 	ChallengeToken string `json:"challenge_token" binding:"required,min=10,max=255,no_space"`
+	CaptchaToken   string `json:"captcha_token" binding:"required,min=10,max=4096"`
 }
 
 type SupportOTPChallengeResponse struct {

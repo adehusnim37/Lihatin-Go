@@ -23,6 +23,35 @@ import (
 	"gorm.io/gorm"
 )
 
+func csrfPublicNoSessionSkipRules() []csrf.SkipRule {
+	return []csrf.SkipRule{
+		// Public auth bootstrap (no authenticated session yet).
+		{Method: http.MethodPost, Path: "/v1/auth/login"},
+		{Method: http.MethodPost, Path: "/v1/auth/oauth/google/start"},
+		{Method: http.MethodPost, Path: "/v1/auth/oauth/google/callback"},
+		{Method: http.MethodPost, Path: "/v1/auth/signup/start"},
+		{Method: http.MethodPost, Path: "/v1/auth/signup/resend-otp"},
+		{Method: http.MethodPost, Path: "/v1/auth/signup/verify-otp"},
+		{Method: http.MethodPost, Path: "/v1/auth/signup/complete"},
+		{Method: http.MethodPost, Path: "/v1/auth/login/email-otp/verify"},
+		{Method: http.MethodPost, Path: "/v1/auth/login/email-otp/resend"},
+		{Method: http.MethodPost, Path: "/v1/auth/forgot-password"},
+		{Method: http.MethodPost, Path: "/v1/auth/reset-password"},
+		{Method: http.MethodPost, Path: "/v1/auth/verify-totp-login"},
+
+		// Public support access & conversation.
+		{Method: http.MethodPost, Path: "/v1/support/tickets"},
+		{Method: http.MethodGet, Path: "/v1/support/track"},
+		{Method: http.MethodPost, Path: "/v1/support/access/request-otp"},
+		{Method: http.MethodPost, Path: "/v1/support/access/resend-otp"},
+		{Method: http.MethodPost, Path: "/v1/support/access/verify-otp"},
+		{Method: http.MethodPost, Path: "/v1/support/access/verify-code"},
+		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/messages"},
+		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/messages"},
+		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/attachments/:attachmentID"},
+	}
+}
+
 func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Inisialisasi router Gin default (sudah include logger & recovery middleware)
 	r := gin.Default()
@@ -34,33 +63,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	env := config.GetEnvOrDefault(config.Env, "development")
 	if env == "production" {
 		csrfOpts := csrf.DefaultOptions()
-		// Skip CSRF untuk public routes yang tidak memerlukan session
-		csrfOpts.SkipPaths = []string{
-			// Webhook & Public API
-			"/v1/webhook",
-			"/v1/public",
-			"/v1/health",
-			// Public Auth Endpoints (no session yet)
-			"/v1/auth/login",
-			"/v1/auth/oauth/google/start",
-			"/v1/auth/oauth/google/callback",
-			"/v1/auth/signup/start",
-			"/v1/auth/signup/resend-otp",
-			"/v1/auth/signup/verify-otp",
-			"/v1/auth/signup/complete",
-			"/v1/auth/login/email-otp/verify",
-			"/v1/auth/login/email-otp/resend",
-			"/v1/auth/forgot-password",
-			"/v1/auth/reset-password",
-			"/v1/auth/verify-email",
-			"/v1/auth/revoke-email-change",
-			"/v1/auth/refresh-token",
-			"/v1/auth/verify-totp-login",
-			"/v1/auth/validate-reset",
-			"/v1/support/tickets",
-			"/v1/support/track",
-			"/v1/support/access",
-		}
+		csrfOpts.SkipRules = csrfPublicNoSessionSkipRules()
 		r.Use(csrf.Middleware(csrfOpts))
 	}
 

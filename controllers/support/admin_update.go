@@ -2,6 +2,7 @@ package support
 
 import (
 	"fmt"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"net/http"
 	"strings"
 
@@ -18,7 +19,7 @@ import (
 func (c *Controller) UpdateTicket(ctx *gin.Context) {
 	id := strings.TrimSpace(ctx.Param("id"))
 	if id == "" {
-		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "TICKET_ID_REQUIRED", "Ticket ID is required", "id")
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_ID_REQUIRED", "Ticket ID is required", http.StatusBadRequest, "id"), nil)
 		return
 	}
 
@@ -29,8 +30,12 @@ func (c *Controller) UpdateTicket(ctx *gin.Context) {
 	}
 
 	ticket, err := c.repo.GetTicketByID(id)
-	if err != nil || ticket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusNotFound, "TICKET_NOT_FOUND", "Support ticket not found", "id")
+	if err != nil {
+		c.handleAppErrorAs(ctx, err, "id")
+		return
+	}
+	if ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Support ticket not found", http.StatusNotFound, "id"), nil)
 		return
 	}
 
@@ -53,13 +58,17 @@ func (c *Controller) UpdateTicket(ctx *gin.Context) {
 	}
 
 	if err := c.repo.UpdateTicketStatus(id, req.Status, req.Priority, req.AdminNotes, resolvedBy); err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_UPDATE_FAILED", "Failed to update support ticket", "status")
+		c.handleAppErrorAs(ctx, err, "status")
 		return
 	}
 
 	updatedTicket, err := c.repo.GetTicketByID(id)
-	if err != nil || updatedTicket == nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "TICKET_UPDATE_FAILED", "Ticket updated but failed to fetch latest state", "ticket")
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if updatedTicket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_UPDATE_FAILED", "Ticket updated but failed to fetch latest state", http.StatusInternalServerError, "ticket"), nil)
 		return
 	}
 

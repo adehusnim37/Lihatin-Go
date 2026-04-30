@@ -39,8 +39,9 @@ func NewAppError(code, message string, statusCode int, field string) *AppError {
 
 // WithError wraps an existing error
 func (e *AppError) WithError(err error) *AppError {
-	e.Err = err
-	return e
+	cloned := *e
+	cloned.Err = err
+	return &cloned
 }
 
 // ============================================
@@ -1122,5 +1123,81 @@ var (
 		"Server internal error for history",
 		http.StatusInternalServerError,
 		"history",
+	)
+)
+
+// Support Errors
+var (
+	ErrSupportTicketNotFound = NewAppError(
+		"SUPPORT_TICKET_NOT_FOUND",
+		"Support ticket not found",
+		http.StatusNotFound,
+		"ticket",
+	)
+	ErrSupportTicketCreateFailed = NewAppError(
+		"SUPPORT_TICKET_CREATE_FAILED",
+		"Failed to create support ticket",
+		http.StatusInternalServerError,
+		"ticket",
+	)
+	ErrSupportTicketFindFailed = NewAppError(
+		"SUPPORT_TICKET_FIND_FAILED",
+		"Failed to find support ticket",
+		http.StatusInternalServerError,
+		"ticket",
+	)
+	ErrSupportTicketListFailed = NewAppError(
+		"SUPPORT_TICKET_LIST_FAILED",
+		"Failed to list support tickets",
+		http.StatusInternalServerError,
+		"ticket",
+	)
+	ErrSupportTicketUpdateFailed = NewAppError(
+		"SUPPORT_TICKET_UPDATE_FAILED",
+		"Failed to update support ticket",
+		http.StatusInternalServerError,
+		"ticket",
+	)
+	ErrSupportTicketCountFailed = NewAppError(
+		"SUPPORT_TICKET_COUNT_FAILED",
+		"Failed to count support tickets",
+		http.StatusInternalServerError,
+		"ticket",
+	)
+	ErrSupportTicketCheckFailed = NewAppError(
+		"SUPPORT_TICKET_CHECK_FAILED",
+		"Failed to check support ticket",
+		http.StatusInternalServerError,
+		"ticket",
+	)
+	ErrSupportMessageCreateFailed = NewAppError(
+		"SUPPORT_MESSAGE_CREATE_FAILED",
+		"Failed to create support message",
+		http.StatusInternalServerError,
+		"message",
+	)
+	ErrSupportMessageListFailed = NewAppError(
+		"SUPPORT_MESSAGE_LIST_FAILED",
+		"Failed to list support messages",
+		http.StatusInternalServerError,
+		"message",
+	)
+	ErrSupportAttachmentNotFound = NewAppError(
+		"SUPPORT_ATTACHMENT_NOT_FOUND",
+		"Support attachment not found",
+		http.StatusNotFound,
+		"attachment",
+	)
+	ErrSupportAttachmentFindFailed = NewAppError(
+		"SUPPORT_ATTACHMENT_FIND_FAILED",
+		"Failed to find support attachment",
+		http.StatusInternalServerError,
+		"attachment",
+	)
+	ErrSupportAttachmentCreateFailed = NewAppError(
+		"SUPPORT_ATTACHMENT_CREATE_FAILED",
+		"Failed to create support attachment",
+		http.StatusInternalServerError,
+		"attachment",
 	)
 )
