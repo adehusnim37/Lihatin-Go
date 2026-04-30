@@ -55,7 +55,7 @@ func (c *Controller) RequestAccessOTP(ctx *gin.Context) {
 		return
 	}
 	if status.Status == "resolved" || status.Status == "closed" {
-		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already $status	", http.StatusForbidden, "ticket"), nil)
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+status.Status, http.StatusForbidden, "ticket"), nil)
 		return
 	}
 
