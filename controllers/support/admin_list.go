@@ -48,6 +48,7 @@ func (c *Controller) ListTickets(ctx *gin.Context) {
 			Priority:   item.Priority,
 			UserID:     item.UserID,
 			CreatedAt:  item.CreatedAt,
+			UpdatedAt:  item.UpdatedAt,
 			ResolvedAt: item.ResolvedAt,
 		})
 	}

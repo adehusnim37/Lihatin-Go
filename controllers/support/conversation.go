@@ -49,6 +49,16 @@ func (c *Controller) RequestAccessOTP(ctx *gin.Context) {
 		return
 	}
 
+	status, err := c.repo.GetStatusByCode(req.Ticket)
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if status.Status == "resolved" || status.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already $status	", http.StatusForbidden, "ticket"), nil)
+		return
+	}
+
 	ticket, err := c.repo.GetTicketByCodeAndEmail(req.Ticket, req.Email)
 	if err != nil {
 		c.handleAppError(ctx, err)
@@ -133,10 +143,18 @@ func (c *Controller) ResendAccessOTP(ctx *gin.Context) {
 		return
 	}
 
-	ticketCode := strings.TrimSpace(challenge.UserID)
-	if ticket, getErr := c.repo.GetTicketByID(strings.TrimSpace(challenge.UserID)); getErr == nil && ticket != nil {
-		ticketCode = ticket.TicketCode
+	ticket, err := c.repo.GetTicketByID(strings.TrimSpace(challenge.UserID))
+	if err != nil || ticket == nil {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found", http.StatusNotFound, "challenge_token"), nil)
+		return
 	}
+	
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already closed/resolved", http.StatusForbidden, "challenge_token"), nil)
+		return
+	}
+
+	ticketCode := ticket.TicketCode
 
 	blocked, rateLimitErr := c.enforceSupportAccessRateLimit(
 		ctx.Request.Context(),
@@ -346,6 +364,16 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 		UpdatedAt:   now,
 	}
 
+	ticket, err = c.repo.GetStatusByCode(ticket.TicketCode)
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+ticket.Status+", cant send message", http.StatusBadRequest, "ticket"), nil)
+		return
+	}
+
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
 		c.cleanupUploadedAttachments(ctx, attachments)
 		c.handleAppError(ctx, err)
@@ -476,6 +504,16 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 		UpdatedAt:    now,
 	}
 
+	ticket, err = c.repo.GetStatusByCode(ticket.TicketCode)
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+ticket.Status+", cant send message", http.StatusBadRequest, "ticket"), nil)
+		return
+	}
+
 	if err := c.repo.CreateMessageWithAttachments(&message, attachments); err != nil {
 		c.cleanupUploadedAttachments(ctx, attachments)
 		c.handleAppError(ctx, err)
@@ -569,6 +607,16 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 	body := strings.TrimSpace(ctx.PostForm("body"))
 	if len(body) > maxSupportMessageBodyLength {
 		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
+		return
+	}
+
+	ticket, err = c.repo.GetStatusByCode(ticket.TicketCode)
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+ticket.Status+", cant send message", http.StatusBadRequest, "ticket"), nil)
 		return
 	}
 

@@ -79,6 +79,14 @@ func (r *SupportTicketRepository) CreateMessageWithAttachments(message *supportm
 	})
 }
 
+func (r *SupportTicketRepository) GetStatusByCode(code string) (*supportmodel.SupportTicket, error) {
+	var ticket supportmodel.SupportTicket
+	if err := r.db.Where("ticket_code = ?", strings.TrimSpace(code)).First(&ticket).Error; err != nil {
+		return nil, supportTicketNotFound(err)
+	}
+	return &ticket, nil
+}
+
 func (r *SupportTicketRepository) GetTicketByCode(code string) (*supportmodel.SupportTicket, error) {
 	var ticket supportmodel.SupportTicket
 	if err := r.db.Where("ticket_code = ?", strings.TrimSpace(code)).First(&ticket).Error; err != nil {

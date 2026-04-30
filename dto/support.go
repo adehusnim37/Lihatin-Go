@@ -46,6 +46,7 @@ type AdminSupportTicketItem struct {
 	Priority   string     `json:"priority"`
 	UserID     *string    `json:"user_id,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
 }
 
