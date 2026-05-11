@@ -308,3 +308,23 @@ func (r *SupportTicketRepository) MarkTicketAsActiveByReply(ticketID string) err
 
 	return nil
 }
+
+func (r *SupportTicketRepository) UpdatePublicAccessCodeHash(id, accessCodeHash string) error {
+	normalizedID := strings.TrimSpace(id)
+	normalizedHash := strings.TrimSpace(accessCodeHash)
+
+	if normalizedID == "" || normalizedHash == "" {
+		return apperrors.ErrSupportTicketUpdateFailed.WithError(errors.New("ticket id and access code hash are required"))
+	}
+
+	if err := r.db.Model(&supportmodel.SupportTicket{}).
+		Where("id = ?", normalizedID).
+		Updates(map[string]any{
+			"public_access_code_hash": normalizedHash,
+			"updated_at":              time.Now(),
+		}).Error; err != nil {
+		return apperrors.ErrSupportTicketUpdateFailed.WithError(err)
+	}
+
+	return nil
+}

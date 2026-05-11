@@ -7,7 +7,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 )
 
-func (es *EmailService) SendSupportTicketUpdatedEmail(toEmail, ticketCode, status, adminNotes, frontendURL string) error {
+func (es *EmailService) SendSupportTicketUpdatedEmail(toEmail, ticketCode, status, adminNotes, accessCode, frontendURL string) error {
 	baseURL := strings.TrimSpace(frontendURL)
 	if baseURL == "" {
 		baseURL = config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
@@ -15,7 +15,7 @@ func (es *EmailService) SendSupportTicketUpdatedEmail(toEmail, ticketCode, statu
 	baseURL = strings.TrimRight(baseURL, "/")
 
 	statusLabel := formatSupportStatusLabel(status)
-	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s", baseURL, ticketCode, toEmail)
+	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s&code=%s", baseURL, ticketCode, toEmail, strings.TrimSpace(accessCode))
 	note := strings.TrimSpace(adminNotes)
 	if note == "" {
 		note = "Support team updated your ticket status."
@@ -30,6 +30,7 @@ func (es *EmailService) SendSupportTicketUpdatedEmail(toEmail, ticketCode, statu
 		Details: []emailDetail{
 			{Label: "Ticket Code", Value: ticketCode},
 			{Label: "Latest Status", Value: statusLabel},
+			{Label: "Access Code", Value: strings.TrimSpace(accessCode)},
 		},
 		Sections: []string{
 			renderParagraphSection("Update Summary", note),
@@ -47,25 +48,26 @@ LIHATIN - SUPPORT TICKET UPDATED
 
 Ticket Code: %s
 Status: %s
+Access Code: %s
 
 Update Summary:
 %s
 
 Open ticket:
 %s
-`, ticketCode, statusLabel, note, trackURL)
+`, ticketCode, statusLabel, strings.TrimSpace(accessCode), note, trackURL)
 
 	return es.sendEmail(toEmail, fmt.Sprintf("Support Ticket %s Updated - Lihatin", ticketCode), textBody, htmlBody)
 }
 
-func (es *EmailService) SendSupportTicketMessageToRequesterEmail(toEmail, ticketCode, senderLabel, messagePreview, frontendURL string) error {
+func (es *EmailService) SendSupportTicketMessageToRequesterEmail(toEmail, ticketCode, senderLabel, messagePreview, accessCode, frontendURL string) error {
 	baseURL := strings.TrimSpace(frontendURL)
 	if baseURL == "" {
 		baseURL = config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
 
-	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s", baseURL, ticketCode, toEmail)
+	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s&code=%s", baseURL, ticketCode, toEmail, strings.TrimSpace(accessCode))
 	preview := strings.TrimSpace(messagePreview)
 	if preview == "" {
 		preview = "You have a new message on your support ticket."
@@ -83,6 +85,7 @@ func (es *EmailService) SendSupportTicketMessageToRequesterEmail(toEmail, ticket
 		Details: []emailDetail{
 			{Label: "Ticket Code", Value: ticketCode},
 			{Label: "Sender", Value: strings.TrimSpace(senderLabel)},
+			{Label: "Access Code", Value: strings.TrimSpace(accessCode)},
 		},
 		Sections: []string{
 			renderParagraphSection("Message Preview", preview),
@@ -100,13 +103,14 @@ LIHATIN - NEW SUPPORT MESSAGE
 
 Ticket Code: %s
 Sender: %s
+Access Code: %s
 
 Message Preview:
 %s
 
 Open conversation:
 %s
-`, ticketCode, senderLabel, preview, trackURL)
+`, ticketCode, senderLabel, strings.TrimSpace(accessCode), preview, trackURL)
 
 	return es.sendEmail(toEmail, fmt.Sprintf("New Message on Support Ticket %s - Lihatin", ticketCode), textBody, htmlBody)
 }

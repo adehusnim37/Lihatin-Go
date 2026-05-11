@@ -2,9 +2,10 @@ package support
 
 import (
 	"fmt"
-	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"net/http"
 	"strings"
+
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
@@ -200,6 +201,17 @@ func (c *Controller) sendTicketUpdatedEmail(ticket *supportmodel.SupportTicket, 
 		return
 	}
 
+	accessCode, err := auth.GenerateSecureToken(24)
+	if err != nil {
+		logger.Logger.Error("Failed generating support access code for update email", "ticket_code", ticket.TicketCode, "error", err.Error())
+		return
+	}
+
+	if err := c.repo.UpdatePublicAccessCodeHash(ticket.ID, hashSupportAccessCode(accessCode)); err != nil {
+		logger.Logger.Error("Failed updating support access code hash", "ticket_code", ticket.TicketCode, "error", err.Error())
+		return
+	}
+
 	adminSummary := ""
 	if ticket.AdminNotes != nil && strings.TrimSpace(*ticket.AdminNotes) != "" {
 		adminSummary = strings.TrimSpace(*ticket.AdminNotes)
@@ -218,6 +230,7 @@ func (c *Controller) sendTicketUpdatedEmail(ticket *supportmodel.SupportTicket, 
 		ticket.TicketCode,
 		ticket.Status,
 		adminSummary,
+		accessCode,
 		c.frontendURL(),
 	); err != nil {
 		logger.Logger.Error("Failed sending support updated email", "ticket_code", ticket.TicketCode, "error", err.Error())

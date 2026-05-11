@@ -3,12 +3,13 @@ package support
 import (
 	"errors"
 	"fmt"
-	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
+
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
@@ -148,7 +149,7 @@ func (c *Controller) ResendAccessOTP(ctx *gin.Context) {
 		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found", http.StatusNotFound, "challenge_token"), nil)
 		return
 	}
-	
+
 	if ticket.Status == "resolved" || ticket.Status == "closed" {
 		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already closed/resolved", http.StatusForbidden, "challenge_token"), nil)
 		return
@@ -659,17 +660,32 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 
 	if !isInternal {
 		_ = c.repo.MarkTicketAsActiveByReply(ticket.ID)
-		go func(toEmail string, ticketCode string, preview string) {
+
+		accessCode, genErr := auth.GenerateSecureToken(24)
+		if genErr != nil {
+			logger.Logger.Error("Failed generating support access code for message email", "ticket_code", ticket.TicketCode, "error", genErr.Error())
+			accessCode = ""
+		}
+
+		if accessCode != "" {
+			if hashErr := c.repo.UpdatePublicAccessCodeHash(ticket.ID, hashSupportAccessCode(accessCode)); hashErr != nil {
+				logger.Logger.Error("Failed updating support access code hash for message email", "ticket_code", ticket.TicketCode, "error", hashErr.Error())
+				accessCode = ""
+			}
+		}
+
+		go func(toEmail string, ticketCode string, preview string, accessCode string) {
 			if err := c.emailSvc.SendSupportTicketMessageToRequesterEmail(
 				toEmail,
 				ticketCode,
 				"Support Team",
 				preview,
+				accessCode,
 				c.frontendURL(),
 			); err != nil {
 				// Best effort notification only.
 			}
-		}(ticket.Email, ticket.TicketCode, supportMessagePreview(body))
+		}(ticket.Email, ticket.TicketCode, supportMessagePreview(body), accessCode)
 	}
 	message.Attachments = attachments
 	httputil.SendCreatedResponse(ctx, c.toMessageResponse(message), "Message sent")
