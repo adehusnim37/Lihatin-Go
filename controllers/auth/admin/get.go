@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetUserByID retrieves a single user by ID (admin only)
 func (c *Controller) GetUserByID(ctx *gin.Context) {
 	logger.Logger.Info("Admin GetUserByID called")
 	// Bind URI parameters

@@ -79,7 +79,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 
 	// Inisialisasi controller spesifik
 	authController := auth.NewAuthController(baseController)
-	loggerController := logger.NewLoggerController(baseController)
+	loggerController := logger.NewController(baseController)
 	shortController := shortlink.NewController(baseController)
 	emailController := email.NewController(baseController)
 	totpController := totp.NewController(baseController)

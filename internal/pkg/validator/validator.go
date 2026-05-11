@@ -235,7 +235,7 @@ func formatIndonesianMessage(err validator.FieldError, fieldLabel string) string
 
 // SendValidationError sends formatted validation error response
 // Uses common.APIResponse format for consistency with other API responses
-func SendValidationError(c *gin.Context, err error, structPtr interface{}) {
+func SendValidationError(c *gin.Context, err error, structPtr any) {
 	var result ValidationResponse
 
 	// Check if it's a JSON binding error or validation error
