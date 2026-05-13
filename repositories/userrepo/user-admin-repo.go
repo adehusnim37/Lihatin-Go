@@ -286,7 +286,7 @@ func (uar *userAdminRepository) RevokePremiumAccess(userID, reason, revokeType, 
 		updates := map[string]any{
 			"is_premium":                 false,
 			"premium_status":             string(user.PremiumStatusRevoked),
-			"premium_revoke_type":        normalizedRevokeType,
+			"premium_revoke_type":        nil,
 			"premium_revoked_at":         &now,
 			"premium_revoked_by":         changedByPtr,
 			"premium_revoked_reason":     reason,
