@@ -254,6 +254,15 @@ type AdminReactivatePremiumRequest struct {
 	OverridePermanent bool   `json:"override_permanent,omitempty"`
 }
 
+// AdminUpdateUserRequest represents admin payload to update user core fields.
+type AdminUpdateUserRequest struct {
+	FirstName *string `json:"first_name" binding:"omitempty,min=3,max=50"`
+	LastName  *string `json:"last_name" binding:"omitempty,min=3,max=50"`
+	Username  *string `json:"username" binding:"omitempty,min=3,max=30,alphanum"`
+	Email     *string `json:"email" binding:"omitempty,email"`
+	Role      *string `json:"role" binding:"omitempty,oneof=user admin super_admin"`
+}
+
 // AdminUserResponse represents the response format for admin user data
 type AdminUserResponse struct {
 	ID                       string     `json:"id"`
@@ -275,6 +284,109 @@ type AdminUserResponse struct {
 	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
 	PremiumReactivatedBy     *string    `json:"premium_reactivated_by,omitempty"`
 	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty"`
+}
+
+// AdminUserAuthDetailResponse represents detailed user_auth section for admin user detail.
+type AdminUserAuthDetailResponse struct {
+	ID                  string     `json:"id"`
+	UserID              string     `json:"user_id"`
+	IsEmailVerified     bool       `json:"is_email_verified"`
+	PasswordChangedAt   *time.Time `json:"password_changed_at,omitempty"`
+	LastEmailSendAt     *time.Time `json:"last_email_send_at,omitempty"`
+	DeviceID            *string    `json:"device_id,omitempty"`
+	LastIP              *string    `json:"last_ip,omitempty"`
+	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
+	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
+	FailedLoginAttempts int        `json:"failed_login_attempts"`
+	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`
+	IsActive            bool       `json:"is_active"`
+	IsTOTPEnabled       bool       `json:"is_totp_enabled"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	DeletedAt           *time.Time `json:"deleted_at,omitempty"`
+}
+
+// AdminAuthMethodDetailResponse represents safe auth method fields for admin user detail.
+type AdminAuthMethodDetailResponse struct {
+	ID             string     `json:"id"`
+	UserAuthID     string     `json:"user_auth_id"`
+	Type           string     `json:"type"`
+	IsEnabled      bool       `json:"is_enabled"`
+	IsVerified     bool       `json:"is_verified"`
+	VerifiedAt     *time.Time `json:"verified_at,omitempty"`
+	LastUsedAt     *time.Time `json:"last_used_at,omitempty"`
+	FriendlyName   string     `json:"friendly_name,omitempty"`
+	ProviderUserID string     `json:"provider_user_id,omitempty"`
+	DisabledAt     *time.Time `json:"disabled_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
+}
+
+// AdminUserDetailStatsResponse represents related counters for admin user detail.
+type AdminUserDetailStatsResponse struct {
+	APIKeysTotal             int64 `json:"api_keys_total"`
+	APIKeysActive            int64 `json:"api_keys_active"`
+	HistoryEventsTotal       int64 `json:"history_events_total"`
+	PremiumKeyUsageTotal     int64 `json:"premium_key_usage_total"`
+	PremiumStatusEventsTotal int64 `json:"premium_status_events_total"`
+	LoginAttempts24h         int64 `json:"login_attempts_24h"`
+	LoginAttempts7d          int64 `json:"login_attempts_7d"`
+}
+
+// AdminUserRecentHistoryResponse represents compact history record for admin user detail.
+type AdminUserRecentHistoryResponse struct {
+	ID         uint      `json:"id"`
+	ActionType string    `json:"action_type"`
+	Reason     string    `json:"reason,omitempty"`
+	ChangedBy  *string   `json:"changed_by,omitempty"`
+	IPAddress  *string   `json:"ip_address,omitempty"`
+	UserAgent  *string   `json:"user_agent,omitempty"`
+	ChangedAt  time.Time `json:"changed_at"`
+}
+
+// AdminUserRecentLoginAttemptResponse represents compact login attempt record for admin user detail.
+type AdminUserRecentLoginAttemptResponse struct {
+	ID              string    `json:"id"`
+	EmailOrUsername string    `json:"email_or_username"`
+	IPAddress       string    `json:"ip_address"`
+	UserAgent       string    `json:"user_agent"`
+	Success         bool      `json:"success"`
+	FailReason      string    `json:"fail_reason,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// AdminUserDetailResponse represents very detailed admin user payload for user detail endpoint.
+// Existing fields from AdminUserResponse are kept for backward compatibility.
+type AdminUserDetailResponse struct {
+	ID                       string                                `json:"id"`
+	Username                 string                                `json:"username"`
+	FirstName                string                                `json:"first_name"`
+	LastName                 string                                `json:"last_name"`
+	Email                    string                                `json:"email"`
+	Avatar                   string                                `json:"avatar,omitempty"`
+	CreatedAt                time.Time                             `json:"created_at"`
+	UpdatedAt                time.Time                             `json:"updated_at"`
+	DeletedAt                *time.Time                            `json:"deleted_at,omitempty"`
+	UsernameChanged          bool                                  `json:"username_changed"`
+	IsPremium                bool                                  `json:"is_premium"`
+	IsLocked                 bool                                  `json:"is_locked"`
+	LockedAt                 *time.Time                            `json:"locked_at,omitempty"`
+	LockedReason             string                                `json:"locked_reason,omitempty"`
+	Role                     string                                `json:"role"`
+	PremiumStatus            string                                `json:"premium_status"`
+	PremiumRevokeType        string                                `json:"premium_revoke_type,omitempty"`
+	PremiumRevokedAt         *time.Time                            `json:"premium_revoked_at,omitempty"`
+	PremiumRevokedBy         *string                               `json:"premium_revoked_by,omitempty"`
+	PremiumRevokedReason     string                                `json:"premium_revoked_reason,omitempty"`
+	PremiumReactivatedAt     *time.Time                            `json:"premium_reactivated_at,omitempty"`
+	PremiumReactivatedBy     *string                               `json:"premium_reactivated_by,omitempty"`
+	PremiumReactivatedReason string                                `json:"premium_reactivated_reason,omitempty"`
+	UserAuth                 *AdminUserAuthDetailResponse          `json:"user_auth,omitempty"`
+	AuthMethods              []AdminAuthMethodDetailResponse       `json:"auth_methods,omitempty"`
+	Stats                    AdminUserDetailStatsResponse          `json:"stats"`
+	RecentHistory            []AdminUserRecentHistoryResponse      `json:"recent_history,omitempty"`
+	RecentLoginAttempts      []AdminUserRecentLoginAttemptResponse `json:"recent_login_attempts,omitempty"`
 }
 
 type AdminPremiumStatusMutationResponse struct {

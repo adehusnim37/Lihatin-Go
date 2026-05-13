@@ -61,6 +61,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.Use(middleware.RequireRole("admin")) // Ensures only admin access
 		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
 		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
+		protectedAdminShort.GET("users/:userID", shortController.ListShortLinks) // Get list of short links for specific user
 		protectedAdminShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
 		protectedAdminShort.DELETE("/:code", shortController.DeleteShortLink)
 		protectedAdminShort.DELETE("/bulk-delete", shortController.AdminBulkDeleteShortLinks)

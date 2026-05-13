@@ -16,22 +16,22 @@ func (c *Controller) UpdateUser(ctx *gin.Context) {
 		return
 	}
 
-	var req dto.UpdateProfileRequest
+	var req dto.AdminUpdateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		validator.SendValidationError(ctx, err, &req)
 		return
 	}
 
-	if err := c.repo.GetUserRepository().UpdateUser(userID.ID, req); err != nil {
+	if err := c.repo.GetUserAdminRepository().UpdateUserByAdmin(userID.ID, req); err != nil {
 		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	updatedUser, err := c.repo.GetUserRepository().GetUserByID(userID.ID)
+	updatedUser, err := c.repo.GetUserAdminRepository().GetUserDetailByID(userID.ID)
 	if err != nil {
 		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	httputil.SendOKResponse(ctx, toAdminUserResponse(*updatedUser), "User updated successfully")
+	httputil.SendOKResponse(ctx, updatedUser, "User updated successfully")
 }

@@ -1323,7 +1323,7 @@ func (r *ShortLinkRepository) DeleteShortsLink(req *dto.BulkDeleteRequest) error
 	return nil
 }
 
-func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy string) (*dto.PaginatedShortLinksAdminResponse, error) {
+func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, sort, orderBy string) (*dto.PaginatedShortLinksAdminResponse, error) {
 	var shortLinks []shortlink.ShortLink
 	var totalCount int64
 
@@ -1334,8 +1334,13 @@ func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy s
 		"order_by", orderBy,
 	)
 
+	queryCount := r.db.Model(&shortlink.ShortLink{})
+	if userID != "" {
+		queryCount = queryCount.Where("user_id = ?", userID)
+	}
+
 	// Get total count (without joins for better performance)
-	if err := r.db.Model(&shortlink.ShortLink{}).Count(&totalCount).Error; err != nil {
+	if err := queryCount.Count(&totalCount).Error; err != nil {
 		logger.Logger.Error("Failed to count short links", "error", err.Error())
 		return nil, apperrors.ErrShortListFailed.WithError(err)
 	}
@@ -1345,13 +1350,18 @@ func (r *ShortLinkRepository) ListAllShortLinks(page, limit int, sort, orderBy s
 	orderClause := sort + " " + orderBy
 
 	// Query with LEFT JOINs to get all data including details and view counts
-	if err := r.db.
+	queryFind := r.db.
 		Preload("Detail"). // Load detail relationship
 		Preload("Views").  // Load views relationship for click counts
 		Order(orderClause).
 		Limit(limit).
-		Offset(offset).
-		Find(&shortLinks).Error; err != nil {
+		Offset(offset)
+
+	if userID != "" {
+		queryFind = queryFind.Where("user_id = ?", userID)
+	}
+
+	if err := queryFind.Find(&shortLinks).Error; err != nil {
 		logger.Logger.Error("Failed to fetch short links", "error", err.Error())
 		return nil, apperrors.ErrShortListFailed.WithError(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adehusnim37/lihatin-go/dto"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/user"
@@ -12,16 +13,17 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-
 // UserAdminRepository defines the methods for admin-related user operations
 type UserAdminRepository interface {
 	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
+	GetUserDetailByID(userID string) (*dto.AdminUserDetailResponse, error)
 	LockUser(userID, reason string) error
 	UnlockUser(userID, reason string) error
 	RevokePremiumAccess(userID, reason, revokeType, changedBy, changedByRole string) (*user.User, error)
 	ReactivatePremiumAccess(userID, reason, changedBy, changedByRole string, overridePermanent bool) (*user.User, error)
 	GetPremiumStatusEvents(userID string, limit int) ([]user.PremiumStatusEvent, error)
 	IsUserLocked(userID string) (bool, error)
+	UpdateUserByAdmin(id string, updateUser dto.AdminUpdateUserRequest) error
 	DeleteUserPermanent(userID string) error
 }
 
@@ -62,6 +64,136 @@ func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int) ([]
 
 	logger.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
 	return users, totalCount, nil
+}
+
+// GetUserDetailByID retrieves detailed user profile and related admin context.
+func (uar *userAdminRepository) GetUserDetailByID(userID string) (*dto.AdminUserDetailResponse, error) {
+	var target user.User
+	if err := uar.db.Where("id = ? AND deleted_at IS NULL", userID).First(&target).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrUserNotFound
+		}
+		logger.Logger.Error("Failed to find user detail", "user_id", userID, "error", err)
+		return nil, apperrors.ErrUserDatabaseError
+	}
+
+	var (
+		authMethods    []user.AuthMethod
+		recentHistory  []user.HistoryUser
+		recentAttempts []user.LoginAttempt
+		stats          dto.AdminUserDetailStatsResponse
+		userAuth       *user.UserAuth
+	)
+
+	var authRecord user.UserAuth
+	authErr := uar.db.Where("user_id = ? AND deleted_at IS NULL", userID).First(&authRecord).Error
+	switch {
+	case authErr == nil:
+		userAuth = &authRecord
+	case errors.Is(authErr, gorm.ErrRecordNotFound):
+		userAuth = nil
+	default:
+		logger.Logger.Error("Failed to find user_auth detail", "user_id", userID, "error", authErr)
+		return nil, apperrors.ErrUserDatabaseError
+	}
+
+	if userAuth != nil {
+		if err := uar.db.
+			Where("user_auth_id = ? AND deleted_at IS NULL", userAuth.ID).
+			Order("created_at DESC").
+			Find(&authMethods).Error; err != nil {
+			logger.Logger.Error("Failed to find auth methods", "user_id", userID, "error", err)
+			return nil, apperrors.ErrUserDatabaseError
+		}
+	}
+
+	since24h := time.Now().Add(-24 * time.Hour)
+	since7d := time.Now().Add(-7 * 24 * time.Hour)
+
+	if err := uar.db.Model(&user.APIKey{}).
+		Where("user_id = ? AND deleted_at IS NULL", userID).
+		Count(&stats.APIKeysTotal).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+	if err := uar.db.Model(&user.APIKey{}).
+		Where("user_id = ? AND is_active = ? AND deleted_at IS NULL", userID, true).
+		Count(&stats.APIKeysActive).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+	if err := uar.db.Model(&user.HistoryUser{}).
+		Where("user_id = ?", userID).
+		Count(&stats.HistoryEventsTotal).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+	if err := uar.db.Model(&user.PremiumKeyUsage{}).
+		Where("user_id = ?", userID).
+		Count(&stats.PremiumKeyUsageTotal).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+	if err := uar.db.Model(&user.PremiumStatusEvent{}).
+		Where("user_id = ?", userID).
+		Count(&stats.PremiumStatusEventsTotal).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+	if err := uar.db.Model(&user.LoginAttempt{}).
+		Where("(email_or_username = ? OR email_or_username = ?) AND created_at >= ? AND deleted_at IS NULL", target.Username, target.Email, since24h).
+		Count(&stats.LoginAttempts24h).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+	if err := uar.db.Model(&user.LoginAttempt{}).
+		Where("(email_or_username = ? OR email_or_username = ?) AND created_at >= ? AND deleted_at IS NULL", target.Username, target.Email, since7d).
+		Count(&stats.LoginAttempts7d).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+
+	if err := uar.db.
+		Where("user_id = ?", userID).
+		Order("changed_at DESC").
+		Limit(10).
+		Find(&recentHistory).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+
+	if err := uar.db.
+		Where("(email_or_username = ? OR email_or_username = ?) AND deleted_at IS NULL", target.Username, target.Email).
+		Order("created_at DESC").
+		Limit(10).
+		Find(&recentAttempts).Error; err != nil {
+		return nil, apperrors.ErrUserDatabaseError
+	}
+
+	resp := &dto.AdminUserDetailResponse{
+		ID:                       target.ID,
+		Username:                 target.Username,
+		FirstName:                target.FirstName,
+		LastName:                 target.LastName,
+		Email:                    target.Email,
+		Avatar:                   target.Avatar,
+		CreatedAt:                target.CreatedAt,
+		UpdatedAt:                target.UpdatedAt,
+		DeletedAt:                target.DeletedAt,
+		UsernameChanged:          target.UsernameChanged,
+		IsPremium:                target.IsPremium,
+		IsLocked:                 target.IsLocked,
+		LockedAt:                 target.LockedAt,
+		LockedReason:             target.LockedReason,
+		Role:                     target.Role,
+		PremiumStatus:            resolveCurrentPremiumStatus(target.PremiumStatus),
+		PremiumRevokeType:        normalizeRevokeTypeOrDefault(target.PremiumRevokeType),
+		PremiumRevokedAt:         target.PremiumRevokedAt,
+		PremiumRevokedBy:         target.PremiumRevokedBy,
+		PremiumRevokedReason:     target.PremiumRevokedReason,
+		PremiumReactivatedAt:     target.PremiumReactivatedAt,
+		PremiumReactivatedBy:     target.PremiumReactivatedBy,
+		PremiumReactivatedReason: target.PremiumReactivatedReason,
+		UserAuth:                 toAdminUserAuthDetail(userAuth),
+		AuthMethods:              toAdminAuthMethodDetails(authMethods),
+		Stats:                    stats,
+		RecentHistory:            toAdminRecentHistory(recentHistory),
+		RecentLoginAttempts:      toAdminRecentLoginAttempts(recentAttempts),
+	}
+
+	return resp, nil
 }
 
 // LockUser locks a user account with a reason
@@ -324,6 +456,81 @@ func (uar *userAdminRepository) GetPremiumStatusEvents(userID string, limit int)
 	return events, nil
 }
 
+func (uar *userAdminRepository) UpdateUserByAdmin(id string, updateUser dto.AdminUpdateUserRequest) error {
+	var currentUser user.User
+	if err := uar.db.Where("id = ? AND deleted_at IS NULL", id).First(&currentUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+		logger.Logger.Error("Error getting current user for admin update", "user_id", id, "error", err)
+		return apperrors.ErrUserFindFailed.WithError(err)
+	}
+
+	updates := map[string]interface{}{
+		"updated_at": time.Now(),
+	}
+	updatedFields := 0
+
+	if updateUser.FirstName != nil {
+		firstName := strings.TrimSpace(*updateUser.FirstName)
+		currentUser.FirstName = firstName
+		updates["first_name"] = firstName
+		updatedFields++
+	}
+	if updateUser.LastName != nil {
+		lastName := strings.TrimSpace(*updateUser.LastName)
+		currentUser.LastName = lastName
+		updates["last_name"] = lastName
+		updatedFields++
+	}
+	if updateUser.Username != nil {
+		username := strings.TrimSpace(*updateUser.Username)
+		currentUser.Username = username
+		updates["username"] = username
+		updatedFields++
+	}
+	if updateUser.Email != nil {
+		email := strings.ToLower(strings.TrimSpace(*updateUser.Email))
+		currentUser.Email = email
+		updates["email"] = email
+		updatedFields++
+	}
+	if updateUser.Role != nil {
+		role := strings.ToLower(strings.TrimSpace(*updateUser.Role))
+		currentUser.Role = role
+		updates["role"] = role
+		updatedFields++
+	}
+
+	if updatedFields == 0 {
+		logger.Logger.Info("Admin update user skipped due to no changes", "user_id", id)
+		return nil
+	}
+
+	result := uar.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", id).Updates(updates)
+	if result.Error != nil {
+		logger.Logger.Error("Failed admin user update", "user_id", id, "error", result.Error)
+		errorText := strings.ToLower(result.Error.Error())
+		if strings.Contains(errorText, "duplicate entry") {
+			if strings.Contains(errorText, "users.email") {
+				return apperrors.ErrUserEmailExists.WithError(result.Error)
+			}
+			if strings.Contains(errorText, "users.username") {
+				return apperrors.ErrUserUsernameExists.WithError(result.Error)
+			}
+			return apperrors.ErrUserDuplicateEntry.WithError(result.Error)
+		}
+		return apperrors.ErrUserUpdateFailed.WithError(result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return apperrors.ErrUserNotFound
+	}
+
+	logger.Logger.Info("Admin user updated successfully", "user_id", id, "fields_updated", updatedFields)
+	return nil
+}
+
 // IsUserLocked checks if a user account is locked
 func (uar *userAdminRepository) IsUserLocked(userID string) (bool, error) {
 	var user user.User
@@ -402,4 +609,91 @@ func nullableString(raw string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+func toAdminUserAuthDetail(auth *user.UserAuth) *dto.AdminUserAuthDetailResponse {
+	if auth == nil {
+		return nil
+	}
+	return &dto.AdminUserAuthDetailResponse{
+		ID:                  auth.ID,
+		UserID:              auth.UserID,
+		IsEmailVerified:     auth.IsEmailVerified,
+		PasswordChangedAt:   auth.PasswordChangedAt,
+		LastEmailSendAt:     auth.LastEmailSendAt,
+		DeviceID:            auth.DeviceID,
+		LastIP:              auth.LastIP,
+		LastLoginAt:         auth.LastLoginAt,
+		LastLogoutAt:        auth.LastLogoutAt,
+		FailedLoginAttempts: auth.FailedLoginAttempts,
+		LockoutUntil:        auth.LockoutUntil,
+		IsActive:            auth.IsActive,
+		IsTOTPEnabled:       auth.IsTOTPEnabled,
+		CreatedAt:           auth.CreatedAt,
+		UpdatedAt:           auth.UpdatedAt,
+		DeletedAt:           auth.DeletedAt,
+	}
+}
+
+func toAdminAuthMethodDetails(methods []user.AuthMethod) []dto.AdminAuthMethodDetailResponse {
+	if len(methods) == 0 {
+		return []dto.AdminAuthMethodDetailResponse{}
+	}
+	out := make([]dto.AdminAuthMethodDetailResponse, 0, len(methods))
+	for _, method := range methods {
+		out = append(out, dto.AdminAuthMethodDetailResponse{
+			ID:             method.ID,
+			UserAuthID:     method.UserAuthID,
+			Type:           string(method.Type),
+			IsEnabled:      method.IsEnabled,
+			IsVerified:     method.IsVerified,
+			VerifiedAt:     method.VerifiedAt,
+			LastUsedAt:     method.LastUsedAt,
+			FriendlyName:   method.FriendlyName,
+			ProviderUserID: method.ProviderUserID,
+			DisabledAt:     method.DisabledAt,
+			CreatedAt:      method.CreatedAt,
+			UpdatedAt:      method.UpdatedAt,
+			DeletedAt:      method.DeletedAt,
+		})
+	}
+	return out
+}
+
+func toAdminRecentHistory(items []user.HistoryUser) []dto.AdminUserRecentHistoryResponse {
+	if len(items) == 0 {
+		return []dto.AdminUserRecentHistoryResponse{}
+	}
+	out := make([]dto.AdminUserRecentHistoryResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, dto.AdminUserRecentHistoryResponse{
+			ID:         item.ID,
+			ActionType: string(item.ActionType),
+			Reason:     item.Reason,
+			ChangedBy:  item.ChangedBy,
+			IPAddress:  item.IPAddress,
+			UserAgent:  item.UserAgent,
+			ChangedAt:  item.ChangedAt,
+		})
+	}
+	return out
+}
+
+func toAdminRecentLoginAttempts(items []user.LoginAttempt) []dto.AdminUserRecentLoginAttemptResponse {
+	if len(items) == 0 {
+		return []dto.AdminUserRecentLoginAttemptResponse{}
+	}
+	out := make([]dto.AdminUserRecentLoginAttemptResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, dto.AdminUserRecentLoginAttemptResponse{
+			ID:              item.ID,
+			EmailOrUsername: item.EmailOrUsername,
+			IPAddress:       item.IPAddress,
+			UserAgent:       item.UserAgent,
+			Success:         item.Success,
+			FailReason:      item.FailReason,
+			CreatedAt:       item.CreatedAt,
+		})
+	}
+	return out
 }

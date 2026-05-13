@@ -9,23 +9,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) GetUserByID(ctx *gin.Context) {
-	logger.Logger.Info("Admin GetUserByID called")
-	// Bind URI parameters
+func (c *Controller) GetUserDetailByID(ctx *gin.Context) {
+	logger.Logger.Info("Admin GetUserDetailByID called")
+
 	var userID dto.UserIDGenericRequest
 	if err := ctx.ShouldBindUri(&userID); err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "USER_ID_REQUIRED", "User ID is required", "user_id", userID)
 		return
 	}
 
-	logger.Logger.Info("Fetching user by ID", "user_id", userID)
+	logger.Logger.Info("Fetching detailed user by ID", "user_id", userID.ID)
 
-	// Get user from repository
-	user, err := c.repo.GetUserRepository().GetUserByID(userID.ID)
+	detail, err := c.repo.GetUserAdminRepository().GetUserDetailByID(userID.ID)
 	if err != nil {
 		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	httputil.SendOKResponse(ctx, toAdminUserResponse(*user), "User retrieved successfully")
+	httputil.SendOKResponse(ctx, detail, "User detailed profile retrieved successfully")
 }

@@ -130,7 +130,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 	{
 		adminAuth.GET("/premium-codes", premiumController.GetAllPremiumKeys)
 		adminAuth.GET("/users", adminController.GetAllUsers)
-		adminAuth.GET("/users/:id", adminController.GetUserByID)
+		adminAuth.GET("/users/:id", adminController.GetUserDetailByID)
 		adminAuth.PUT("/users/:id", adminController.UpdateUser)
 		adminAuth.POST("/users/:id/lock", adminController.LockUser)
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)

@@ -12,10 +12,13 @@ import (
 // ListShortLinks handles both user and admin requests with role-based filtering
 func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	// Get user info from context (set by auth middleware)
-	userID:= ctx.GetString("user_id")
-
-	// Get user role from context (set by auth middleware)
+	userID := ctx.GetString("user_id")
 	userRole := ctx.GetString("role")
+
+	targetUserID := ""
+	if userRole == "admin" {
+		targetUserID = ctx.Param("userID")
+	}
 
 	// Get pagination parameters from query string
 	pageStr := ctx.DefaultQuery("page", "1")
@@ -49,9 +52,16 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	var repositoryErr error
 
 	if userRole == "admin" {
-		// ✅ Admin: Get all short links (no user filter)
-		logger.Logger.Info("Admin accessing all short links", "admin_user", userID)
-		paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(page, limit, sort, orderBy)
+		detail := ctx.Query("detail") == "true"
+		if targetUserID != "" && !detail {
+			// ✅ Admin: Get specific user's short links without details
+			logger.Logger.Info("Admin accessing specific user short links without details", "admin_user", userID, "target_user", targetUserID)
+			paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(targetUserID, page, limit, sort, orderBy)
+		} else {
+			// ✅ Admin: Get all short links (with or without target user filter, but WITH details)
+			logger.Logger.Info("Admin accessing short links with details", "admin_user", userID, "target_user", targetUserID)
+			paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(targetUserID, page, limit, sort, orderBy)
+		}
 	} else {
 		// ✅ User: Get only user's short links (filtered by user_id)
 		logger.Logger.Info("User accessing own short links", "user_id", userID)
@@ -66,9 +76,4 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	httputil.SendOKResponse(ctx, paginatedResponse, "Short links retrieved successfully")
 }
 
-// ✅ DEPRECATED: Keep for backward compatibility (optional)
-func (c *Controller) ListUserShortLinks(ctx *gin.Context) {
-	// Force user role for backward compatibility
-	ctx.Set("role", "user")
-	c.ListShortLinks(ctx)
-}
+
