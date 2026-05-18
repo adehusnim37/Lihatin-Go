@@ -596,8 +596,8 @@ func (r *UserAuthRepository) IsEmailVerified(userID string) (bool, error) {
 	return userAuth.IsEmailVerified, nil
 }
 
-// IsAccountLocked checks if account is currently locked
-func (r *UserAuthRepository) IsAccountLocked(userID string) (bool, error) {
+// IsAccountLockout checks if account is currently locked
+func (r *UserAuthRepository) IsAccountLockout(userID string) (bool, error) {
 	var userAuth user.UserAuth
 
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {

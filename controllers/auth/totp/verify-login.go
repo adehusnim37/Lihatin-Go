@@ -62,7 +62,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
-	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLocked(userID)
+	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLockout(userID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
