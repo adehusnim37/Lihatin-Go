@@ -3,8 +3,8 @@ package admin
 import (
 	"net/http"
 
-	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/dto"
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -35,9 +35,10 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		httputil.SendErrorResponse(ctx, http.StatusConflict, "USER_NOT_LOCKED", "User not locked", "user_id", userID)
 		return
 	}
+	actorID := ctx.GetString("user_id")
 
 	// Unlock the user
-	if err := c.repo.GetUserAdminRepository().UnlockUser(userID, req.Reason); err != nil {
+	if err := c.repo.GetUserAdminRepository().UnlockUser(userID, req.Reason, actorID); err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "UNLOCK_USER_FAILED", "Failed to unlock user account, please try again later", "user_id", userID)
 		return
 	}

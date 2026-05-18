@@ -140,9 +140,10 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		})
 		return
 	}
+	actorID := ctx.GetString("user_id")
 
 	// Lock the user
-	if err := c.repo.GetUserAdminRepository().LockUser(userID, req.Reason); err != nil {
+	if err := c.repo.GetUserAdminRepository().LockUser(userID, req.Reason, actorID); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -209,9 +210,10 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 		})
 		return
 	}
+	actorID := ctx.GetString("user_id")
 
 	// Unlock the user
-	if err := c.repo.GetUserAdminRepository().UnlockUser(userID, req.Reason); err != nil {
+	if err := c.repo.GetUserAdminRepository().UnlockUser(userID, req.Reason, actorID); err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
 			Data:    nil,

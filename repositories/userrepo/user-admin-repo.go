@@ -1,6 +1,7 @@
 package userrepo
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/user"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -17,8 +19,8 @@ import (
 type UserAdminRepository interface {
 	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
 	GetUserDetailByID(userID string) (*dto.AdminUserDetailResponse, error)
-	LockUser(userID, reason string) error
-	UnlockUser(userID, reason string) error
+	LockUser(userID, reason, changedBy string) error
+	UnlockUser(userID, reason, changedBy string) error
 	RevokePremiumAccess(userID, reason, revokeType, changedBy, changedByRole string) (*user.User, error)
 	ReactivatePremiumAccess(userID, reason, changedBy, changedByRole string, overridePermanent bool) (*user.User, error)
 	GetPremiumStatusEvents(userID string, limit int) ([]user.PremiumStatusEvent, error)
@@ -197,23 +199,69 @@ func (uar *userAdminRepository) GetUserDetailByID(userID string) (*dto.AdminUser
 }
 
 // LockUser locks a user account with a reason
-func (uar *userAdminRepository) LockUser(userID, reason string) error {
+func (uar *userAdminRepository) LockUser(userID, reason, changedBy string) error {
 	now := time.Now()
-	updates := map[string]interface{}{
+	tx := uar.db.Begin()
+	if tx.Error != nil {
+		logger.Logger.Error("Failed to start lock user transaction", "user_id", userID, "error", tx.Error)
+		return apperrors.ErrUserLockFailed
+	}
+
+	var target user.User
+	if err := tx.Select("id", "is_locked", "locked_at", "locked_reason").Where("id = ? AND deleted_at IS NULL", userID).First(&target).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+		logger.Logger.Error("Failed to find user before lock", "user_id", userID, "error", err)
+		return apperrors.ErrUserLockFailed
+	}
+
+	updates := map[string]any{
 		"is_locked":     true,
 		"locked_at":     &now,
 		"locked_reason": reason,
 		"updated_at":    now,
 	}
 
-	result := uar.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
-	if result.Error != nil {
-		logger.Logger.Error("Failed to lock user", "user_id", userID, "error", result.Error)
+	if err := tx.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates).Error; err != nil {
+		tx.Rollback()
+		logger.Logger.Error("Failed to lock user", "user_id", userID, "error", err)
 		return apperrors.ErrUserLockFailed
 	}
 
-	if result.RowsAffected == 0 {
-		return apperrors.ErrUserNotFound
+	oldValueJSON, _ := json.Marshal(map[string]any{
+		"is_locked":     target.IsLocked,
+		"locked_at":     target.LockedAt,
+		"locked_reason": target.LockedReason,
+	})
+	newValueJSON, _ := json.Marshal(map[string]any{
+		"is_locked":     true,
+		"locked_at":     now,
+		"locked_reason": reason,
+	})
+
+	history := user.HistoryUser{
+		UserID:     userID,
+		ActionType: user.ActionAccountLock,
+		OldValue:   datatypes.JSON(oldValueJSON),
+		NewValue:   datatypes.JSON(newValueJSON),
+		Reason:     reason,
+		ChangedAt:  now,
+	}
+	if actor := strings.TrimSpace(changedBy); actor != "" {
+		history.ChangedBy = &actor
+	}
+
+	if err := tx.Create(&history).Error; err != nil {
+		tx.Rollback()
+		logger.Logger.Error("Failed to write lock history", "user_id", userID, "error", err)
+		return apperrors.ErrUserHistoryCreateFailed
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		logger.Logger.Error("Failed to commit lock user transaction", "user_id", userID, "error", err)
+		return apperrors.ErrUserLockFailed
 	}
 
 	logger.Logger.Info("User locked successfully", "user_id", userID, "reason", reason)
@@ -221,28 +269,73 @@ func (uar *userAdminRepository) LockUser(userID, reason string) error {
 }
 
 // UnlockUser unlocks a user account
-func (uar *userAdminRepository) UnlockUser(userID, reason string) error {
+func (uar *userAdminRepository) UnlockUser(userID, reason, changedBy string) error {
 	now := time.Now()
 	unlockReason := "Account unlocked"
 	if reason != "" {
 		unlockReason = reason
 	}
-
-	updates := map[string]interface{}{
-		"is_locked":     false,
-		"locked_at":     nil,
-		"locked_reason": unlockReason,
-		"updated_at":    now,
-	}
-
-	result := uar.db.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates)
-	if result.Error != nil {
-		logger.Logger.Error("Failed to unlock user", "user_id", userID, "error", result.Error)
+	tx := uar.db.Begin()
+	if tx.Error != nil {
+		logger.Logger.Error("Failed to start unlock user transaction", "user_id", userID, "error", tx.Error)
 		return apperrors.ErrUserUnlockFailed
 	}
 
-	if result.RowsAffected == 0 {
-		return apperrors.ErrUserNotFound
+	var target user.User
+	if err := tx.Select("id", "is_locked", "locked_at", "locked_reason").Where("id = ? AND deleted_at IS NULL", userID).First(&target).Error; err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+		logger.Logger.Error("Failed to find user before unlock", "user_id", userID, "error", err)
+		return apperrors.ErrUserUnlockFailed
+	}
+
+	updates := map[string]any{
+		"is_locked":     false,
+		"locked_at":     nil,
+		"locked_reason": "",
+		"updated_at":    now,
+	}
+
+	if err := tx.Model(&user.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(updates).Error; err != nil {
+		tx.Rollback()
+		logger.Logger.Error("Failed to unlock user", "user_id", userID, "error", err)
+		return apperrors.ErrUserUnlockFailed
+	}
+
+	oldValueJSON, _ := json.Marshal(map[string]any{
+		"is_locked":     target.IsLocked,
+		"locked_at":     target.LockedAt,
+		"locked_reason": target.LockedReason,
+	})
+	newValueJSON, _ := json.Marshal(map[string]any{
+		"is_locked":     false,
+		"locked_at":     nil,
+		"locked_reason": "",
+	})
+
+	history := user.HistoryUser{
+		UserID:     userID,
+		ActionType: user.ActionAccountUnlock,
+		OldValue:   datatypes.JSON(oldValueJSON),
+		NewValue:   datatypes.JSON(newValueJSON),
+		Reason:     unlockReason,
+		ChangedAt:  now,
+	}
+	if actor := strings.TrimSpace(changedBy); actor != "" {
+		history.ChangedBy = &actor
+	}
+
+	if err := tx.Create(&history).Error; err != nil {
+		tx.Rollback()
+		logger.Logger.Error("Failed to write unlock history", "user_id", userID, "error", err)
+		return apperrors.ErrUserHistoryCreateFailed
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		logger.Logger.Error("Failed to commit unlock user transaction", "user_id", userID, "error", err)
+		return apperrors.ErrUserUnlockFailed
 	}
 
 	logger.Logger.Info("User unlocked successfully", "user_id", userID, "reason", unlockReason)

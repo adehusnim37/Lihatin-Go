@@ -1,8 +1,9 @@
 package admin
 
 import (
-	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"net/http"
+
+	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -36,9 +37,10 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		httputil.SendErrorResponse(ctx, http.StatusConflict, "USER_ALREADY_LOCKED", "User account is already locked", "user_id", userID)
 		return
 	}
+	actorID := ctx.GetString("user_id")
 
 	// Lock the user
-	if err := c.repo.GetUserAdminRepository().LockUser(userID, req.Reason); err != nil {
+	if err := c.repo.GetUserAdminRepository().LockUser(userID, req.Reason, actorID); err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOCK_USER_FAILED", "Failed to lock user account, please try again later", "user_id", userID)
 		return
 	}

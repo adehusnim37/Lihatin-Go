@@ -120,6 +120,15 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 		if manager != nil {
 			_ = premium.MarkRedeemedOwner(context.Background(), manager.GetRedisClient(), premiumReservationKey, newUser.ID)
 		}
+
+		if err := c.redeemPremiumCodeInDB(req.SecretCode, newUser.ID); err != nil {
+			logger.Logger.Error("Failed to persist premium code redemption during signup",
+				"user_id", newUser.ID,
+				"error", err.Error(),
+			)
+			httputil.HandleError(ctx, err, nil)
+			return
+		}
 	}
 
 	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)

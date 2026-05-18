@@ -42,15 +42,15 @@ func (c *Controller) UpdateTicket(ctx *gin.Context) {
 
 	action := strings.TrimSpace(req.Action)
 	actionResult := ""
+	adminID := strings.TrimSpace(ctx.GetString("user_id"))
 	if action != "" {
-		actionResult, err = c.applyAdminAction(action, ticket)
+		actionResult, err = c.applyAdminAction(action, ticket, adminID)
 		if err != nil {
 			httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ACTION_FAILED", err.Error(), "action")
 			return
 		}
 	}
 
-	adminID := strings.TrimSpace(ctx.GetString("user_id"))
 	var resolvedBy *string
 	if req.Status == string(supportmodel.TicketStatusResolved) || req.Status == string(supportmodel.TicketStatusClosed) {
 		if adminID != "" {
@@ -89,7 +89,7 @@ func (c *Controller) UpdateTicket(ctx *gin.Context) {
 	}, "Support ticket updated successfully")
 }
 
-func (c *Controller) applyAdminAction(action string, ticket *supportmodel.SupportTicket) (string, error) {
+func (c *Controller) applyAdminAction(action string, ticket *supportmodel.SupportTicket, actorID string) (string, error) {
 	normalizedAction := strings.ToLower(strings.TrimSpace(action))
 	if normalizedAction == "" || normalizedAction == "manual_response" {
 		return normalizedAction, nil
@@ -103,7 +103,7 @@ func (c *Controller) applyAdminAction(action string, ticket *supportmodel.Suppor
 	switch normalizedAction {
 	case "unlock_user":
 		reason := fmt.Sprintf("Unlocked from support ticket %s", ticket.TicketCode)
-		if err := c.authRepo.GetUserAdminRepository().UnlockUser(targetUser.ID, reason); err != nil {
+		if err := c.authRepo.GetUserAdminRepository().UnlockUser(targetUser.ID, reason, actorID); err != nil {
 			return "", fmt.Errorf("failed to unlock user account")
 		}
 		if err := c.authRepo.GetUserAuthRepository().UnlockAccount(targetUser.ID); err != nil {
