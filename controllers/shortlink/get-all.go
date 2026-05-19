@@ -25,6 +25,7 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 	limitStr := ctx.DefaultQuery("limit", "10")
 	sort := ctx.DefaultQuery("sort", "created_at")
 	orderBy := ctx.DefaultQuery("order_by", "desc")
+	search := ctx.Query("search")
 
 	// Validate and convert pagination parameters
 	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRole))
@@ -45,6 +46,7 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 		"limit", limit,
 		"sort", sort,
 		"order_by", orderBy,
+		"search", search,
 	)
 
 	// ✅ SMART FILTERING: Choose repository method based on role
@@ -56,16 +58,16 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 		if targetUserID != "" && !detail {
 			// ✅ Admin: Get specific user's short links without details
 			logger.Logger.Info("Admin accessing specific user short links without details", "admin_user", userID, "target_user", targetUserID)
-			paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(targetUserID, page, limit, sort, orderBy)
+			paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(targetUserID, page, limit, sort, orderBy, search)
 		} else {
 			// ✅ Admin: Get all short links (with or without target user filter, but WITH details)
 			logger.Logger.Info("Admin accessing short links with details", "admin_user", userID, "target_user", targetUserID)
-			paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(targetUserID, page, limit, sort, orderBy)
+			paginatedResponse, repositoryErr = c.repo.ListAllShortLinks(targetUserID, page, limit, sort, orderBy, search)
 		}
 	} else {
 		// ✅ User: Get only user's short links (filtered by user_id)
 		logger.Logger.Info("User accessing own short links", "user_id", userID)
-		paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(userID, page, limit, sort, orderBy)
+		paginatedResponse, repositoryErr = c.repo.GetShortsByUserIDWithPagination(userID, page, limit, sort, orderBy, search)
 	}
 
 	if repositoryErr != nil {
@@ -75,5 +77,3 @@ func (c *Controller) ListShortLinks(ctx *gin.Context) {
 
 	httputil.SendOKResponse(ctx, paginatedResponse, "Short links retrieved successfully")
 }
-
-

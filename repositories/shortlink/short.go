@@ -220,12 +220,21 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 }
 
 // GetShortsByUserIDWithPagination gets short links with pagination and sorting
-func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, page, limit int, sort, orderBy string) (*dto.PaginatedShortLinksResponse, error) {
+func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, page, limit int, sort, orderBy, search string) (*dto.PaginatedShortLinksResponse, error) {
 	var links []shortlink.ShortLink
 	var totalCount int64
 
+	baseQuery := r.db.Model(&shortlink.ShortLink{}).Where("user_id = ?", userID)
+	if strings.TrimSpace(search) != "" {
+		keyword := "%" + strings.ToLower(strings.TrimSpace(search)) + "%"
+		baseQuery = baseQuery.Where(
+			"LOWER(short_code) LIKE ? OR LOWER(original_url) LIKE ? OR LOWER(title) LIKE ? OR LOWER(description) LIKE ?",
+			keyword, keyword, keyword, keyword,
+		)
+	}
+
 	// Get total count
-	if err := r.db.Model(&shortlink.ShortLink{}).Where("user_id = ?", userID).Count(&totalCount).Error; err != nil {
+	if err := baseQuery.Count(&totalCount).Error; err != nil {
 		return nil, apperrors.ErrShortGetFailed.WithError(err)
 	}
 
@@ -236,7 +245,16 @@ func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, pag
 	orderClause := fmt.Sprintf("%s %s", sort, orderBy)
 
 	// Get paginated results with sorting
-	if err := r.db.Where("user_id = ?", userID).
+	findQuery := r.db.Where("user_id = ?", userID)
+	if strings.TrimSpace(search) != "" {
+		keyword := "%" + strings.ToLower(strings.TrimSpace(search)) + "%"
+		findQuery = findQuery.Where(
+			"LOWER(short_code) LIKE ? OR LOWER(original_url) LIKE ? OR LOWER(title) LIKE ? OR LOWER(description) LIKE ?",
+			keyword, keyword, keyword, keyword,
+		)
+	}
+
+	if err := findQuery.
 		Order(orderClause).
 		Offset(offset).
 		Limit(limit).
@@ -1323,7 +1341,7 @@ func (r *ShortLinkRepository) DeleteShortsLink(req *dto.BulkDeleteRequest) error
 	return nil
 }
 
-func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, sort, orderBy string) (*dto.PaginatedShortLinksAdminResponse, error) {
+func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, sort, orderBy, search string) (*dto.PaginatedShortLinksAdminResponse, error) {
 	var shortLinks []shortlink.ShortLink
 	var totalCount int64
 
@@ -1337,6 +1355,13 @@ func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, 
 	queryCount := r.db.Model(&shortlink.ShortLink{})
 	if userID != "" {
 		queryCount = queryCount.Where("user_id = ?", userID)
+	}
+	if strings.TrimSpace(search) != "" {
+		keyword := "%" + strings.ToLower(strings.TrimSpace(search)) + "%"
+		queryCount = queryCount.Where(
+			"LOWER(short_code) LIKE ? OR LOWER(original_url) LIKE ? OR LOWER(title) LIKE ? OR LOWER(description) LIKE ?",
+			keyword, keyword, keyword, keyword,
+		)
 	}
 
 	// Get total count (without joins for better performance)
@@ -1359,6 +1384,13 @@ func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, 
 
 	if userID != "" {
 		queryFind = queryFind.Where("user_id = ?", userID)
+	}
+	if strings.TrimSpace(search) != "" {
+		keyword := "%" + strings.ToLower(strings.TrimSpace(search)) + "%"
+		queryFind = queryFind.Where(
+			"LOWER(short_code) LIKE ? OR LOWER(original_url) LIKE ? OR LOWER(title) LIKE ? OR LOWER(description) LIKE ?",
+			keyword, keyword, keyword, keyword,
+		)
 	}
 
 	if err := queryFind.Find(&shortLinks).Error; err != nil {
