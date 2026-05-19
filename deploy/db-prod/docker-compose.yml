@@ -1,6 +1,6 @@
 services:
   mariadb:
-    image: mariadb:latest
+    image: mariadb:lts
     container_name: lihatin-mariadb
     restart: unless-stopped
     env_file:
@@ -9,13 +9,15 @@ services:
       - --defaults-file=/etc/mysql/my.cnf
     ports:
       - "${DB_BIND_IP:-127.0.0.1}:3306:3306"
+    networks:
+      - backbone
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mariadb/my.cnf:/etc/mysql/my.cnf:ro
       - ./mariadb/conf.d:/etc/mysql/conf.d:ro
       - ./backups/mariadb:/backups
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MARIADB_USER -p$$MARIADB_PASSWORD --silent"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 20s
       timeout: 5s
       retries: 10
@@ -41,6 +43,8 @@ services:
     command: ["sh", "-c", "valkey-server /usr/local/etc/valkey/valkey.conf --requirepass $$REDIS_PASSWORD"]
     ports:
       - "${DB_BIND_IP:-127.0.0.1}:6379:6379"
+    networks:
+      - backbone
     volumes:
       - valkey_data:/data
       - ./valkey/valkey.conf:/usr/local/etc/valkey/valkey.conf:ro
@@ -66,3 +70,8 @@ services:
 volumes:
   mysql_data:
   valkey_data:
+
+networks:
+  backbone:
+    external: true
+    name: ${SHARED_NETWORK_NAME:-lihatin-backbone}

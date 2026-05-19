@@ -5,18 +5,26 @@ Production Docker deployment for API server.
 ## Prerequisites
 
 - Docker Engine + Compose plugin installed.
-- External MariaDB and Valkey already running.
+- DB stack (`deploy/db-prod`) already running.
 - DNS/Reverse proxy prepared.
+- Shared Docker network already created (default: `lihatin-backbone`).
 
 ## 1) Configure
 
 ```bash
+docker network create lihatin-backbone
 cd deploy/backend-prod
 cp .env.example .env
 nano .env
 ```
 
 Set all secrets and connection values.
+For same-host deployment with split compose projects:
+
+- `SHARED_NETWORK_NAME` must match value in `deploy/db-prod/.env`
+- `DATABASE_URL` should target `lihatin-mariadb:3306`
+- `REDIS_ADDR` should target `lihatin-valkey:6379`
+
 If you use optional features, also set related vars:
 
 - Google OAuth: `GOOGLE_OAUTH_*`
@@ -64,4 +72,4 @@ docker image ls | grep lihatin-go
 
 - App runs DB migrations on startup. Run only one API instance per DB unless you add migration locking.
 - Keep `APP_BIND_IP=127.0.0.1` and expose via reverse proxy for production.
-- If API is on separate host, allow only proxy IP in firewall/security group.
+- If API is on separate host, use private DB IP and lock firewall/security group strictly.

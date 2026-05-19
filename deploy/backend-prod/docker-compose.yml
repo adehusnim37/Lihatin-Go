@@ -10,6 +10,8 @@ services:
       - .env
     ports:
       - "${APP_BIND_IP:-127.0.0.1}:8080:8080"
+    networks:
+      - backbone
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/v1/health || exit 1"]
       interval: 30s
@@ -27,3 +29,8 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+networks:
+  backbone:
+    external: true
+    name: ${SHARED_NETWORK_NAME:-lihatin-backbone}

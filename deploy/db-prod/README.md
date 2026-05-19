@@ -38,6 +38,17 @@ cp .env.example .env
 
 Edit `.env` with strong passwords (24+ chars).
 
+Create shared Docker network (once per host):
+
+```bash
+docker network create lihatin-backbone
+```
+
+If you use a custom name, set `SHARED_NETWORK_NAME` in both:
+
+- `deploy/db-prod/.env`
+- `deploy/backend-prod/.env`
+
 ## 3) Start
 
 ```bash
@@ -68,6 +79,10 @@ Valkey (Redis-compatible):
 - `REDIS_DB=0`
 
 `<DB_HOST>` can be private IP of your Tencent VPS.
+If backend runs in same host using shared Docker network, use:
+
+- `DATABASE_URL=...@tcp(lihatin-mariadb:3306)/...`
+- `REDIS_ADDR=lihatin-valkey:6379`
 
 ## 5) Backups
 
