@@ -17,6 +17,13 @@ nano .env
 ```
 
 Set all secrets and connection values.
+If you use optional features, also set related vars:
+
+- Google OAuth: `GOOGLE_OAUTH_*`
+- Support captcha: `TURNSTILE_SECRET_KEY`
+- Support notifications: `SUPPORT_ALERT_EMAILS`
+- Disposable policy source override: `DISPOSABLE_EMAIL_BLOCK_LIST_URL`
+- Object storage avatars: `OSS_*`
 
 ## 2) Build and Run
 
