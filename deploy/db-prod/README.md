@@ -72,6 +72,8 @@ MariaDB DSN (`DATABASE_URL`):
 <MARIADB_USER>:<MARIADB_PASSWORD>@tcp(<DB_HOST>:3306)/<MARIADB_DATABASE>?charset=utf8mb4&parseTime=true&loc=Local
 ```
 
+Use exact same database name and credentials in backend `.env` (case-sensitive).
+
 Valkey (Redis-compatible):
 
 - `REDIS_ADDR=<DB_HOST>:6379`

@@ -23,6 +23,8 @@ For same-host deployment with split compose projects:
 
 - `SHARED_NETWORK_NAME` must match value in `deploy/db-prod/.env`
 - `DATABASE_URL` should target `lihatin-mariadb:3306`
+- DB name in `DATABASE_URL` must match `MARIADB_DATABASE` from db stack exactly (default: `lihatin_go`, lowercase)
+- DB user/password in `DATABASE_URL` must match `MARIADB_USER`/`MARIADB_PASSWORD` from db stack
 - `REDIS_ADDR` should target `lihatin-valkey:6379`
 
 If you use optional features, also set related vars:
