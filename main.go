@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/adehusnim37/lihatin-go/internal/jobs"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
@@ -12,6 +14,7 @@ import (
 	appvalidator "github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/routes"
+	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
@@ -20,7 +23,25 @@ import (
 	"gorm.io/gorm"
 )
 
+func configureGinMode() {
+	// Allow explicit GIN_MODE override from environment.
+	if mode := strings.TrimSpace(os.Getenv("GIN_MODE")); mode != "" {
+		gin.SetMode(mode)
+		return
+	}
+
+	// Fallback policy: production ENV defaults to release mode.
+	env := strings.ToLower(strings.TrimSpace(config.GetEnvOrDefault(config.Env, "development")))
+	if env == "production" {
+		gin.SetMode(gin.ReleaseMode)
+		return
+	}
+
+	gin.SetMode(gin.DebugMode)
+}
+
 func main() {
+	configureGinMode()
 
 	// Initialize GORM for new auth repositories
 	_ = godotenv.Load() // ignore error kalau .env ga ada

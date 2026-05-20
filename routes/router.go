@@ -53,8 +53,9 @@ func csrfPublicNoSessionSkipRules() []csrf.SkipRule {
 }
 
 func SetupRouter(validate *validator.Validate) *gin.Engine {
-	// Inisialisasi router Gin default (sudah include logger & recovery middleware)
-	r := gin.Default()
+	// Use gin.New and attach middleware once to avoid duplicate default middleware warnings.
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
 
 	// Apply CORS middleware first
 	r.Use(pkgauth.CORSMiddleware())
