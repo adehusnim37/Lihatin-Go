@@ -1,0 +1,38 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        env:
+          JWT_SECRET: ci-secret
+        run: go test -vet=off ./...
+
+      - name: Run go vet
+        run: go list ./... | grep -v '/tests$' | xargs go vet
+
+      - name: Build Docker image
+        run: docker build -f Dockerfile -t lihatin-go:ci .
