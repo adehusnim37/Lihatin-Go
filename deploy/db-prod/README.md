@@ -130,3 +130,61 @@ Restore:
 - Valkey memory cap in compose: `320m`
 - Valkey dataset configured with `maxmemory 256mb` + `allkeys-lru`
 - Enough for small-to-medium workloads with proper indexing and query tuning.
+
+## 8) Optional: Remote DB Access via Tailscale/WireGuard (Safer than Public Port)
+
+Use this only if you need desktop tools (Navicat, RedisInsight) from outside VPS.
+Recommended: keep `DB_BIND_IP=127.0.0.1` and use tunnel over private mesh VPN.
+
+### Option A: Tailscale + SSH Tunnel (recommended)
+
+1. Install Tailscale on VPS and client, login with same account.
+2. Keep DB stack local-only:
+
+```env
+DB_BIND_IP=127.0.0.1
+```
+
+3. From your laptop, create tunnel to MariaDB and Valkey:
+
+```bash
+ssh -L 3307:127.0.0.1:3306 -L 6380:127.0.0.1:6379 root@<TAILSCALE_VPS_IP>
+```
+
+4. Connect tools to local forwarded ports:
+
+- Navicat: host `127.0.0.1`, port `3307`
+- RedisInsight/redis-cli: host `127.0.0.1`, port `6380`
+
+Redis CLI example:
+
+```bash
+redis-cli -h 127.0.0.1 -p 6380 -a <REDIS_PASSWORD> PING
+```
+
+### Option B: Direct over Tailscale/WireGuard subnet
+
+If you need direct connection (no SSH tunnel):
+
+1. Set `DB_BIND_IP=0.0.0.0`
+2. Restart DB stack:
+
+```bash
+docker compose up -d
+```
+
+3. Allow firewall only private VPN range, never public world:
+
+```bash
+# Example Tailscale subnet
+sudo ufw allow from 100.64.0.0/10 to any port 3306 proto tcp
+sudo ufw allow from 100.64.0.0/10 to any port 6379 proto tcp
+```
+
+4. Connect using VPS private VPN IP (`100.x.x.x` for Tailscale).
+
+### Security Notes
+
+- Do not expose `3306`/`6379` to `0.0.0.0/0`.
+- Use dedicated read/write user for tools (avoid root for daily use).
+- Rotate DB/Redis credentials if secrets ever shared in chat/logs.
