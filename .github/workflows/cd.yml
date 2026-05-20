@@ -47,7 +47,7 @@ jobs:
 
           ssh -p "$PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "DEPLOY_PATH='$DEPLOY_PATH' BRANCH='$BRANCH' bash -se" <<'EOF'
             set -euo pipefail
-            APP_DIR="${DEPLOY_PATH:-~/apps/Lihatin-Go}"
+            APP_DIR="${DEPLOY_PATH:-$HOME/apps/Lihatin-Go}"
             cd "$APP_DIR"
             git fetch --all --prune
             git checkout "$BRANCH"
