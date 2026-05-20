@@ -26,6 +26,7 @@ type UserRepository interface {
 	SetPremium(id string, isPremium bool) error
 	CheckUsernameChangeEligibility(userID string) error
 	ChangeUsername(userID string, newUsername string) (string, error)
+	IsAccountLocked(userID string) (bool, error)
 }
 
 type userRepository struct {
@@ -40,8 +41,10 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 
 func userFindError(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		logger.Logger.Warn("User not found", "error", err)
 		return apperrors.ErrUserNotFound.WithError(err)
 	}
+	logger.Logger.Error("Database error while finding user", "error", err)
 	return apperrors.ErrUserFindFailed.WithError(err)
 }
 
@@ -56,6 +59,15 @@ func (ur *userRepository) GetAllUsers() ([]user.User, error) {
 
 	logger.Logger.Info("Successfully retrieved users", "count", len(users))
 	return users, nil
+}
+
+func (ur *userRepository) IsAccountLocked(userID string) (bool, error) {
+	var user user.User
+	result := ur.db.Select("is_locked").Where("id = ? AND deleted_at IS NULL", userID).First(&user)
+	if result.Error != nil {
+		return false, userFindError(result.Error)
+	}
+	return user.IsLocked, nil
 }
 
 func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
@@ -81,11 +93,7 @@ func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (bool, er
 	result := ur.db.Select("is_premium").Where("(username = ? OR email = ?) AND deleted_at IS NULL", inputs, inputs).First(&user)
 
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return false, apperrors.ErrUserNotFound.WithError(result.Error)
-		}
-		logger.Logger.Error("Database error while checking premium status", "input", inputs, "error", result.Error)
-		return false, apperrors.ErrUserFindFailed.WithError(result.Error)
+		return false, userFindError(result.Error)
 	}
 
 	return user.IsPremium, nil
@@ -96,11 +104,7 @@ func (ur *userRepository) GetUserByEmail(email string) (*user.User, error) {
 	result := ur.db.Where("LOWER(email) = LOWER(?) AND deleted_at IS NULL", email).First(&user)
 
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound.WithError(result.Error)
-		}
-		logger.Logger.Error("Database error while getting user by email", "email", email, "error", result.Error)
-		return nil, apperrors.ErrUserFindFailed.WithError(result.Error)
+		return nil, userFindError(result.Error)
 	}
 
 	return &user, nil
@@ -111,11 +115,7 @@ func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, er
 	result := ur.db.Select("id, email, username, is_locked").Where("(email = ? OR username = ?) AND deleted_at IS NULL AND is_locked = false", input, input).First(&user)
 
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrUserNotFound.WithError(result.Error)
-		}
-		logger.Logger.Error("Database error while getting user by email/username", "input", input, "error", result.Error)
-		return nil, apperrors.ErrUserFindFailed.WithError(result.Error)
+		return nil, userFindError(result.Error)
 	}
 
 	return &user, nil
@@ -125,11 +125,7 @@ func (ur *userRepository) CheckUsernameChangeEligibility(userID string) error {
 	var user user.User
 	result := ur.db.Where("id = ? AND deleted_at IS NULL", userID).First(&user)
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return apperrors.ErrUserNotFound.WithError(result.Error)
-		}
-		logger.Logger.Error("Database error while checking username change eligibility", "user_id", userID, "error", result.Error)
-		return apperrors.ErrUserFindFailed.WithError(result.Error)
+		return userFindError(result.Error)
 	}
 
 	if user.UsernameChanged {
@@ -145,11 +141,7 @@ func (ur *userRepository) ChangeUsername(userID string, newUsername string) (str
 
 	result := ur.db.Where("id = ? AND deleted_at IS NULL", userID).First(&existingUser)
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return "", apperrors.ErrUserNotFound.WithError(result.Error)
-		}
-		logger.Logger.Error("Database error while checking username change eligibility", "user_id", userID, "error", result.Error)
-		return "", apperrors.ErrUserFindFailed.WithError(result.Error)
+		return "", userFindError(result.Error)
 	}
 
 	if existingUser.UsernameChanged {

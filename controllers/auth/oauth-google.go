@@ -140,7 +140,7 @@ func (c *Controller) StartGoogleOAuth(ctx *gin.Context) {
 	}, "Google OAuth started")
 }
 
-// GoogleOAuthCallback exchanges Google auth code and continues login flow.
+// GoogleOAuthCallback exchanges Google auth code and completes login/signup directly.
 func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 	var req dto.GoogleOAuthCallbackRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -154,7 +154,7 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		return
 	}
 
-	statePayload, err := auth.ConsumeGoogleOAuthState(ctx.Request.Context(), req.State)
+	_, err = auth.ConsumeGoogleOAuthState(ctx.Request.Context(), req.State)
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrOAuthStateNotFound):
@@ -169,8 +169,6 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		}
 		return
 	}
-
-	allowCreate := statePayload != nil && statePayload.Intent == auth.GoogleOAuthIntentSignup
 
 	tokenResp, err := exchangeGoogleCode(ctx.Request.Context(), cfg, req.Code)
 	if err != nil {
@@ -213,7 +211,7 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		return
 	}
 
-	usr, userAuth, err := c.resolveGoogleOAuthIdentity(ctx.Request.Context(), email, sub, tokenInfo, allowCreate)
+	usr, userAuth, err := c.resolveGoogleOAuthIdentity(ctx.Request.Context(), email, sub, tokenInfo)
 	if err != nil {
 		if errors.Is(err, disposable.ErrDisposableEmailBlocked) {
 			httputil.SendErrorResponse(
@@ -223,10 +221,6 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 				"Disposable email addresses are not allowed. Please use a permanent email address.",
 				"email",
 			)
-			return
-		}
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "ACCOUNT_NOT_REGISTERED", "Account not found. Please sign up first.", "auth")
 			return
 		}
 		logger.Logger.Error("Failed to resolve Google OAuth identity",
@@ -242,21 +236,31 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		return
 	}
 
-	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLockout(usr.ID)
+	isLockout, err := c.repo.GetUserAuthRepository().IsAccountLockout(usr.ID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
 	}
-	if isLocked {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account is locked. Please try again later.", "auth")
+	if isLockout {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account has been lockout for security reasons. Please try again later.", "auth")
 		return
 	}
 	if !userAuth.IsActive {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
 		return
 	}
+	
+	isLocked, err := c.repo.GetUserRepository().IsAccountLocked(usr.ID)
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
+		return
+	}
+	if isLocked {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
+		return
+	}
 
-	if err := c.requireSecondFactor(ctx, usr, userAuth, "Google sign-in verified"); err != nil {
+	if err := c.completeLogin(ctx, usr, userAuth, "Google sign-in successful"); err != nil {
 		return
 	}
 }
@@ -386,7 +390,7 @@ func verifyGoogleIDToken(ctx context.Context, idToken string) (*googleTokenInfoR
 	return &tokenInfo, nil
 }
 
-func (c *Controller) resolveGoogleOAuthIdentity(ctx context.Context, email, providerUserID string, tokenInfo *googleTokenInfoResponse, allowCreate bool) (*user.User, *user.UserAuth, error) {
+func (c *Controller) resolveGoogleOAuthIdentity(ctx context.Context, email, providerUserID string, tokenInfo *googleTokenInfoResponse) (*user.User, *user.UserAuth, error) {
 	metadata := buildGoogleAuthMetadata(email, tokenInfo)
 
 	// 1) Primary lookup by existing provider mapping.
@@ -436,10 +440,6 @@ func (c *Controller) resolveGoogleOAuthIdentity(ctx context.Context, email, prov
 	}
 	if !errors.Is(err, apperrors.ErrUserNotFound) {
 		return nil, nil, err
-	}
-
-	if !allowCreate {
-		return nil, nil, apperrors.ErrUserNotFound
 	}
 
 	if policy := disposable.Global(); policy != nil {
