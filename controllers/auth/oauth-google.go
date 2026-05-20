@@ -261,8 +261,11 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 	}
 
 	if err := c.completeLogin(ctx, usr, userAuth, "Google sign-in successful"); err != nil {
+		c.recordGoogleLoginAttempt(ctx, usr.Username, false, "Google sign-in failed")
 		return
 	}
+
+	c.recordGoogleLoginAttempt(ctx, usr.Username, true, "Google sign-in successful")
 }
 
 func getGoogleOAuthConfig(requireSecret bool) (googleOAuthConfig, error) {
@@ -721,4 +724,33 @@ func buildGoogleAuthMetadata(email string, tokenInfo *googleTokenInfoResponse) s
 		return "{}"
 	}
 	return string(raw)
+}
+
+func (c *Controller) recordGoogleLoginAttempt(ctx *gin.Context, emailOrUsername string, success bool, reason string) {
+	loginIdentifier := strings.TrimSpace(emailOrUsername)
+	if loginIdentifier == "" {
+		loginIdentifier = "google_oauth"
+	}
+
+	if strings.TrimSpace(reason) == "" {
+		if success {
+			reason = "Google sign-in successful"
+		} else {
+			reason = "Google sign-in failed"
+		}
+	}
+
+	if err := c.repo.GetLoginAttemptRepository().RecordLoginAttempt(
+		ctx.ClientIP(),
+		ctx.GetHeader("User-Agent"),
+		success,
+		reason,
+		loginIdentifier,
+	); err != nil {
+		logger.Logger.Warn("Failed to record Google OAuth login attempt",
+			"identifier", loginIdentifier,
+			"success", success,
+			"error", err.Error(),
+		)
+	}
 }
