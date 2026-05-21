@@ -56,6 +56,8 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Use gin.New and attach middleware once to avoid duplicate default middleware warnings.
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+	r.Use(middleware.SecurityHeaders())
+	r.Use(middleware.BlockSensitivePaths())
 
 	// Apply CORS middleware first
 	r.Use(pkgauth.CORSMiddleware())
