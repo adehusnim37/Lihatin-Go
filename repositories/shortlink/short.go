@@ -215,11 +215,11 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 	for i := range code { // Generate 4 random characters
 		idx, err := rand.Int(rand.Reader, max)
 		if err != nil { // Fallback to deterministic character if random generation fails
-			code[i] = encodedString[i%len(encodedString)] // Use modulo to avoid index out of range
-			continue // Log the error for debugging
+			logger.Logger.Error("Failed to generate random index for short code", "error", err)
+			code[i] = encodedString[i%len(encodedString)]
+			continue
 		}
-		code[i] = encodedString[idx.Int64()] // Use the random index to select a character from the encoded string
-		logger.Logger.Info("Generated character for short code", "char", string(code[i]))
+		code[i] = encodedString[idx.Int64()]
 	}
 	return string(code)
 }
