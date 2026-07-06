@@ -118,6 +118,7 @@ const (
 	EnvEmailVerificationExpiry = "EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS"
 
 	// Object Storage (S3-compatible)
+	// #nosec G101 -- These are validation messages, not credentials.
 	EnvOSSEndpoint      = "OSS_ENDPOINT"
 	EnvOSSRegion        = "OSS_REGION"
 	EnvOSSAccessKey     = "OSS_ACCESS_KEY"
@@ -127,6 +128,7 @@ const (
 	EnvOSSPublicBaseURL = "OSS_PUBLIC_BASE_URL"
 
 	// OAuth (Google)
+	// #nosec G101 -- These are validation messages, not credentials.
 	EnvGoogleOAuthClientID     = "GOOGLE_OAUTH_CLIENT_ID"
 	EnvGoogleOAuthClientSecret = "GOOGLE_OAUTH_CLIENT_SECRET"
 	EnvGoogleOAuthRedirectURI  = "GOOGLE_OAUTH_REDIRECT_URI"

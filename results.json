@@ -1,0 +1,780 @@
+{
+	"Golang errors": {},
+	"Issues": [
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/config/config.go",
+			"code": "130: \tEnvGoogleOAuthClientID     = \"GOOGLE_OAUTH_CLIENT_ID\"\n131: \tEnvGoogleOAuthClientSecret = \"GOOGLE_OAUTH_CLIENT_SECRET\"\n132: \tEnvGoogleOAuthRedirectURI  = \"GOOGLE_OAUTH_REDIRECT_URI\"\n",
+			"line": "131",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/config/config.go",
+			"code": "123: \tEnvOSSAccessKey     = \"OSS_ACCESS_KEY\"\n124: \tEnvOSSSecretKey     = \"OSS_SECRET_KEY\"\n125: \tEnvOSSBucket        = \"OSS_BUCKET\"\n",
+			"line": "124",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/config/config.go",
+			"code": "114: \tEnvRateLimit         = \"RATE_LIMIT\"\n115: \tEnvPremiumCodeSecret = \"PREMIUM_CODE_SECRET\"\n116: \n",
+			"line": "115",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/config/config.go",
+			"code": "99: \tEnvRefreshTokenExpired = \"REFRESH_TOKEN_EXPIRED\"\n100: \tEnvIPGeoAPIKey         = \"IP_GEOLOCATION_API_KEY\"\n101: \tEnvFrontendURL         = \"FRONTEND_URL\"\n",
+			"line": "100",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/config/config.go",
+			"code": "98: \tEnvJWTExpired          = \"JWT_EXPIRED\"\n99: \tEnvRefreshTokenExpired = \"REFRESH_TOKEN_EXPIRED\"\n100: \tEnvIPGeoAPIKey         = \"IP_GEOLOCATION_API_KEY\"\n",
+			"line": "99",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/validate.go",
+			"code": "45: \t\t\tMessage: \"Invalid token\",\n46: \t\t\tError:   map[string]string{\"token\": \"Invalid or expired token\"},\n47: \t\t})\n",
+			"line": "46",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/oauth-google.go",
+			"code": "32: \tgoogleOAuthTokenEndpoint     = \"https://oauth2.googleapis.com/token\"\n33: \tgoogleOAuthTokenInfoEndpoint = \"https://oauth2.googleapis.com/tokeninfo\"\n34: )\n",
+			"line": "33",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/oauth-google.go",
+			"code": "31: \tgoogleOAuthAuthorizeEndpoint = \"https://accounts.google.com/o/oauth2/v2/auth\"\n32: \tgoogleOAuthTokenEndpoint     = \"https://oauth2.googleapis.com/token\"\n33: \tgoogleOAuthTokenInfoEndpoint = \"https://oauth2.googleapis.com/tokeninfo\"\n",
+			"line": "32",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/base.go",
+			"code": "264: \t\t\tMessage: \"Invalid or expired refresh token\",\n265: \t\t\tError:   map[string]string{\"refresh_token\": \"Please login again\"},\n266: \t\t})\n",
+			"line": "265",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "HIGH",
+			"confidence": "LOW",
+			"cwe": {
+				"id": "798",
+				"url": "https://cwe.mitre.org/data/definitions/798.html"
+			},
+			"rule_id": "G101",
+			"details": "Potential hardcoded credentials",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/base.go",
+			"code": "244: \t\t\tMessage: \"Refresh token missing\",\n245: \t\t\tError:   map[string]string{\"refresh_token\": \"Please login again\"},\n246: \t\t})\n",
+			"line": "245",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/verify-login.go",
+			"code": "248: \t// Set Refresh Token Cookie\n249: \trefreshTokenCookie := \u0026http.Cookie{\n250: \t\tName:     \"refresh_token\",\n",
+			"line": "249",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/verify-login.go",
+			"code": "236: \t// Set Access Token Cookie\n237: \taccessTokenCookie := \u0026http.Cookie{\n238: \t\tName:     \"access_token\",\n",
+			"line": "237",
+			"column": "35",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/logout.go",
+			"code": "107: \t// Clear refresh_token cookie\n108: \trefreshTokenCookie := \u0026nethttp.Cookie{\n109: \t\tName:     \"refresh_token\",\n",
+			"line": "108",
+			"column": "39",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/logout.go",
+			"code": "95: \t// Clear access_token cookie\n96: \taccessTokenCookie := \u0026nethttp.Cookie{\n97: \t\tName:     \"access_token\",\n",
+			"line": "96",
+			"column": "38",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/login-common.go",
+			"code": "110: \n111: \trefreshTokenCookie := \u0026http.Cookie{\n112: \t\tName:     \"refresh_token\",\n",
+			"line": "111",
+			"column": "36",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/login-common.go",
+			"code": "99: \n100: \taccessTokenCookie := \u0026http.Cookie{\n101: \t\tName:     \"access_token\",\n",
+			"line": "100",
+			"column": "35",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/base.go",
+			"code": "373: \t// Refresh token cookie (long-lived: default 168 hours = 7 days)\n374: \tnewRefreshTokenCookie := \u0026http.Cookie{\n375: \t\tName:     \"refresh_token\",\n",
+			"line": "374",
+			"column": "39",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "614",
+				"url": "https://cwe.mitre.org/data/definitions/614.html"
+			},
+			"rule_id": "G124",
+			"details": "http.Cookie missing or has insecure Secure, HttpOnly, or SameSite attribute",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/base.go",
+			"code": "361: \t// Access token cookie (short-lived: default 48 hours)\n362: \tnewAccessTokenCookie := \u0026http.Cookie{\n363: \t\tName:     \"access_token\",\n",
+			"line": "362",
+			"column": "38",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "88",
+				"url": "https://cwe.mitre.org/data/definitions/88.html"
+			},
+			"rule_id": "G107",
+			"details": "Potential HTTP request made with variable url",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "35: \tjsonData, _ := json.Marshal(payload)\n36: \tresp, err := http.Post(url, \"application/json\", bytes.NewBuffer(jsonData))\n37: \tif err != nil {\n",
+			"line": "36",
+			"column": "15",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Marshaled struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "123: \n124: \tjsonData, _ = json.Marshal(loginPayload)\n125: \tloginResp, err := http.Post(sv.BaseURL+\"/api/auth/login\", \"application/json\", bytes.NewBuffer(jsonData))\n",
+			"line": "124",
+			"column": "16",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Marshaled struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "110: \n111: \tjsonData, _ := json.Marshal(regPayload)\n112: \tregResp, err := http.Post(sv.BaseURL+\"/api/auth/register\", \"application/json\", bytes.NewBuffer(jsonData))\n",
+			"line": "111",
+			"column": "17",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Marshaled struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "75: \n76: \tjsonData, _ = json.Marshal(loginPayload)\n77: \tloginResp, err := http.Post(sv.BaseURL+\"/api/auth/login\", \"application/json\", bytes.NewBuffer(jsonData))\n",
+			"line": "76",
+			"column": "16",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Marshaled struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "62: \n63: \tjsonData, _ := json.Marshal(regPayload)\n64: \tregResp, err := http.Post(sv.BaseURL+\"/api/auth/register\", \"application/json\", bytes.NewBuffer(jsonData))\n",
+			"line": "63",
+			"column": "17",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "MEDIUM",
+			"confidence": "MEDIUM",
+			"cwe": {
+				"id": "499",
+				"url": "https://cwe.mitre.org/data/definitions/499.html"
+			},
+			"rule_id": "G117",
+			"details": "Marshaled struct field \"Password\" (JSON key \"password\") matches secret pattern",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "34: \n35: \tjsonData, _ := json.Marshal(payload)\n36: \tresp, err := http.Post(url, \"application/json\", bytes.NewBuffer(jsonData))\n",
+			"line": "35",
+			"column": "17",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "117",
+				"url": "https://cwe.mitre.org/data/definitions/117.html"
+			},
+			"rule_id": "G706",
+			"details": "Log injection via taint analysis",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/cmd/migrate/main.go",
+			"code": "48: \tdefault:\n49: \t\tlog.Fatalf(\"Unknown command: %s. Available: migrate, fresh, rollback, status\", command)\n50: \t}\n",
+			"line": "49",
+			"column": "13",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "115: \t}\n116: \tregResp.Body.Close()\n117: \n",
+			"line": "116",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/tests/auth_system_verification.go",
+			"code": "67: \t}\n68: \tregResp.Body.Close()\n69: \n",
+			"line": "68",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/main.go",
+			"code": "112: \tfmt.Println(\"Server running on port:\", config.GetRequiredEnv(config.EnvAppPort))\n113: \tr.Run(config.GetRequiredEnv(config.EnvAppPort))\n114: }\n",
+			"line": "113",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/main.go",
+			"code": "95: \tscheduler.Register(jobs.NewCleanupLoginAttemptsJob(gormDB))\n96: \tscheduler.Register(jobs.NewRefreshDisposableDomainsJob())\n97: \tlog.Println(\"⬇ Starting scheduler...\")\n",
+			"line": "96",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/main.go",
+			"code": "94: \tscheduler.Register(jobs.NewDeactivateExpiredLinksJob(gormDB))\n95: \tscheduler.Register(jobs.NewCleanupLoginAttemptsJob(gormDB))\n96: \tscheduler.Register(jobs.NewRefreshDisposableDomainsJob())\n",
+			"line": "95",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/main.go",
+			"code": "93: \tlog.Println(\"⬇️ Registering jobs...\")\n94: \tscheduler.Register(jobs.NewDeactivateExpiredLinksJob(gormDB))\n95: \tscheduler.Register(jobs.NewCleanupLoginAttemptsJob(gormDB))\n",
+			"line": "94",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "371: \tv.RegisterValidation(\"secret_code\", validateSecretCode)\n372: \tv.RegisterValidation(\"not_same_digit\", validateNotSameDigit)\n373: }\n",
+			"line": "372",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "370: \tv.RegisterValidation(\"six_digit\", validateSixDigit)\n371: \tv.RegisterValidation(\"secret_code\", validateSecretCode)\n372: \tv.RegisterValidation(\"not_same_digit\", validateNotSameDigit)\n",
+			"line": "371",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "369: \tv.RegisterValidation(\"saveurlshort\", validateSaveUrlShort)\n370: \tv.RegisterValidation(\"six_digit\", validateSixDigit)\n371: \tv.RegisterValidation(\"secret_code\", validateSecretCode)\n",
+			"line": "370",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "368: \tv.RegisterValidation(\"no_special\", validateNoSpecial)\n369: \tv.RegisterValidation(\"saveurlshort\", validateSaveUrlShort)\n370: \tv.RegisterValidation(\"six_digit\", validateSixDigit)\n",
+			"line": "369",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "367: \tv.RegisterValidation(\"no_space\", validateNoSpace)\n368: \tv.RegisterValidation(\"no_special\", validateNoSpecial)\n369: \tv.RegisterValidation(\"saveurlshort\", validateSaveUrlShort)\n",
+			"line": "368",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "366: \tv.RegisterValidation(\"unique\", validateUnique)\n367: \tv.RegisterValidation(\"no_space\", validateNoSpace)\n368: \tv.RegisterValidation(\"no_special\", validateNoSpecial)\n",
+			"line": "367",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "365: \tv.RegisterValidation(\"username\", validateUsername)\n366: \tv.RegisterValidation(\"unique\", validateUnique)\n367: \tv.RegisterValidation(\"no_space\", validateNoSpace)\n",
+			"line": "366",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "364: \tv.RegisterValidation(\"pwdcomplex\", validatePasswordComplexity)\n365: \tv.RegisterValidation(\"username\", validateUsername)\n366: \tv.RegisterValidation(\"unique\", validateUnique)\n",
+			"line": "365",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/validator/validator.go",
+			"code": "363: func SetupCustomValidators(v *validator.Validate) {\n364: \tv.RegisterValidation(\"pwdcomplex\", validatePasswordComplexity)\n365: \tv.RegisterValidation(\"username\", validateUsername)\n",
+			"line": "364",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/internal/pkg/auth/jwt_blacklist.go",
+			"code": "180: \tvar result int64\n181: \tfmt.Sscanf(s, \"%d\", \u0026result)\n182: \treturn result\n",
+			"line": "181",
+			"column": "2",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/verify-login.go",
+			"code": "230: \t\tclientIP := ctx.ClientIP()\n231: \t\tc.emailService.SendLoginAlertEmail(user.Email, user.Username, clientIP, userAgent)\n232: \t}()\n",
+			"line": "231",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/validate.go",
+			"code": "108: \tif err == nil {\n109: \t\tc.repo.GetAuthMethodRepository().UpdateLastUsed(totpMethod.ID)\n110: \t}\n",
+			"line": "109",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/validate.go",
+			"code": "93: \t\t\tupdatedCodes := auth.RemoveRecoveryCode(recoveryCodes, req.Code)\n94: \t\t\tc.repo.GetAuthMethodRepository().UpdateRecoveryCodes(userAuth.ID, updatedCodes)\n95: \t\t} else {\n",
+			"line": "94",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/totp/disable.go",
+			"code": "60: \t\t\t)\n61: \t\t\tc.repo.GetUserAuthRepository().IncrementFailedLogin(userID)\n62: \t\t\thttputil.SendErrorResponse(ctx, http.StatusUnauthorized, \"INVALID_CREDENTIALS\", \"Invalid password provided\", \"auth\", userID)\n",
+			"line": "61",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/login.go",
+			"code": "54: \tif err := auth.CheckPassword(userAuth.PasswordHash, loginReq.Password); err != nil {\n55: \t\tc.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)\n56: \t\thttputil.SendErrorResponse(ctx, http.StatusUnauthorized, \"INVALID_CREDENTIALS\", \"Invalid email/username or password\", \"auth\")\n",
+			"line": "55",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/login.go",
+			"code": "26: \t\tif user != nil {\n27: \t\t\tc.repo.GetUserAuthRepository().IncrementFailedLogin(user.ID)\n28: \t\t}\n",
+			"line": "27",
+			"column": "4",
+			"nosec": false,
+			"suppressions": null
+		},
+		{
+			"severity": "LOW",
+			"confidence": "HIGH",
+			"cwe": {
+				"id": "703",
+				"url": "https://cwe.mitre.org/data/definitions/703.html"
+			},
+			"rule_id": "G104",
+			"details": "Errors unhandled",
+			"file": "/Users/adehusnim/Programming/GO/Lihatin-Go/controllers/auth/login-common.go",
+			"code": "94: \t\tclientIP := ctx.ClientIP()\n95: \t\tc.emailService.SendLoginAlertEmail(u.Email, u.Username, clientIP, userAgent)\n96: \t}()\n",
+			"line": "95",
+			"column": "3",
+			"nosec": false,
+			"suppressions": null
+		}
+	],
+	"Stats": {
+		"files": 214,
+		"lines": 30763,
+		"nosec": 1,
+		"found": 48
+	},
+	"GosecVersion": "dev"
+}

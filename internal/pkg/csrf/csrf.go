@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/binary"
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -238,15 +240,11 @@ func generateToken(secret []byte) (string, error) {
 	raw := make([]byte, TokenLength)
 
 	// Embed timestamp (untuk expiry check)
-	timestamp := time.Now().Unix()
-	raw[0] = byte(timestamp >> 56)
-	raw[1] = byte(timestamp >> 48)
-	raw[2] = byte(timestamp >> 40)
-	raw[3] = byte(timestamp >> 32)
-	raw[4] = byte(timestamp >> 24)
-	raw[5] = byte(timestamp >> 16)
-	raw[6] = byte(timestamp >> 8)
-	raw[7] = byte(timestamp)
+	var timestampBytes bytes.Buffer
+	if err := binary.Write(&timestampBytes, binary.BigEndian, time.Now().Unix()); err != nil {
+		return "", fmt.Errorf("failed to encode timestamp: %w", err)
+	}
+	copy(raw[:8], timestampBytes.Bytes())
 
 	// Fill rest with random bytes
 	if _, err := rand.Read(raw[8:]); err != nil {
@@ -300,9 +298,10 @@ func parseToken(tokenStr string, secret []byte, maxAge int) (*csrfToken, error) 
 	}
 
 	// 5. Extract and check timestamp
-	timestamp := int64(raw[0])<<56 | int64(raw[1])<<48 | int64(raw[2])<<40 |
-		int64(raw[3])<<32 | int64(raw[4])<<24 | int64(raw[5])<<16 |
-		int64(raw[6])<<8 | int64(raw[7])
+	var timestamp int64
+	if err := binary.Read(bytes.NewReader(raw[:8]), binary.BigEndian, &timestamp); err != nil {
+		return nil, fmt.Errorf("failed to decode timestamp: %w", err)
+	}
 
 	tokenTime := time.Unix(timestamp, 0)
 	if time.Since(tokenTime) > time.Duration(maxAge)*time.Second {

@@ -1,10 +1,11 @@
 package shortlink
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net/url"
 	"sort"
 	"strings"
@@ -19,12 +20,6 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
-
-var localRng *rand.Rand
-
-func init() {
-	localRng = rand.New(rand.NewSource(time.Now().UnixNano()))
-}
 
 type ShortLinkRepository struct {
 	db *gorm.DB
@@ -211,9 +206,19 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 func (r *ShortLinkRepository) generateCustomCode(url string) string {
 	// Encode the URL to base64 and take 4 random characters from the encoded string
 	encodedString := base64.RawURLEncoding.EncodeToString([]byte(url))
+	if encodedString == "" {
+		encodedString = "shortlink"
+	}
+
 	code := make([]byte, 4)
-	for i := range code {
-		code[i] = encodedString[localRng.Intn(len(encodedString))]
+	max := big.NewInt(int64(len(encodedString))) // Use the length of the encoded string for random index generation
+	for i := range code { // Generate 4 random characters
+		idx, err := rand.Int(rand.Reader, max)
+		if err != nil { // Fallback to deterministic character if random generation fails
+			code[i] = encodedString[i%len(encodedString)] // Use modulo to avoid index out of range
+			continue // Log the error for debugging
+		}
+		code[i] = encodedString[idx.Int64()] // Use the random index to select a character from the encoded string
 		logger.Logger.Info("Generated character for short code", "char", string(code[i]))
 	}
 	return string(code)

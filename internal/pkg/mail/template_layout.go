@@ -107,7 +107,8 @@ func renderEmailTemplate(t emailTemplate) string {
       .shell { padding: 16px 8px; }
       .header, .content, .footer { padding-left: 16px; padding-right: 16px; }
       .button-table, .button-table tbody, .button-table tr, .btn-cell { display: block !important; width: 100%% !important; }
-      .btn-cell { padding: 0 !important; }
+			.btn-cell { padding: 0 !important; margin: 0 0 10px !important; }
+			.btn-cell:last-child { margin-bottom: 0 !important; }
       .btn { width: 100%% !important; font-size: 14px; padding: 11px 10px; }
       .summary-label { width: 42%%; }
     }
