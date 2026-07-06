@@ -85,7 +85,11 @@ func BuildSecretCode(validUntil time.Time) (string, error) {
 
 	payload := make([]byte, payloadSize)
 	payload[0] = codeVersion
-	binary.BigEndian.PutUint32(payload[1:5], uint32(validUntil.Unix()))
+	unix := validUntil.Unix()
+	if unix < 0 || unix > 0xFFFFFFFF {
+		return "", fmt.Errorf("validUntil is out of range for 32-bit unsigned integer")
+	}
+	binary.BigEndian.PutUint32(payload[1:5], uint32(unix))
 	if _, err := rand.Read(payload[5:]); err != nil {
 		return "", err
 	}
@@ -128,7 +132,8 @@ func VerifyCode(code string, now time.Time) (time.Time, string, error) {
 		return time.Time{}, "", ErrCodeSignature
 	}
 
-	expiry := time.Unix(int64(binary.BigEndian.Uint32(payload[1:5])), 0).UTC()
+	unix := int64(binary.BigEndian.Uint32(payload[1:5]))
+	expiry := time.Unix(unix, 0).UTC()
 	if now.UTC().After(expiry) {
 		return time.Time{}, "", ErrCodeExpired
 	}
