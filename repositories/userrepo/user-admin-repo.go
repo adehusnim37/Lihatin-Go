@@ -565,7 +565,7 @@ func (uar *userAdminRepository) UpdateUserByAdmin(id string, updateUser dto.Admi
 	updatedFields := 0
 
 	if currentUser.Role == "admin" || currentUser.Role == "super_admin" {
-		return apperrors.ErrUserRoleUpdateNotAllowed
+		return apperrors.ErrUserUpdateNotAllowed
 	}
 
 	if updateUser.FirstName != nil {
@@ -596,7 +596,7 @@ func (uar *userAdminRepository) UpdateUserByAdmin(id string, updateUser dto.Admi
 		// disallow setting role to admin or super_admin via this path
 		rawRole := strings.TrimSpace(*updateUser.Role)
 		if rawRole == "admin" || rawRole == "super_admin" {
-			return apperrors.ErrUserRoleUpdateNotAllowed
+			return apperrors.ErrUserUpdateNotAllowed
 		}
 		role := strings.ToLower(rawRole)
 		currentUser.Role = role
@@ -661,7 +661,7 @@ func (uar *userAdminRepository) DeleteUserPermanent(userID string) error {
 
 	if user.Role == "admin" || user.Role == "super_admin" {
 		logger.Logger.Warn("Attempted to permanently delete an admin user", "user_id", userID)
-		return apperrors.ErrUserRoleUpdateNotAllowed
+		return apperrors.ErrUserUpdateNotAllowed
 	}
 
 	result = uar.db.Unscoped().Delete(&user, "id = ?", userID)
