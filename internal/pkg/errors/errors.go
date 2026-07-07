@@ -254,6 +254,12 @@ var (
 		http.StatusBadRequest,
 		"premium",
 	)
+	ErrUserRoleUpdateNotAllowed = NewAppError(
+		"USER_ROLE_UPDATE_NOT_ALLOWED",
+		"User role update is not allowed",
+		http.StatusBadRequest,
+		"user",
+	)
 )
 
 // User Auth Errors

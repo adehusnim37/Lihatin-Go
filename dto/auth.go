@@ -260,7 +260,7 @@ type AdminUpdateUserRequest struct {
 	LastName  *string `json:"last_name" binding:"omitempty,min=3,max=50"`
 	Username  *string `json:"username" binding:"omitempty,min=3,max=30,alphanum"`
 	Email     *string `json:"email" binding:"omitempty,email"`
-	Role      *string `json:"role" binding:"omitempty,oneof=user admin super_admin"`
+	Role      *string `json:"role" binding:"omitempty"`
 }
 
 // AdminUserResponse represents the response format for admin user data
