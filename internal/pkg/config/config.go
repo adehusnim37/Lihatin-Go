@@ -110,9 +110,13 @@ const (
 	Env                    = "ENV"
 
 	// Security
-	EnvCSRFSecret        = "CSRF_SECRET"
-	EnvRateLimit         = "RATE_LIMIT"
-	EnvPremiumCodeSecret = "PREMIUM_CODE_SECRET"
+	EnvCSRFSecret                     = "CSRF_SECRET"
+	EnvRateLimit                      = "RATE_LIMIT"
+	EnvPremiumCodeSecret              = "PREMIUM_CODE_SECRET"
+	EnvAuthEnforceTOTPForPrivileged   = "AUTH_ENFORCE_TOTP_FOR_PRIVILEGED"
+	EnvAuthSecondFactorLimitPerUserIP = "AUTH_SECOND_FACTOR_LIMIT_PER_USER_IP"
+	EnvAuthSecondFactorLimitPerIP     = "AUTH_SECOND_FACTOR_LIMIT_PER_IP"
+	EnvAuthSecondFactorWindowMinutes  = "AUTH_SECOND_FACTOR_WINDOW_MINUTES"
 
 	// Email
 	EnvEmailVerificationExpiry = "EXPIRE_EMAIL_VERIFICATION_TOKEN_HOURS"

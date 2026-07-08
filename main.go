@@ -44,7 +44,10 @@ func main() {
 	configureGinMode()
 
 	// Initialize GORM for new auth repositories
-	_ = godotenv.Load() // ignore error kalau .env ga ada
+	envErr := godotenv.Load() // ignore error kalau .env ga ada
+	if envErr != nil {
+		log.Printf("Error loading .env file, Please check your environment variables: %v", envErr)
+	}
 	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
 	// Setup database connection for sql.DB (existing code)
 	db, err := sql.Open("mysql", dsn)

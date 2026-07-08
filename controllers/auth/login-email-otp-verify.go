@@ -46,6 +46,18 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 		return
 	}
 
+	blocked, retryAfterSeconds, err := auth.EnforceSecondFactorRiskLimit(ctx.Request.Context(), "email_otp_verify", challenge.UserID, ctx.ClientIP())
+	if err != nil {
+		logger.Logger.Warn("Second-factor risk guard unavailable for login email OTP verification",
+			"user_id", challenge.UserID,
+			"ip", ctx.ClientIP(),
+			"error", err.Error(),
+		)
+	} else if blocked {
+		httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "SECOND_FACTOR_RATE_LIMITED", fmt.Sprintf("Too many verification attempts. Please wait %d seconds and try again.", retryAfterSeconds), "otp_code")
+		return
+	}
+
 	user, err := c.repo.GetUserRepository().GetUserByID(challenge.UserID)
 	if err != nil {
 		httputil.HandleError(ctx, err, challenge.UserID)
@@ -80,6 +92,17 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 
 	if !userAuth.IsEmailVerified {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "Your email is not verified. Please verify your email first.", "email")
+		return
+	}
+
+	if isPrivilegedRole(user.Role) && !userAuth.IsTOTPEnabled && isPrivilegedTOTPEnforced() {
+		_ = auth.DeleteEmailOTPChallenge(context.Background(), req.ChallengeToken)
+		logger.Logger.Warn("Blocked privileged email OTP login due to missing TOTP",
+			"user_id", user.ID,
+			"role", user.Role,
+			"ip", ctx.ClientIP(),
+		)
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "TOTP_REQUIRED_FOR_PRIVILEGED_ACCOUNT", "Privileged accounts must use TOTP. Please enroll TOTP before logging in.", "auth")
 		return
 	}
 

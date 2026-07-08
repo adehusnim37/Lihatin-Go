@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -17,6 +18,16 @@ func (c *Controller) requireSecondFactor(ctx *gin.Context, usr *user.User, userA
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return err
+	}
+
+	if !hasTOTP && isPrivilegedRole(usr.Role) && isPrivilegedTOTPEnforced() {
+		logger.Logger.Warn("Blocked privileged login without TOTP enrollment",
+			"user_id", usr.ID,
+			"role", usr.Role,
+			"ip", ctx.ClientIP(),
+		)
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "TOTP_REQUIRED_FOR_PRIVILEGED_ACCOUNT", "Privileged accounts must use TOTP. Please enroll TOTP before logging in.", "auth")
+		return errors.New("privileged account requires totp")
 	}
 
 	if hasTOTP {

@@ -36,6 +36,18 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
+	blocked, retryAfterSeconds, err := auth.EnforceSecondFactorRiskLimit(ctx.Request.Context(), "totp_verify", userID, ctx.ClientIP())
+	if err != nil {
+		logger.Logger.Warn("Second-factor risk guard unavailable for TOTP login verification",
+			"user_id", userID,
+			"ip", ctx.ClientIP(),
+			"error", err.Error(),
+		)
+	} else if blocked {
+		httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "SECOND_FACTOR_RATE_LIMITED", fmt.Sprintf("Too many verification attempts. Please wait %d seconds and try again.", retryAfterSeconds), "totp")
+		return
+	}
+
 	// Get user and auth info
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
