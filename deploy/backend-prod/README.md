@@ -33,7 +33,7 @@ echo 'export DOPPLER_TOKEN=dp.st.xxxxx' >> ~/.profile
 source ~/.profile
 ```
 
-The deploy workflow loads `~/.profile`, `~/.bash_profile`, and `~/.bashrc` before running `doppler`.
+The deploy workflow loads `~/.profile` and `~/.bash_profile` before running `doppler`.
 
 Set all application secrets in Doppler instead of creating `.env` on the VPS.
 If you use optional features, also set related vars there:
