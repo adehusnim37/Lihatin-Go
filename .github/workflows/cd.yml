@@ -76,7 +76,8 @@ jobs:
             cd "$APP_DIR"
             git fetch --all --prune
             git checkout "$BRANCH"
-            git pull --ff-only origin "$BRANCH"
+            git diff --stat HEAD "origin/$BRANCH" || true
+            git reset --hard "origin/$BRANCH"
 
             cd deploy/backend-prod
             doppler run -- docker compose up -d --build
