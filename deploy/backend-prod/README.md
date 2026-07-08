@@ -14,11 +14,8 @@ Production Docker deployment for API server.
 ```bash
 docker network create lihatin-backbone
 cd deploy/backend-prod
-cp .env.example .env
-nano .env
 ```
 
-Set all secrets and connection values.
 For same-host deployment with split compose projects:
 
 - `SHARED_NETWORK_NAME` must match value in `deploy/db-prod/.env`
@@ -27,7 +24,19 @@ For same-host deployment with split compose projects:
 - DB user/password in `DATABASE_URL` must match `MARIADB_USER`/`MARIADB_PASSWORD` from db stack
 - `REDIS_ADDR` should target `lihatin-valkey:6379`
 
-If you use optional features, also set related vars:
+### Using Doppler on the VPS
+
+Install the Doppler CLI on the server, then export the service token from the deploy user's profile:
+
+```bash
+echo 'export DOPPLER_TOKEN=dp.st.xxxxx' >> ~/.profile
+source ~/.profile
+```
+
+The deploy workflow loads `~/.profile`, `~/.bash_profile`, and `~/.bashrc` before running `doppler`.
+
+Set all application secrets in Doppler instead of creating `.env` on the VPS.
+If you use optional features, also set related vars there:
 
 - Google OAuth: `GOOGLE_OAUTH_*`
 - Support captcha: `TURNSTILE_SECRET_KEY`
@@ -38,15 +47,15 @@ If you use optional features, also set related vars:
 ## 2) Build and Run
 
 ```bash
-docker compose build --no-cache
-docker compose up -d
+source ~/.profile
+doppler run -- docker compose up -d --build
 ```
 
 Check status:
 
 ```bash
-docker compose ps
-docker compose logs -f api
+doppler run -- docker compose ps
+doppler run -- docker compose logs -f api
 ```
 
 Health endpoint:
@@ -59,8 +68,8 @@ curl -fsS http://127.0.0.1:8080/v1/health
 
 ```bash
 git pull
-docker compose build --no-cache
-docker compose up -d
+source ~/.profile
+doppler run -- docker compose up -d --build
 ```
 
 ## 4) Rollback (quick)
@@ -72,6 +81,7 @@ docker image ls | grep lihatin-go
 
 ## Notes
 
+- This deployment no longer needs app `.env` on the VPS; Doppler provides runtime environment variables directly.
 - App runs DB migrations on startup. Run only one API instance per DB unless you add migration locking.
 - Keep `APP_BIND_IP=127.0.0.1` and expose via reverse proxy for production.
 - If API is on separate host, use private DB IP and lock firewall/security group strictly.

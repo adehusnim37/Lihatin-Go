@@ -45,20 +45,51 @@ jobs:
 
           PORT="${DEPLOY_PORT:-22}"
 
+          required_vars=(
+            DEPLOY_HOST
+            DEPLOY_USER
+          )
+
+          for required_var in "${required_vars[@]}"; do
+            if [ -z "${!required_var:-}" ]; then
+              echo "Missing required deploy variable: ${required_var}"
+              exit 1
+            fi
+          done
+
           ssh -p "$PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "DEPLOY_PATH='$DEPLOY_PATH' BRANCH='$BRANCH' bash -se" <<'EOF'
             set -euo pipefail
             APP_DIR="${DEPLOY_PATH:-$HOME/apps/Lihatin-Go}"
+
+            if ! command -v doppler >/dev/null 2>&1; then
+              echo "doppler CLI is not installed on VPS"
+              exit 1
+            fi
+
+            for env_file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc"; do
+              if [ -f "$env_file" ]; then
+                set -a
+                . "$env_file"
+                set +a
+              fi
+            done
+
+            if [ -z "${DOPPLER_TOKEN:-}" ]; then
+              echo "DOPPLER_TOKEN is not loaded from user profile files"
+              exit 1
+            fi
+
             cd "$APP_DIR"
             git fetch --all --prune
             git checkout "$BRANCH"
             git pull --ff-only origin "$BRANCH"
 
             cd deploy/backend-prod
-            docker compose up -d --build
+            doppler run -- docker compose up -d --build
             docker compose ps
             # Wait until API is reachable (container can be Up while health is still starting)
             for i in $(seq 1 30); do
-              if docker compose exec -T api sh -lc 'curl -fsS http://127.0.0.1:8080/v1/health >/dev/null'; then
+              if doppler run -- docker compose exec -T api sh -lc 'curl -fsS http://127.0.0.1:8080/v1/health >/dev/null'; then
                 echo "API healthcheck passed"
                 exit 0
               fi
@@ -66,6 +97,6 @@ jobs:
               sleep 3
             done
             echo "API failed to become ready in time"
-            docker compose logs --tail=200 api || true
+            doppler run -- docker compose logs --tail=200 api || true
             exit 1
           EOF
