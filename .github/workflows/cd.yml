@@ -39,6 +39,7 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PORT: ${{ vars.DEPLOY_SSH_PORT }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -48,6 +49,7 @@ jobs:
           required_vars=(
             DEPLOY_HOST
             DEPLOY_USER
+            DOPPLER_TOKEN
           )
 
           for required_var in "${required_vars[@]}"; do
@@ -57,7 +59,7 @@ jobs:
             fi
           done
 
-          ssh -p "$PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "DEPLOY_PATH='$DEPLOY_PATH' BRANCH='$BRANCH' bash -se" <<'EOF'
+          ssh -p "$PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" "DEPLOY_PATH='$DEPLOY_PATH' BRANCH='$BRANCH' DOPPLER_TOKEN='$DOPPLER_TOKEN' bash -se" <<'EOF'
             set -euo pipefail
             APP_DIR="${DEPLOY_PATH:-$HOME/apps/Lihatin-Go}"
 
@@ -66,16 +68,8 @@ jobs:
               exit 1
             fi
 
-            for env_file in "$HOME/.profile" "$HOME/.bash_profile"; do
-              if [ -f "$env_file" ]; then
-                set -a
-                . "$env_file"
-                set +a
-              fi
-            done
-
             if [ -z "${DOPPLER_TOKEN:-}" ]; then
-              echo "DOPPLER_TOKEN is not loaded from user profile files"
+              echo "DOPPLER_TOKEN is not available in deploy session"
               exit 1
             fi
 

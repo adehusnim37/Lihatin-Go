@@ -26,14 +26,14 @@ For same-host deployment with split compose projects:
 
 ### Using Doppler on the VPS
 
-Install the Doppler CLI on the server, then export the service token from the deploy user's profile:
+Install the Doppler CLI on the server.
+For GitHub Actions deploys, store `DOPPLER_TOKEN` in GitHub Secrets and the workflow will pass it directly to the remote deploy session.
+
+If you want to run deploy commands manually on the VPS, export the token in your current shell:
 
 ```bash
-echo 'export DOPPLER_TOKEN=dp.st.xxxxx' >> ~/.profile
-source ~/.profile
+export DOPPLER_TOKEN=dp.st.xxxxx
 ```
-
-The deploy workflow loads `~/.profile` and `~/.bash_profile` before running `doppler`.
 
 Set all application secrets in Doppler instead of creating `.env` on the VPS.
 If you use optional features, also set related vars there:
@@ -47,7 +47,6 @@ If you use optional features, also set related vars there:
 ## 2) Build and Run
 
 ```bash
-source ~/.profile
 doppler run -- docker compose up -d --build
 ```
 
@@ -68,7 +67,6 @@ curl -fsS http://127.0.0.1:8080/v1/health
 
 ```bash
 git pull
-source ~/.profile
 doppler run -- docker compose up -d --build
 ```
 
