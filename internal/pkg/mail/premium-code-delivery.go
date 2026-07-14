@@ -2,6 +2,7 @@ package mail
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,7 +20,7 @@ func (es *EmailService) SendPremiumCodeDeliveryEmail(
 ) error {
 	subject := "Your Premium Access Code - Lihatin"
 	frontendURL := config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
-	redeemURL := fmt.Sprintf("%s/profile/me", frontendURL)
+	redeemURL := fmt.Sprintf("%s/profile/me?redeem_code=%s", frontendURL, url.QueryEscape(secretCode))
 
 	recipientName := strings.TrimSpace(toName)
 	if recipientName == "" {
