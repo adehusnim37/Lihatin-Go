@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net"
+	"net/url"
 	"strings"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
@@ -16,20 +18,8 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		origin := c.Request.Header.Get("Origin")
 
-		// Check if origin is allowed
-		originAllowed := false
-		for _, allowedOrigin := range origins {
-			if strings.TrimSpace(allowedOrigin) == origin {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-				originAllowed = true
-				break
-			}
-		}
-
-		// If no specific origin matched but we have origins configured, still allow for development
-		if !originAllowed && origin != "" {
-			// For development, allow localhost origins
-			if strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1") {
+		if origin != "" {
+			if isExactAllowedOrigin(origin, origins) || (isDevelopmentEnv() && isLocalhostOrigin(origin)) {
 				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			}
 		}
@@ -46,4 +36,38 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func isExactAllowedOrigin(origin string, allowedOrigins []string) bool {
+	for _, allowedOrigin := range allowedOrigins {
+		if strings.TrimSpace(allowedOrigin) == origin {
+			return true
+		}
+	}
+	return false
+}
+
+func isDevelopmentEnv() bool {
+	env := strings.ToLower(strings.TrimSpace(config.GetEnvOrDefault(config.Env, "development")))
+	return env == "development" || env == "dev" || env == "local"
+}
+
+func isLocalhostOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	host := parsed.Hostname()
+	if host == "" {
+		// Fallback for non-standard origins if hostname extraction fails.
+		if h, _, splitErr := net.SplitHostPort(parsed.Host); splitErr == nil {
+			host = h
+		} else {
+			host = parsed.Host
+		}
+	}
+
+	host = strings.Trim(host, "[]")
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }

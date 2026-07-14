@@ -524,6 +524,9 @@ func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
 		}
 	}
 
+	// Set SameSite before SetCookie so cookie attributes are applied consistently.
+	c.SetSameSite(opts.SameSite)
+
 	// Save to cookie
 	c.SetCookie(
 		opts.CookieName,
@@ -534,9 +537,6 @@ func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
 		secureCookie,
 		opts.HttpOnly,
 	)
-
-	// Set SameSite via header (Gin's SetCookie doesn't support SameSite well)
-	c.SetSameSite(opts.SameSite)
 
 	return token, nil
 }

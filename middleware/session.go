@@ -191,6 +191,7 @@ func getSessionIDFromRequest(c *gin.Context) string {
 
 // SetSessionCookie sets the session cookie in response
 func SetSessionCookie(c *gin.Context, sessionID string, maxAge int) {
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(
 		"session_id", // name
 		sessionID,    // value
@@ -204,6 +205,7 @@ func SetSessionCookie(c *gin.Context, sessionID string, maxAge int) {
 
 // ClearSessionCookie removes the session cookie
 func ClearSessionCookie(c *gin.Context) {
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(
 		"session_id",
 		"",
