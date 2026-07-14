@@ -128,6 +128,10 @@ func (ur *userRepository) CheckUsernameChangeEligibility(userID string) error {
 		return userFindError(result.Error)
 	}
 
+	if user.Role == "admin" {
+		return apperrors.ErrUserUpdateNotAllowed
+	}
+
 	if user.UsernameChanged {
 		return apperrors.ErrUsernameChangeNotAllowed
 	}
