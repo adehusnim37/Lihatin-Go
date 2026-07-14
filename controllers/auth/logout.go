@@ -91,6 +91,10 @@ func (c *Controller) Logout(ctx *gin.Context) {
 
 	// Clear HTTP-Only cookies with the same attributes used during login.
 	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
+	if cookieSettings.RejectInsecureRequest {
+		http.SendErrorResponse(ctx, nethttp.StatusForbidden, "HTTPS is required in production", "INSECURE_TRANSPORT", "Insecure transport is not allowed in production", nil)
+		return
+	}
 
 	// Clear access_token cookie
 	accessTokenCookie := &nethttp.Cookie{

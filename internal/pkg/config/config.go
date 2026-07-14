@@ -133,6 +133,9 @@ const (
 
 	// OAuth (Google)
 	// #nosec G101 -- These are validation messages, not credentials.
+	EnvGoogleOAuthAuthorizeEndpoint = "GOOGLE_OAUTH_AUTHORIZE_ENDPOINT"
+	EnvGoogleOAuthTokenEndpoint     = "GOOGLE_OAUTH_TOKEN_ENDPOINT"
+	EnvGoogleOAuthTokenInfoEndpoint = "GOOGLE_OAUTH_TOKEN_INFO_ENDPOINT"
 	EnvGoogleOAuthClientID     = "GOOGLE_OAUTH_CLIENT_ID"
 	EnvGoogleOAuthClientSecret = "GOOGLE_OAUTH_CLIENT_SECRET"
 	EnvGoogleOAuthRedirectURI  = "GOOGLE_OAUTH_REDIRECT_URI"

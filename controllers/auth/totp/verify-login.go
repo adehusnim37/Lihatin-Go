@@ -244,6 +244,10 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	}()
 
 	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
+	if cookieSettings.RejectInsecureRequest {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "INSECURE_TRANSPORT", "HTTPS is required in production", "auth")
+		return
+	}
 
 	// Set Access Token Cookie
 	accessTokenCookie := &http.Cookie{

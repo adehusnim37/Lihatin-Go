@@ -46,7 +46,7 @@ func main() {
 	case "status":
 		showMigrationStatus(db)
 	default:
-		log.Fatalf("Unknown command: %s. Available: migrate, fresh, rollback, status", command)
+		log.Fatalf("Unknown command. Available: migrate, fresh, rollback, status")
 	}
 }
 

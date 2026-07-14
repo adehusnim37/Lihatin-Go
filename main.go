@@ -92,11 +92,20 @@ func main() {
 	log.Println("✅ Disposable email policy initialized")
 
 	log.Println("🔁 Initializing scheduler...")
-	scheduler := jobs.NewScheduler(gormDB)
+	scheduler, err := jobs.NewScheduler(gormDB)
+	if err != nil {
+		log.Printf("Failed to initialize scheduler: %v", err)
+		panic(err)
+	}
 	log.Println("⬇️ Registering jobs...")
-	scheduler.Register(jobs.NewDeactivateExpiredLinksJob(gormDB))
-	scheduler.Register(jobs.NewCleanupLoginAttemptsJob(gormDB))
-	scheduler.Register(jobs.NewRefreshDisposableDomainsJob())
+	if err := scheduler.RegisterMany(
+		jobs.NewDeactivateExpiredLinksJob(gormDB),
+		jobs.NewCleanupLoginAttemptsJob(gormDB),
+		jobs.NewRefreshDisposableDomainsJob(),
+	); err != nil {
+		log.Printf("Failed to register scheduler jobs: %v", err)
+		panic(err)
+	}
 	log.Println("⬇ Starting scheduler...")
 	scheduler.Start()
 	log.Println("✅ Scheduler started successfully!")
@@ -104,11 +113,17 @@ func main() {
 
 	// Minimal validator instance untuk backward compatibility dengan controller lama
 	validate := validator.New()
-	appvalidator.SetupCustomValidators(validate)
+	if err := appvalidator.SetupCustomValidators(validate); err != nil {
+		log.Printf("Failed to register custom validators: %v", err)
+		panic(err)
+	}
 
 	// ✅ TAMBAHKAN INI: Override Gin's default validator dengan custom validator
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		appvalidator.SetupCustomValidators(v)
+		if err := appvalidator.SetupCustomValidators(v); err != nil {
+			log.Printf("Failed to register custom validators for Gin binding validator: %v", err)
+			panic(err)
+		}
 	}
 
 	r := routes.SetupRouter(validate)

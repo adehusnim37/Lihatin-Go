@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,10 +13,11 @@ import (
 
 // CookieSettings defines common auth cookie attributes.
 type CookieSettings struct {
-	Domain        string
-	Secure        bool
-	SameSite      http.SameSite
-	SameSiteLabel string
+	Domain                string
+	Secure                bool
+	SameSite              http.SameSite
+	SameSiteLabel         string
+	RejectInsecureRequest bool
 }
 
 // ResolveAuthCookieSettings returns safe cookie settings for both development and production.
@@ -23,6 +25,8 @@ func ResolveAuthCookieSettings(ctx *gin.Context) CookieSettings {
 	secure := ctx.Request.TLS != nil ||
 		strings.EqualFold(ctx.GetHeader("X-Forwarded-Proto"), "https") ||
 		strings.EqualFold(ctx.GetHeader("X-Forwarded-Ssl"), "on")
+	env := strings.ToLower(strings.TrimSpace(config.GetEnvOrDefault(config.Env, "development")))
+	isProduction := env == "production"
 
 	domain := normalizeCookieDomain(config.GetEnvOrDefault(config.EnvDomain, ""))
 	if isLocalCookieHost(domain) {
@@ -30,6 +34,17 @@ func ResolveAuthCookieSettings(ctx *gin.Context) CookieSettings {
 	}
 	if domain != "" && !strings.HasPrefix(domain, ".") {
 		domain = "." + domain
+	}
+
+	if isProduction && !secure {
+		log.Printf("Warning: insecure request detected in production while resolving auth cookie settings")
+		return CookieSettings{
+			Domain:                domain,
+			Secure:                true,
+			SameSite:              http.SameSiteNoneMode,
+			SameSiteLabel:         "None",
+			RejectInsecureRequest: true,
+		}
 	}
 
 	// SameSite=None requires Secure=true. For HTTP development we must use Lax.
@@ -41,10 +56,11 @@ func ResolveAuthCookieSettings(ctx *gin.Context) CookieSettings {
 	}
 
 	return CookieSettings{
-		Domain:        domain,
-		Secure:        secure,
-		SameSite:      sameSite,
-		SameSiteLabel: sameSiteLabel,
+		Domain:                domain,
+		Secure:                secure,
+		SameSite:              sameSite,
+		SameSiteLabel:         sameSiteLabel,
+		RejectInsecureRequest: false,
 	}
 }
 

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -96,6 +97,10 @@ func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.User
 	}()
 
 	cookieSettings := pkgauth.ResolveAuthCookieSettings(ctx)
+	if cookieSettings.RejectInsecureRequest {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "INSECURE_TRANSPORT", "HTTPS is required in production", "auth")
+		return errors.New("insecure transport is not allowed in production")
+	}
 
 	accessTokenCookie := &http.Cookie{
 		Name:     "access_token",

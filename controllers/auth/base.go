@@ -357,6 +357,15 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 
 	// ✅ Set tokens as HTTP-Only cookies (XSS protection)
 	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
+	if cookieSettings.RejectInsecureRequest {
+		ctx.JSON(http.StatusForbidden, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "HTTPS is required in production",
+			Error:   map[string]string{"auth": "Insecure transport is not allowed in production"},
+		})
+		return
+	}
 
 	// Access token cookie (short-lived: default 48 hours)
 	newAccessTokenCookie := &http.Cookie{

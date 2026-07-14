@@ -16,6 +16,7 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -46,10 +47,13 @@ type Scheduler struct {
 	jobs   []Job
 }
 
-
 // NewScheduler creates a new scheduler instance
-func NewScheduler(db *gorm.DB) *Scheduler {
+func NewScheduler(db *gorm.DB) (*Scheduler, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	return &Scheduler{
 		cron:   cron.New(cron.WithSeconds()), // Support second-level precision
@@ -57,7 +61,7 @@ func NewScheduler(db *gorm.DB) *Scheduler {
 		ctx:    ctx,
 		cancel: cancel,
 		jobs:   make([]Job, 0),
-	}
+	}, nil
 }
 
 // Register adds a job to the scheduler
@@ -87,6 +91,17 @@ func (s *Scheduler) Register(job Job) error {
 		"job", job.Name(),
 		"schedule", job.Schedule(),
 	)
+
+	return nil
+}
+
+// RegisterMany adds multiple jobs and returns an error with job context when one fails.
+func (s *Scheduler) RegisterMany(jobs ...Job) error {
+	for _, job := range jobs {
+		if err := s.Register(job); err != nil {
+			return fmt.Errorf("register job %q failed: %w", job.Name(), err)
+		}
+	}
 
 	return nil
 }

@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -177,7 +179,10 @@ func (m *RefreshTokenManager) DeleteAllUserRefreshTokens(ctx context.Context, us
 
 // Helper function to parse int64 from string
 func parseInt64(s string) int64 {
-	var result int64
-	fmt.Sscanf(s, "%d", &result)
-	return result
+	value, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return value
 }

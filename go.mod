@@ -4,8 +4,8 @@ go 1.26.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.42.1
-	github.com/aws/aws-sdk-go-v2/config v1.32.28
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.27
+	github.com/aws/aws-sdk-go-v2/config v1.32.29
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.28
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.0
 	github.com/aws/smithy-go v1.27.3
 	github.com/gin-gonic/gin v1.12.0
@@ -18,7 +18,7 @@ require (
 	github.com/mssola/useragent v1.0.0
 	github.com/pquerna/otp v1.5.0
 	github.com/robfig/cron/v3 v3.0.1
-	golang.org/x/crypto v0.53.0
+	golang.org/x/crypto v0.54.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.2
 )
@@ -34,7 +34,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.23 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.30 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.31 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.3.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.32.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.37.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.44.0 // indirect
@@ -42,7 +42,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.60.0 // indirect
-	go.mongodb.org/mongo-driver/v2 v2.7.0 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.8.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 )
 
@@ -71,10 +71,10 @@ require (
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
-	golang.org/x/arch v0.28.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/arch v0.29.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gorm.io/datatypes v1.2.7
 )

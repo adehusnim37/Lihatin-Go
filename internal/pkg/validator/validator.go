@@ -2,6 +2,7 @@ package validator
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -360,14 +361,27 @@ func validateSecretCode(fl validator.FieldLevel) bool {
 }
 
 // SetupCustomValidators registers custom validation rules
-func SetupCustomValidators(v *validator.Validate) {
-	v.RegisterValidation("pwdcomplex", validatePasswordComplexity)
-	v.RegisterValidation("username", validateUsername)
-	v.RegisterValidation("unique", validateUnique)
-	v.RegisterValidation("no_space", validateNoSpace)
-	v.RegisterValidation("no_special", validateNoSpecial)
-	v.RegisterValidation("saveurlshort", validateSaveUrlShort)
-	v.RegisterValidation("six_digit", validateSixDigit)
-	v.RegisterValidation("secret_code", validateSecretCode)
-	v.RegisterValidation("not_same_digit", validateNotSameDigit)
+func SetupCustomValidators(v *validator.Validate) error {
+	registrations := []struct {
+		tag string
+		fn  validator.Func
+	}{
+		{tag: "pwdcomplex", fn: validatePasswordComplexity},
+		{tag: "username", fn: validateUsername},
+		{tag: "unique", fn: validateUnique},
+		{tag: "no_space", fn: validateNoSpace},
+		{tag: "no_special", fn: validateNoSpecial},
+		{tag: "saveurlshort", fn: validateSaveUrlShort},
+		{tag: "six_digit", fn: validateSixDigit},
+		{tag: "secret_code", fn: validateSecretCode},
+		{tag: "not_same_digit", fn: validateNotSameDigit},
+	}
+
+	for _, registration := range registrations {
+		if err := v.RegisterValidation(registration.tag, registration.fn); err != nil {
+			return fmt.Errorf("failed to register validation %q: %w", registration.tag, err)
+		}
+	}
+
+	return nil
 }

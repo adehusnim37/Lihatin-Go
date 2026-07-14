@@ -27,10 +27,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	googleOAuthAuthorizeEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
-	googleOAuthTokenEndpoint     = "https://oauth2.googleapis.com/token"
-	googleOAuthTokenInfoEndpoint = "https://oauth2.googleapis.com/tokeninfo"
+var (
+	googleOAuthAuthorizeEndpoint = config.GetRequiredEnv(config.EnvGoogleOAuthAuthorizeEndpoint)
+	googleOAuthTokenEndpoint     = config.GetRequiredEnv(config.EnvGoogleOAuthTokenEndpoint)
+	googleOAuthTokenInfoEndpoint = config.GetRequiredEnv(config.EnvGoogleOAuthTokenInfoEndpoint)
 )
 
 var oauthUsernameSanitizer = regexp.MustCompile(`[^a-z0-9]+`)
@@ -249,7 +249,7 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
 		return
 	}
-	
+
 	isLocked, err := c.repo.GetUserRepository().IsAccountLocked(usr.ID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
