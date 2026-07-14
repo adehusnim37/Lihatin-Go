@@ -11,7 +11,7 @@ import (
 func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo userrepo.UserRepository, userAuthRepo *authrepo.UserAuthRepository, authRepo *authrepo.AuthRepository) {
 	shortGroup := rg.Group("/short")
 	{
-		shortGroup.Use(middleware.RateLimitMiddleware(25, 30)) // Limit to 25 requests per minute for public access
+		shortGroup.Use(middleware.RateLimitMiddleware(25, 00, 30)) // Limit to 25 requests per minute for public access
 		shortGroup.Use(middleware.OptionalAuth(userRepo))
 		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)
@@ -40,7 +40,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	protectedShort := rg.Group("users/me/shorts")
 	{
 		protectedShort.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
-		protectedShort.Use(middleware.RateLimitMiddleware(100))
+		protectedShort.Use(middleware.RateLimitMiddleware(100, 0, 60)) // Limit to 100 requests per minute for authenticated users
 		protectedShort.POST("", shortController.Create)
 		protectedShort.GET("", shortController.ListShortLinks) // ✅ UNIVERSAL: Auto-detects role and filters accordingly
 		protectedShort.GET("/stats", shortController.GetAllStatsShorts)
