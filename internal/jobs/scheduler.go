@@ -52,6 +52,7 @@ func NewScheduler(db *gorm.DB) (*Scheduler, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if err := ctx.Err(); err != nil {
+		cancel()
 		return nil, err
 	}
 
