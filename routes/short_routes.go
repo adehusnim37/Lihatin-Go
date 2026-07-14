@@ -11,7 +11,7 @@ import (
 func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Controller, userRepo userrepo.UserRepository, userAuthRepo *authrepo.UserAuthRepository, authRepo *authrepo.AuthRepository) {
 	shortGroup := rg.Group("/short")
 	{
-		shortGroup.Use(middleware.RateLimitMiddleware(25))
+		shortGroup.Use(middleware.RateLimitMiddleware(25, 30)) // Limit to 25 requests per minute for public access
 		shortGroup.Use(middleware.OptionalAuth(userRepo))
 		shortGroup.POST("", shortController.Create)
 		shortGroup.GET("/:code", shortController.Redirect)
