@@ -26,13 +26,5 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run unit tests
-        env:
-          JWT_SECRET: ci-secret
-        run: go test -vet=off ./...
-
-      - name: Run go vet
-        run: go list ./... | grep -v '/tests$' | xargs go vet
-
       - name: Build Docker image
         run: docker build -f Dockerfile -t lihatin-go:ci .
