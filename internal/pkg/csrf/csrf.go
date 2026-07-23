@@ -1,13 +1,13 @@
 package csrf
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/binary"
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -56,8 +56,8 @@ var (
 	ErrTokenExpired = errors.New("csrf token has expired")
 )
 
-// Safe HTTP methods yang tidak perlu CSRF check (RFC 7231)
-var safeMethods = []string{"GET", "HEAD", "OPTIONS", "TRACE"}
+// Safe browser methods that do not require a CSRF token.
+var safeMethods = []string{"GET", "HEAD", "OPTIONS"}
 
 // ===========================================================================
 // OPTIONS STRUCT
@@ -84,6 +84,10 @@ type Options struct {
 	// Trusted origins untuk cross-origin requests
 	TrustedOrigins []string
 
+	// Authentication cookies used to bind tokens to the current login session.
+	// The first cookie found is used.
+	SessionCookieNames []string
+
 	// Redis client untuk token storage (optional, default: cookie-based)
 	RedisClient *redis.Client
 
@@ -101,8 +105,9 @@ type Options struct {
 
 // SkipRule mendefinisikan satu rule bypass CSRF yang explicit.
 type SkipRule struct {
-	Method string
-	Path   string
+	Method          string
+	Path            string
+	SkipOriginCheck bool
 }
 
 // ===========================================================================
@@ -145,6 +150,9 @@ func Middleware(opts Options) gin.HandlerFunc {
 	if opts.SameSite == 0 {
 		opts.SameSite = http.SameSiteLaxMode
 	}
+	if len(opts.SessionCookieNames) == 0 {
+		opts.SessionCookieNames = []string{"refresh_token", "access_token", "session_id"}
+	}
 	if opts.ErrorHandler == nil {
 		opts.ErrorHandler = defaultErrorHandler
 	}
@@ -153,53 +161,60 @@ func Middleware(opts Options) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		// 1. Check if path should be skipped
+		// Safe requests initialize the CSRF cookie so token endpoints and
+		// server-rendered forms can expose a masked token.
+		if isSafeMethod(c.Request.Method) {
+			token, err := getOrCreateToken(c, opts)
+			if err != nil {
+				logger.Logger.Error("CSRF: Failed to get/create token", "error", err)
+				opts.ErrorHandler(c)
+				return
+			}
+			c.Set("csrf_token", token)
+			c.Next()
+			return
+		}
+
+		// Origin and Referer checks apply to every unsafe browser request,
+		// including public/login routes that intentionally skip token checks.
+		// Explicit non-browser routes may bypass them when downstream
+		// middleware still authenticates the request.
+		if !shouldSkipOriginCheck(c, opts.SkipRules) {
+			if err := validateOrigin(c, opts); err != nil {
+				logger.Logger.Warn("CSRF: Origin validation failed",
+					"error", err,
+					"origin", c.Request.Header.Get("Origin"),
+					"path", c.Request.URL.Path,
+				)
+				opts.ErrorHandler(c)
+				return
+			}
+
+			if err := validateReferer(c, opts); err != nil {
+				logger.Logger.Warn("CSRF: Referer validation failed",
+					"error", err,
+					"referer", c.Request.Referer(),
+					"path", c.Request.URL.Path,
+				)
+				opts.ErrorHandler(c)
+				return
+			}
+		}
+
+		// Token bypass never bypasses the origin checks above.
 		if shouldSkipRequest(c, opts.SkipRules, opts.SkipPaths) {
 			c.Next()
 			return
 		}
 
-		// 2. Get or generate token
 		token, err := getOrCreateToken(c, opts)
 		if err != nil {
 			logger.Logger.Error("CSRF: Failed to get/create token", "error", err)
 			opts.ErrorHandler(c)
 			return
 		}
-
-		// 3. Save token to context (untuk dipakai di handler)
 		c.Set("csrf_token", token)
 
-		// 4. For safe methods, just continue
-		if isSafeMethod(c.Request.Method) {
-			c.Next()
-			return
-		}
-
-		// 5. For unsafe methods, validate token
-		// 5a. Check Origin header
-		if err := validateOrigin(c, opts); err != nil {
-			logger.Logger.Warn("CSRF: Origin validation failed",
-				"error", err,
-				"origin", c.Request.Header.Get("Origin"),
-				"path", c.Request.URL.Path,
-			)
-			opts.ErrorHandler(c)
-			return
-		}
-
-		// 5b. Check Referer (untuk HTTPS)
-		if err := validateReferer(c, opts); err != nil {
-			logger.Logger.Warn("CSRF: Referer validation failed",
-				"error", err,
-				"referer", c.Request.Referer(),
-				"path", c.Request.URL.Path,
-			)
-			opts.ErrorHandler(c)
-			return
-		}
-
-		// 5c. Get token from request (header or form)
 		requestToken := getTokenFromRequest(c, opts)
 		if requestToken == "" {
 			logger.Logger.Warn("CSRF: No token in request",
@@ -211,8 +226,7 @@ func Middleware(opts Options) gin.HandlerFunc {
 			return
 		}
 
-		// 5d. Validate token
-		if err := validateToken(requestToken, token, opts); err != nil {
+		if err := validateToken(requestToken, token, sessionBinding(c, opts), opts); err != nil {
 			logger.Logger.Warn("CSRF: Token validation failed",
 				"error", err,
 				"path", c.Request.URL.Path,
@@ -222,7 +236,6 @@ func Middleware(opts Options) gin.HandlerFunc {
 			return
 		}
 
-		// 6. Token valid, continue
 		logger.Logger.Debug("CSRF: Token validated successfully",
 			"path", c.Request.URL.Path,
 		)
@@ -235,7 +248,7 @@ func Middleware(opts Options) gin.HandlerFunc {
 // ===========================================================================
 
 // generateToken creates a new CSRF token
-func generateToken(secret []byte) (string, error) {
+func generateToken(secret, binding []byte) (string, error) {
 	// 1. Generate raw token: timestamp (8 bytes) + random (24 bytes)
 	raw := make([]byte, TokenLength)
 
@@ -252,7 +265,7 @@ func generateToken(secret []byte) (string, error) {
 	}
 
 	// 2. Create HMAC signature
-	signature := signToken(raw, secret)
+	signature := signToken(raw, binding, secret)
 
 	// 3. Encode: base64(raw).base64(signature)
 	rawEncoded := base64.RawURLEncoding.EncodeToString(raw)
@@ -262,14 +275,18 @@ func generateToken(secret []byte) (string, error) {
 }
 
 // signToken creates HMAC-SHA256 signature
-func signToken(data, secret []byte) []byte {
+func signToken(data, binding, secret []byte) []byte {
 	h := hmac.New(sha256.New, secret)
-	h.Write(data)
+	var bindingLength [8]byte
+	binary.BigEndian.PutUint64(bindingLength[:], uint64(len(binding)))
+	_, _ = h.Write(bindingLength[:])
+	_, _ = h.Write(binding)
+	_, _ = h.Write(data)
 	return h.Sum(nil)
 }
 
 // parseToken decodes and validates a token string
-func parseToken(tokenStr string, secret []byte, maxAge int) (*csrfToken, error) {
+func parseToken(tokenStr string, secret, binding []byte, maxAge int) (*csrfToken, error) {
 	// 1. Split into parts
 	parts := strings.Split(tokenStr, ".")
 	if len(parts) != 2 {
@@ -292,7 +309,7 @@ func parseToken(tokenStr string, secret []byte, maxAge int) (*csrfToken, error) 
 	}
 
 	// 4. Verify signature (timing-safe comparison)
-	expectedSig := signToken(raw, secret)
+	expectedSig := signToken(raw, binding, secret)
 	if !hmac.Equal(signature, expectedSig) {
 		return nil, errors.New("invalid signature")
 	}
@@ -369,26 +386,29 @@ func unmaskToken(maskedToken string) (string, error) {
 // VALIDATION FUNCTIONS
 // ===========================================================================
 
-// validateOrigin checks Origin header against trusted origins
+// validateOrigin checks Origin header against the request origin and trusted origins.
 func validateOrigin(c *gin.Context, opts Options) error {
 	origin := c.Request.Header.Get("Origin")
 	if origin == "" {
 		return nil // No origin header, will check referer
 	}
 
-	parsedOrigin, err := url.Parse(origin)
+	requestOrigin, err := canonicalRequestOrigin(c)
 	if err != nil {
 		return ErrBadOrigin
 	}
 
-	// Check if same origin
-	if parsedOrigin.Host == c.Request.Host {
+	candidateOrigin, err := canonicalOrigin(origin, false)
+	if err != nil {
+		return ErrBadOrigin
+	}
+
+	if candidateOrigin == requestOrigin {
 		return nil
 	}
 
-	// Check trusted origins
 	for _, trusted := range opts.TrustedOrigins {
-		if isTrustedOrigin(parsedOrigin.Host, trusted) {
+		if isTrustedOrigin(candidateOrigin, trusted) {
 			return nil
 		}
 	}
@@ -398,8 +418,12 @@ func validateOrigin(c *gin.Context, opts Options) error {
 
 // validateReferer checks Referer header for HTTPS requests
 func validateReferer(c *gin.Context, opts Options) error {
-	// Skip for HTTP (development)
-	if c.Request.TLS == nil && c.Request.Header.Get("X-Forwarded-Proto") != "https" {
+	requestOrigin, err := canonicalRequestOrigin(c)
+	if err != nil {
+		return ErrBadReferer
+	}
+
+	if !strings.HasPrefix(requestOrigin, "https://") {
 		return nil
 	}
 
@@ -413,24 +437,21 @@ func validateReferer(c *gin.Context, opts Options) error {
 		return ErrBadReferer
 	}
 
-	parsedReferer, err := url.Parse(referer)
+	refererOrigin, err := canonicalOrigin(referer, true)
 	if err != nil {
 		return ErrBadReferer
 	}
 
-	// Must be HTTPS
-	if parsedReferer.Scheme != "https" {
+	if !strings.HasPrefix(refererOrigin, "https://") {
 		return ErrBadReferer
 	}
 
-	// Check if same host
-	if parsedReferer.Host == c.Request.Host {
+	if refererOrigin == requestOrigin {
 		return nil
 	}
 
-	// Check trusted origins
 	for _, trusted := range opts.TrustedOrigins {
-		if isTrustedOrigin(parsedReferer.Host, trusted) {
+		if isTrustedOrigin(refererOrigin, trusted) {
 			return nil
 		}
 	}
@@ -438,29 +459,76 @@ func validateReferer(c *gin.Context, opts Options) error {
 	return ErrBadReferer
 }
 
-// isTrustedOrigin supports env formats:
-// - host only (e.g. lihat.in)
-// - full origin URL (e.g. https://lihat.in)
-func isTrustedOrigin(requestHost, trusted string) bool {
+func canonicalRequestOrigin(c *gin.Context) (string, error) {
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	} else if forwarded := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); forwarded != "" {
+		switch strings.ToLower(forwarded) {
+		case "http", "https":
+			scheme = strings.ToLower(forwarded)
+		default:
+			return "", ErrBadOrigin
+		}
+	}
+
+	return canonicalOrigin(scheme+"://"+c.Request.Host, false)
+}
+
+// canonicalOrigin normalizes an HTTP(S) origin as scheme://host[:port].
+// Referer URLs may contain a path; Origin and trusted-origin values may not.
+func canonicalOrigin(raw string, allowPath bool) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
+		return "", ErrBadOrigin
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", ErrBadOrigin
+	}
+	if !allowPath && parsed.Path != "" && parsed.Path != "/" {
+		return "", ErrBadOrigin
+	}
+	if !allowPath && (parsed.RawQuery != "" || parsed.Fragment != "") {
+		return "", ErrBadOrigin
+	}
+
+	hostname := strings.ToLower(parsed.Hostname())
+	if hostname == "" {
+		return "", ErrBadOrigin
+	}
+	port := parsed.Port()
+	if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+		port = ""
+	}
+
+	host := hostname
+	if strings.Contains(hostname, ":") {
+		host = "[" + hostname + "]"
+	}
+	if port != "" {
+		host = net.JoinHostPort(hostname, port)
+	}
+
+	return (&url.URL{Scheme: scheme, Host: host}).String(), nil
+}
+
+func isTrustedOrigin(requestOrigin, trusted string) bool {
 	trusted = strings.TrimSpace(trusted)
 	if trusted == "" {
 		return false
 	}
 
-	if !strings.Contains(trusted, "://") {
-		return requestHost == trusted
-	}
-
-	parsed, err := url.Parse(trusted)
+	trustedOrigin, err := canonicalOrigin(trusted, false)
 	if err != nil {
 		return false
 	}
-
-	return requestHost == parsed.Host
+	return requestOrigin == trustedOrigin
 }
 
 // validateToken compares request token with stored token
-func validateToken(requestToken, storedToken string, opts Options) error {
+func validateToken(requestToken, storedToken string, binding []byte, opts Options) error {
 	// Unmask if masked
 	unmaskedRequest, err := unmaskToken(requestToken)
 	if err != nil {
@@ -469,7 +537,7 @@ func validateToken(requestToken, storedToken string, opts Options) error {
 	}
 
 	// Parse and validate both tokens
-	_, err = parseToken(unmaskedRequest, opts.Secret, opts.MaxAge)
+	_, err = parseToken(unmaskedRequest, opts.Secret, binding, opts.MaxAge)
 	if err != nil {
 		return err
 	}
@@ -494,17 +562,19 @@ func validateToken(requestToken, storedToken string, opts Options) error {
 
 // getOrCreateToken retrieves existing token or creates new one
 func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
+	binding := sessionBinding(c, opts)
+
 	// Try to get from cookie
 	cookieToken, err := c.Cookie(opts.CookieName)
 	if err == nil && cookieToken != "" {
 		// Validate it's still valid
-		if _, err := parseToken(cookieToken, opts.Secret, opts.MaxAge); err == nil {
+		if _, err := parseToken(cookieToken, opts.Secret, binding, opts.MaxAge); err == nil {
 			return cookieToken, nil
 		}
 	}
 
 	// Generate new token
-	token, err := generateToken(opts.Secret)
+	token, err := generateToken(opts.Secret, binding)
 	if err != nil {
 		return "", err
 	}
@@ -541,6 +611,24 @@ func getOrCreateToken(c *gin.Context, opts Options) (string, error) {
 	return token, nil
 }
 
+func sessionBinding(c *gin.Context, opts Options) []byte {
+	for _, cookieName := range opts.SessionCookieNames {
+		cookieName = strings.TrimSpace(cookieName)
+		if cookieName == "" {
+			continue
+		}
+		value, err := c.Cookie(cookieName)
+		if err != nil || value == "" {
+			continue
+		}
+
+		sum := sha256.Sum256([]byte(cookieName + "\x00" + value))
+		return sum[:]
+	}
+
+	return []byte("anonymous")
+}
+
 func isLocalHost(host string) bool {
 	// Handle host:port and IPv6 bracket format.
 	if h, _, err := net.SplitHostPort(host); err == nil {
@@ -562,15 +650,10 @@ func getTokenFromRequest(c *gin.Context, opts Options) string {
 		return token
 	}
 
-	// 3. Check query param (less common)
-	if token := c.Query(opts.FormField); token != "" {
-		return token
-	}
-
 	return ""
 }
 
-// isSafeMethod checks if HTTP method is safe (idempotent)
+// isSafeMethod checks whether the method is safe and read-only.
 func isSafeMethod(method string) bool {
 	for _, m := range safeMethods {
 		if m == method {
@@ -589,6 +672,22 @@ func shouldSkipRequest(c *gin.Context, skipRules []SkipRule, skipPaths []string)
 		skipRules,
 		skipPaths,
 	)
+}
+
+func shouldSkipOriginCheck(c *gin.Context, skipRules []SkipRule) bool {
+	requestMethod := strings.ToUpper(c.Request.Method)
+	requestPath := c.Request.URL.Path
+	fullPath := c.FullPath()
+
+	for _, rule := range skipRules {
+		if !rule.SkipOriginCheck || strings.ToUpper(rule.Method) != requestMethod {
+			continue
+		}
+		if rule.Path == requestPath || (fullPath != "" && rule.Path == fullPath) {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldSkipRoute(method, requestPath, fullPath string, skipRules []SkipRule, skipPaths []string) bool {
@@ -661,27 +760,37 @@ func TemplateFunc(c *gin.Context) string {
 func DefaultOptions() Options {
 	secret := config.GetEnvOrDefault(config.EnvCSRFSecret, "")
 	if secret == "" {
-		// Generate a random secret if not set (will change on restart!)
+		if isProductionEnv() {
+			panic("csrf: CSRF_SECRET is required in production")
+		}
+
 		randomBytes := make([]byte, 32)
-		rand.Read(randomBytes)
+		if _, err := rand.Read(randomBytes); err != nil {
+			panic(fmt.Sprintf("csrf: failed to generate development secret: %v", err))
+		}
 		secret = hex.EncodeToString(randomBytes)
-		logger.Logger.Warn("CSRF: No CSRF_SECRET set, using random key (will change on restart)")
+		logger.Logger.Warn("CSRF: No CSRF_SECRET set, using an ephemeral development key")
 	}
 
 	return Options{
-		Secret:       []byte(secret),
-		CookieName:   DefaultCookieName,
-		CookieDomain: config.GetEnvOrDefault(config.EnvDomain, ""),
-		CookiePath:   "/",
-		MaxAge:       DefaultMaxAge,
-		Secure:       config.GetEnvOrDefault(config.Env, "development") == "production",
-		HttpOnly:     true,
-		SameSite:     http.SameSiteLaxMode,
-		HeaderName:   DefaultHeaderName,
-		FormField:    DefaultFormField,
+		Secret:             []byte(secret),
+		CookieName:         DefaultCookieName,
+		CookieDomain:       "", // Host-only prevents sibling subdomain cookie injection.
+		CookiePath:         "/",
+		MaxAge:             DefaultMaxAge,
+		Secure:             isProductionEnv(),
+		HttpOnly:           true,
+		SameSite:           http.SameSiteLaxMode,
+		HeaderName:         DefaultHeaderName,
+		FormField:          DefaultFormField,
+		SessionCookieNames: []string{"refresh_token", "access_token", "session_id"},
 		TrustedOrigins: strings.Split(
 			config.GetEnvOrDefault(config.EnvAllowedOrigins, ""),
 			",",
 		),
 	}
+}
+
+func isProductionEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(config.GetEnvOrDefault(config.Env, "development")), "production")
 }

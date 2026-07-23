@@ -38,6 +38,8 @@ BCRYPT_COST=12
 
 # CORS Configuration
 ALLOWED_ORIGINS=http://localhost:3000,https://yourapp.com
+AUTH_COOKIE_SAME_SITE=lax
+CSRF_SECRET=generate-at-least-32-random-bytes
 ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
 ALLOWED_HEADERS=Content-Type,Authorization
 ```

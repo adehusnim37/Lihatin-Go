@@ -41,19 +41,16 @@ func ResolveAuthCookieSettings(ctx *gin.Context) CookieSettings {
 		return CookieSettings{
 			Domain:                domain,
 			Secure:                true,
-			SameSite:              http.SameSiteNoneMode,
-			SameSiteLabel:         "None",
+			SameSite:              http.SameSiteLaxMode,
+			SameSiteLabel:         "Lax",
 			RejectInsecureRequest: true,
 		}
 	}
 
-	// SameSite=None requires Secure=true. For HTTP development we must use Lax.
-	sameSite := http.SameSiteLaxMode
-	sameSiteLabel := "Lax"
-	if secure {
-		sameSite = http.SameSiteNoneMode
-		sameSiteLabel = "None"
-	}
+	sameSite, sameSiteLabel := resolveSameSite(
+		config.GetEnvOrDefault(config.EnvAuthCookieSameSite, "lax"),
+		secure,
+	)
 
 	return CookieSettings{
 		Domain:                domain,
@@ -62,6 +59,20 @@ func ResolveAuthCookieSettings(ctx *gin.Context) CookieSettings {
 		SameSiteLabel:         sameSiteLabel,
 		RejectInsecureRequest: false,
 	}
+}
+
+func resolveSameSite(value string, secure bool) (http.SameSite, string) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "strict":
+		return http.SameSiteStrictMode, "Strict"
+	case "none":
+		if secure {
+			return http.SameSiteNoneMode, "None"
+		}
+		log.Printf("Warning: AUTH_COOKIE_SAME_SITE=none requires HTTPS; falling back to Lax")
+	}
+
+	return http.SameSiteLaxMode, "Lax"
 }
 
 func normalizeCookieDomain(domain string) string {

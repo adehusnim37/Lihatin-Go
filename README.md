@@ -83,6 +83,7 @@ cp .env.example .env
 - `REDIS_ADDR`
 - `JWT_SECRET`
 - `SESSION_SECRET`
+- `CSRF_SECRET` (required in production; use at least 32 random bytes)
 - `PREMIUM_CODE_SECRET`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
 - `APP_PORT` (default `:8080`)
@@ -101,7 +102,10 @@ curl -fsS http://127.0.0.1:8080/v1/health
 
 ## Environment and Runtime Notes
 
-- `ENV=production` enables production-only middleware behavior (such as CSRF middleware application rules).
+- CSRF validation is enabled in every environment; `ENV=production` requires
+  `CSRF_SECRET` and emits Secure CSRF cookies.
+- `AUTH_COOKIE_SAME_SITE=lax` is the secure default. Use `none` only for a
+  genuinely cross-site HTTPS frontend.
 - `GIN_MODE=release` should be set in production.
 - Application runs database migrations on startup.
 

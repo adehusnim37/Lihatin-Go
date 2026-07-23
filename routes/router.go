@@ -23,9 +23,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func csrfPublicNoSessionSkipRules() []csrf.SkipRule {
+func csrfTokenSkipRules() []csrf.SkipRule {
 	return []csrf.SkipRule{
-		// Public auth bootstrap (no authenticated session yet).
+		// Public auth bootstrap. Origin/Referer validation still applies.
 		{Method: http.MethodPost, Path: "/v1/auth/login"},
 		{Method: http.MethodPost, Path: "/v1/auth/oauth/google/start"},
 		{Method: http.MethodPost, Path: "/v1/auth/oauth/google/callback"},
@@ -49,6 +49,12 @@ func csrfPublicNoSessionSkipRules() []csrf.SkipRule {
 		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/messages"},
 		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/messages"},
 		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/attachments/:attachmentID"},
+
+		// API-key clients do not use browser cookies and are not CSRF targets.
+		// Their route middleware still validates the API key after this bypass.
+		{Method: http.MethodPost, Path: "/v1/api/short", SkipOriginCheck: true},
+		{Method: http.MethodPut, Path: "/v1/api/short/:code", SkipOriginCheck: true},
+		{Method: http.MethodDelete, Path: "/v1/api/short/:code", SkipOriginCheck: true},
 	}
 }
 
@@ -62,13 +68,11 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Apply CORS middleware first
 	r.Use(pkgauth.CORSMiddleware())
 
-	// Apply CSRF middleware (only in production)
-	env := config.GetEnvOrDefault(config.Env, "development")
-	if env == "production" {
-		csrfOpts := csrf.DefaultOptions()
-		csrfOpts.SkipRules = csrfPublicNoSessionSkipRules()
-		r.Use(csrf.Middleware(csrfOpts))
-	}
+	// Keep CSRF enabled in every environment so development and CI exercise
+	// the same browser-security contract as production.
+	csrfOpts := csrf.DefaultOptions()
+	csrfOpts.SkipRules = csrfTokenSkipRules()
+	r.Use(csrf.Middleware(csrfOpts))
 
 	// Initialize GORM for new auth repositories
 	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
@@ -101,17 +105,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	v1 := r.Group("/v1")
 
 	// CSRF Token endpoint (untuk SPA fetch token)
-	v1.GET("/csrf-token", func(c *gin.Context) {
-		token := csrf.GetMaskedToken(c)
-		c.JSON(http.StatusOK, common.APIResponse{
-			Success: true,
-			Data: gin.H{
-				"csrfToken": token,
-			},
-			Message: "CSRF token generated",
-			Error:   nil,
-		})
-	})
+	v1.GET("/csrf-token", csrfTokenHandler)
 
 	RegisterAuthRoutes(v1, authController, userRepo, userAuthRepo, *loginAttemptRepo, emailController, totpController, baseController)
 	RegisterSupportRoutes(v1, userRepo, userAuthRepo, baseController)
@@ -129,4 +123,18 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	})
 
 	return r
+}
+
+func csrfTokenHandler(c *gin.Context) {
+	c.Header("Cache-Control", "no-store, max-age=0")
+	c.Header("Pragma", "no-cache")
+	token := csrf.GetMaskedToken(c)
+	c.JSON(http.StatusOK, common.APIResponse{
+		Success: true,
+		Data: gin.H{
+			"csrfToken": token,
+		},
+		Message: "CSRF token generated",
+		Error:   nil,
+	})
 }

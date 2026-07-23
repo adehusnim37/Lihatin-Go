@@ -31,16 +31,16 @@ func SetupRouter() *gin.Engine {
     csrfOpts := csrf.Options{
         Secret:       []byte(os.Getenv("CSRF_SECRET")), // WAJIB 32+ bytes
         CookieName:   "_csrf_token",
-        CookieDomain: ".yourdomain.com",
+        CookieDomain: "", // host-only
         MaxAge:       3600 * 24, // 24 hours
         Secure:       true,      // HTTPS only
-        HttpOnly:     false,     // JS harus bisa baca untuk SPA
+        HttpOnly:     true,      // frontend reads the masked response token
         SameSite:     http.SameSiteLaxMode,
 
         // Trusted origins untuk CORS
         TrustedOrigins: []string{
-            "app.yourdomain.com",
-            "admin.yourdomain.com",
+            "https://app.yourdomain.com",
+            "https://admin.yourdomain.com",
         },
 
         // Skip CSRF untuk API key authenticated routes
@@ -71,6 +71,7 @@ func SetupRouter() *gin.Engine {
 func GetCSRFToken(c *gin.Context) {
     // Token sudah di-generate oleh middleware
     token := csrf.GetMaskedToken(c) // Masked untuk security
+    c.Header("Cache-Control", "no-store, max-age=0")
 
     c.JSON(200, gin.H{
         "csrfToken": token,
@@ -86,10 +87,9 @@ const response = await fetch('/api/v1/csrf-token', {
     credentials: 'include' // PENTING: untuk kirim cookie
 });
 const data = await response.json();
-const csrfToken = data.csrfToken;
+const csrfToken = data.data.csrfToken;
 
-// Step 2: Store token (bisa di memory atau localStorage)
-localStorage.setItem('csrfToken', csrfToken);
+// Step 2: Keep the token in memory, not localStorage.
 
 // Step 3: Kirim di setiap POST/PUT/DELETE request
 const result = await fetch('/api/v1/transfer', {
@@ -97,7 +97,7 @@ const result = await fetch('/api/v1/transfer', {
     credentials: 'include',
     headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': localStorage.getItem('csrfToken')
+        'X-CSRF-Token': csrfToken
     },
     body: JSON.stringify({ to: 'user123', amount: 100 })
 });
@@ -112,9 +112,8 @@ const api = axios.create({
 
 // Interceptor untuk auto-attach token
 api.interceptors.request.use(config => {
-    const token = localStorage.getItem('csrfToken');
-    if (token && ['post', 'put', 'delete', 'patch'].includes(config.method)) {
-        config.headers['X-CSRF-Token'] = token;
+    if (csrfToken && ['post', 'put', 'delete', 'patch'].includes(config.method)) {
+        config.headers['X-CSRF-Token'] = csrfToken;
     }
     return config;
 });

@@ -237,6 +237,8 @@ REFRESH_TOKEN_EXPIRED=168  # Refresh token expiration in hours (default: 168 hou
 
 # CORS Configuration
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+AUTH_COOKIE_SAME_SITE=lax
+CSRF_SECRET=generate-at-least-32-random-bytes
 
 # Database
 DATABASE_URL=user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local

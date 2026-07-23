@@ -111,6 +111,7 @@ const (
 
 	// Security
 	EnvCSRFSecret                     = "CSRF_SECRET"
+	EnvAuthCookieSameSite             = "AUTH_COOKIE_SAME_SITE"
 	EnvRateLimit                      = "RATE_LIMIT"
 	EnvPremiumCodeSecret              = "PREMIUM_CODE_SECRET"
 	EnvAuthEnforceTOTPForPrivileged   = "AUTH_ENFORCE_TOTP_FOR_PRIVILEGED"
@@ -136,10 +137,10 @@ const (
 	EnvGoogleOAuthAuthorizeEndpoint = "GOOGLE_OAUTH_AUTHORIZE_ENDPOINT"
 	EnvGoogleOAuthTokenEndpoint     = "GOOGLE_OAUTH_TOKEN_ENDPOINT"
 	EnvGoogleOAuthTokenInfoEndpoint = "GOOGLE_OAUTH_TOKEN_INFO_ENDPOINT"
-	EnvGoogleOAuthClientID     = "GOOGLE_OAUTH_CLIENT_ID"
-	EnvGoogleOAuthClientSecret = "GOOGLE_OAUTH_CLIENT_SECRET"
-	EnvGoogleOAuthRedirectURI  = "GOOGLE_OAUTH_REDIRECT_URI"
-	EnvGoogleOAuthScopes       = "GOOGLE_OAUTH_SCOPES"
+	EnvGoogleOAuthClientID          = "GOOGLE_OAUTH_CLIENT_ID"
+	EnvGoogleOAuthClientSecret      = "GOOGLE_OAUTH_CLIENT_SECRET"
+	EnvGoogleOAuthRedirectURI       = "GOOGLE_OAUTH_REDIRECT_URI"
+	EnvGoogleOAuthScopes            = "GOOGLE_OAUTH_SCOPES"
 
 	// Disposable email policy
 	EnvDisposableEmailBlockListURL = "DISPOSABLE_EMAIL_BLOCK_LIST_URL"
