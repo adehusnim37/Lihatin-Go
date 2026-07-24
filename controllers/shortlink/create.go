@@ -2,7 +2,6 @@ package shortlink
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
@@ -111,7 +110,7 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 		go func() {
 			// Build complete short URL
 			var fullShortURL string
-			backendURL := config.GetRequiredEnv(config.EnvBackendURL)
+			frontendURL := config.GetRequiredEnv(config.EnvFrontendURL)
 
 			// Format dates
 			createdAt := createdLink.CreatedAt.Format("January 2, 2006 at 3:04 PM MST")
@@ -126,9 +125,9 @@ func (c *Controller) handleSingleCreation(ctx *gin.Context, req dto.CreateShortL
 			var passcode string = "-"
 			if createdDetail.Passcode != 0 {
 				passcode = fmt.Sprintf("%d", createdDetail.Passcode)
-				fullShortURL = fmt.Sprintf("%s/%s?passcode=%s", backendURL, createdLink.ShortCode, strconv.Itoa(createdDetail.Passcode))
+				fullShortURL = fmt.Sprintf("%s/%s?passcode=%d", frontendURL, createdLink.ShortCode, createdDetail.Passcode)
 			} else {
-				fullShortURL = fmt.Sprintf("%s/%s", backendURL, createdLink.ShortCode)
+				fullShortURL = fmt.Sprintf("%s/%s", frontendURL, createdLink.ShortCode)
 			}
 
 			if createdLink.Title == "" {
