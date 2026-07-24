@@ -47,3 +47,6 @@ test-build
 lihatin-go
 main
 .DS_Store
+
+# Graphify generated artifacts
+/graphify-out/
