@@ -2,6 +2,8 @@ package admin
 
 import (
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
@@ -9,55 +11,70 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (c *Controller) GetAllUsers(ctx *gin.Context) {
-	// Get pagination parameters from query string
+const maxRecipientSearchLength = 100
+
+// ListUserEmail returns paginated non-premium users for recipient pickers.
+func (c *Controller) ListUserEmail(ctx *gin.Context) {
 	pageStr := ctx.DefaultQuery("page", "1")
-	limitStr := ctx.DefaultQuery("limit", "10")
+	limitStr := ctx.DefaultQuery("limit", "20")
 	sort := ctx.DefaultQuery("sort", "created_at")
 	orderBy := ctx.DefaultQuery("order_by", "desc")
-	// Get user role from context (set by auth middleware)
+	search := strings.TrimSpace(ctx.Query("search"))
 	userRole := ctx.GetString("role")
 
-	// Validate and convert pagination parameters
 	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sort, orderBy, httputil.Role(userRole))
 	if vErrs != nil {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_PAGINATION_PARAMS", "Invalid pagination parameters", "pagination", vErrs)
 		return
 	}
+	if sort != "created_at" && sort != "updated_at" {
+		httputil.SendErrorResponse(
+			ctx,
+			http.StatusBadRequest,
+			"INVALID_SORT",
+			"Sort must be either created_at or updated_at",
+			"sort",
+		)
+		return
+	}
 
-	// Calculate offset
+	if utf8.RuneCountInString(search) > maxRecipientSearchLength {
+		httputil.SendErrorResponse(
+			ctx,
+			http.StatusBadRequest,
+			"INVALID_SEARCH",
+			"Search must not exceed 100 characters",
+			"search",
+		)
+		return
+	}
+
 	offset := (page - 1) * limit
 
-	//logging
-	logger.Logger.Info("Fetching all users",
+	logger.Logger.Info("Fetching non-premium recipient options",
 		"page", page,
 		"limit", limit,
 		"sort", sort,
 		"order_by", orderBy,
+		"has_search", search != "",
 	)
 
-	// Get users with pagination
-	users, totalCount, err := c.repo.GetUserAdminRepository().GetAllUsersWithPagination(limit, offset, sort, orderBy)
+	users, totalCount, err := c.repo.GetUserAdminRepository().
+		GetNonPremiumUserEmailsWithPagination(limit, offset, search, sort, orderBy)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "FAILED_TO_RETRIEVE_USERS", "Failed to retrieve users, please try again later", "error", err.Error())
 		return
 	}
 
-	// Convert to admin response format (remove passwords)
-	adminUsers := make([]dto.AdminUserResponse, len(users))
-	for i, u := range users {
-		adminUsers[i] = toAdminUserResponse(u)
-	}
-
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
-	response := dto.PaginatedUsersResponse{
-		Users:      adminUsers,
+	response := dto.PaginatedUserEmailsResponse{
+		Users:      users,
 		TotalCount: totalCount,
 		Page:       page,
 		Limit:      limit,
 		TotalPages: totalPages,
 	}
 
-	httputil.SendOKResponse(ctx, response, "Users retrieved successfully")
+	httputil.SendOKResponse(ctx, response, "Non-premium users retrieved successfully")
 }

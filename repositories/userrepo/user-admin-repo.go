@@ -17,7 +17,8 @@ import (
 
 // UserAdminRepository defines the methods for admin-related user operations
 type UserAdminRepository interface {
-	GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error)
+	GetAllUsersWithPagination(limit, offset int, sort, orderBy string) ([]user.User, int64, error)
+	GetNonPremiumUserEmailsWithPagination(limit, offset int, search, sort, orderBy string) ([]dto.AdminUserEmailResponse, int64, error)
 	GetUserDetailByID(userID string) (*dto.AdminUserDetailResponse, error)
 	LockUser(userID, reason, changedBy string) error
 	UnlockUser(userID, reason, changedBy string) error
@@ -41,7 +42,7 @@ func NewUserAdminRepository(db *gorm.DB) UserAdminRepository {
 }
 
 // GetAllUsersWithPagination retrieves all users with pagination (admin only)
-func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int) ([]user.User, int64, error) {
+func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int, sort, orderBy string) ([]user.User, int64, error) {
 	var users []user.User
 	var totalCount int64
 
@@ -54,7 +55,7 @@ func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int) ([]
 
 	// Get users with pagination
 	result := uar.db.Where("deleted_at IS NULL").
-		Order("created_at DESC").
+		Order(sort + " " + orderBy).
 		Limit(limit).
 		Offset(offset).
 		Find(&users)
@@ -65,6 +66,59 @@ func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int) ([]
 	}
 
 	logger.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
+	return users, totalCount, nil
+}
+
+// GetNonPremiumUserEmailsWithPagination returns compact, searchable recipient
+// options. The premium filter is intentionally enforced here so callers cannot
+// accidentally expose premium users as eligible recipients.
+func (uar *userAdminRepository) GetNonPremiumUserEmailsWithPagination(limit, offset int, search, sort, orderBy string) ([]dto.AdminUserEmailResponse, int64, error) {
+	users := make([]dto.AdminUserEmailResponse, 0)
+	var totalCount int64
+
+	query := uar.db.Model(&user.User{}).
+		Where("deleted_at IS NULL").
+		Where("is_premium = ?", false).
+		Where("is_locked = ?", false).
+		Where("(premium_revoked_reason = '' OR premium_revoked_reason IS NULL)")
+
+	if search != "" {
+		searchPattern := "%" + strings.ToLower(search) + "%"
+		query = query.Where(
+			"(LOWER(username) LIKE ? OR LOWER(email) LIKE ?)",
+			searchPattern,
+			searchPattern,
+		)
+	}
+
+	if err := query.Count(&totalCount).Error; err != nil {
+		logger.Logger.Error("Error getting non-premium recipient count", "error", err)
+		return nil, 0, apperrors.ErrUserDatabaseError
+	}
+
+	sortColumn := "created_at"
+	if sort == "updated_at" {
+		sortColumn = "updated_at"
+	}
+	sortDirection := "DESC"
+	if strings.EqualFold(orderBy, "asc") {
+		sortDirection = "ASC"
+	}
+
+	result := query.
+		Select("id, username, email").
+		Order(sortColumn + " " + sortDirection).
+		Order("id ASC").
+		Limit(limit).
+		Offset(offset).
+		Scan(&users)
+
+	if result.Error != nil {
+		logger.Logger.Error("Error getting non-premium recipients", "error", result.Error)
+		return nil, 0, apperrors.ErrUserDatabaseError
+	}
+
+	logger.Logger.Info("Retrieved non-premium recipient options", "count", len(users), "total", totalCount)
 	return users, totalCount, nil
 }
 

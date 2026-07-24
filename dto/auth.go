@@ -430,6 +430,22 @@ type PaginatedUsersResponse struct {
 	TotalPages int                 `json:"total_pages"`
 }
 
+// PaginatedUserEmailsResponse represents paginated non-premium recipient results.
+type PaginatedUserEmailsResponse struct {
+	Users      []AdminUserEmailResponse `json:"users"`
+	TotalCount int64                    `json:"total_count"`
+	Page       int                      `json:"page"`
+	Limit      int                      `json:"limit"`
+	TotalPages int                      `json:"total_pages"`
+}
+
+// AdminUserEmailResponse is the compact user shape used by recipient pickers.
+type AdminUserEmailResponse struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
 // AdminDisposableEmailPolicyResponse represents disposable email policy state.
 type AdminDisposableEmailPolicyResponse struct {
 	Enabled               bool       `json:"enabled"`

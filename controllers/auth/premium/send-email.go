@@ -1,13 +1,16 @@
 package premium
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,6 +41,16 @@ func (c *Controller) SendPremiumCodeEmail(ctx *gin.Context) {
 		)
 		return
 	}
+	if targetUserID != "" && targetEmail != "" {
+		httputil.SendErrorResponse(
+			ctx,
+			http.StatusBadRequest,
+			"AMBIGUOUS_RECIPIENT",
+			"Provide either user_id or recipient_email, not both",
+			"recipient",
+		)
+		return
+	}
 
 	premiumKey, err := c.premiumRepo.GetUserPremiumKeyByID(uri.ID)
 	if err != nil {
@@ -45,62 +58,60 @@ func (c *Controller) SendPremiumCodeEmail(ctx *gin.Context) {
 		return
 	}
 
-	checkuser, err := c.userRepo.GetUserByID(targetUserID)
-	if err != nil && targetUserID != "" {
-		httputil.HandleError(ctx, err, targetUserID)
-		return
-	}
-
-	if checkuser.IsLocked {
-		httputil.SendErrorResponse(
-			ctx,
-			http.StatusForbidden,
-			"USER_ACCOUNT_LOCKED",
-			"User account is locked",
-			"user_id",
-		)
-		return
-	}
-
-	if checkuser.PremiumRevokedReason != "" {
-		httputil.SendErrorResponse(
-			ctx,
-			http.StatusForbidden,
-			"USER_PREMIUM_REVOKED",
-			"User's premium access has been revoked",
-			"user_id",
-		)
-		return
-	}
-
-	checkPremium, err := c.userRepo.CheckPremiumByUsernameOrEmail(checkuser.Username)
-	if err != nil {
-		httputil.HandleError(ctx, err, checkuser.Username)
-		return
-	}
-
-	if checkPremium {
-		httputil.SendErrorResponse(
-			ctx,
-			http.StatusBadRequest,
-			"USER_ALREADY_PREMIUM",
-			"User already has premium access",
-			"user_id",
-		)
-		return
-	}
-
-	if targetEmail == "" && targetUserID != "" {
-		userData, userErr := c.userRepo.GetUserByID(targetUserID)
-		if userErr != nil {
-			httputil.HandleError(ctx, userErr, targetUserID)
+	var targetUser *user.User
+	if targetUserID != "" {
+		targetUser, err = c.userRepo.GetUserByID(targetUserID)
+		if err != nil {
+			httputil.HandleError(ctx, err, targetUserID)
 			return
 		}
-		targetEmail = strings.TrimSpace(userData.Email)
+	} else {
+		targetUser, err = c.userRepo.GetUserByEmail(targetEmail)
+		if err != nil && !isUserNotFoundError(err) {
+			httputil.HandleError(ctx, err, targetEmail)
+			return
+		}
+	}
+
+	if targetUser != nil {
+		if targetUser.IsLocked {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusForbidden,
+				"USER_ACCOUNT_LOCKED",
+				"User account is locked",
+				"user_id",
+			)
+			return
+		}
+		if targetUser.PremiumRevokedReason != "" {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusForbidden,
+				"USER_PREMIUM_REVOKED",
+				"User's premium access has been revoked",
+				"user_id",
+			)
+			return
+		}
+		if targetUser.IsPremium {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusBadRequest,
+				"USER_ALREADY_PREMIUM",
+				"User already has premium access",
+				"user_id",
+			)
+			return
+		}
+
+		// A user_id always resolves to the account's own email address. This
+		// prevents callers from pairing an eligible user ID with another email.
+		targetEmail = strings.TrimSpace(targetUser.Email)
 		if targetName == "" {
-			targetName = strings.TrimSpace(userData.FirstName + " " + userData.LastName)
+			targetName = strings.TrimSpace(targetUser.FirstName + " " + targetUser.LastName)
 			if targetName == "" {
-				targetName = strings.TrimSpace(userData.Username)
+				targetName = strings.TrimSpace(targetUser.Username)
 			}
 		}
 	}
@@ -164,4 +175,9 @@ func (c *Controller) SendPremiumCodeEmail(ctx *gin.Context) {
 		SentAt:          time.Now(),
 	}
 	httputil.SendOKResponse(ctx, response, "Premium code email sent successfully")
+}
+
+func isUserNotFoundError(err error) bool {
+	var appErr *apperrors.AppError
+	return errors.As(err, &appErr) && appErr.Code == apperrors.ErrUserNotFound.Code
 }

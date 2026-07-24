@@ -173,15 +173,50 @@ func (r *UserPremiumKeyRepository) GetUserPremiumKeyList(page, limit int, sort, 
 		return nil, apperrors.ErrUserFindFailed
 	}
 
+	userIDs := make([]string, 0)
+	seenUserIDs := make(map[string]struct{})
+	for _, key := range userPremiumKeys {
+		for _, usage := range key.Usage {
+			if _, exists := seenUserIDs[usage.UserID]; exists {
+				continue
+			}
+			seenUserIDs[usage.UserID] = struct{}{}
+			userIDs = append(userIDs, usage.UserID)
+		}
+	}
+
+	type usageUserLabel struct {
+		ID       string
+		Username string
+		Email    string
+	}
+	userLabels := make(map[string]usageUserLabel, len(userIDs))
+	if len(userIDs) > 0 {
+		var labels []usageUserLabel
+		if err := r.db.Model(&user.User{}).
+			Select("id, username, email").
+			Where("id IN ?", userIDs).
+			Scan(&labels).Error; err != nil {
+			logger.Logger.Error("Failed to load premium usage user labels", "error", err)
+			return nil, apperrors.ErrUserFindFailed
+		}
+		for _, label := range labels {
+			userLabels[label.ID] = label
+		}
+	}
+
 	items := make([]dto.GeneratePremiumCodeResponse, len(userPremiumKeys))
 	for i, key := range userPremiumKeys {
 
 		keyUsage := make([]dto.PremiumKeyUsageResponse, len(key.Usage))
 		for j, usage := range key.Usage {
+			label := userLabels[usage.UserID]
 			keyUsage[j] = dto.PremiumKeyUsageResponse{
 				ID:           usage.ID,
 				PremiumKeyID: usage.PremiumKeyID,
 				UserID:       usage.UserID,
+				Username:     label.Username,
+				Email:        label.Email,
 				CreatedAt:    usage.CreatedAt,
 				UpdatedAt:    usage.UpdatedAt,
 			}
