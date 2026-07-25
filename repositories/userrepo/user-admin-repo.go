@@ -17,7 +17,7 @@ import (
 
 // UserAdminRepository defines the methods for admin-related user operations
 type UserAdminRepository interface {
-	GetAllUsersWithPagination(limit, offset int, sort, orderBy string) ([]user.User, int64, error)
+	GetAllUsersWithPagination(limit, offset int, filters AdminUserListFilters) ([]user.User, int64, error)
 	GetNonPremiumUserEmailsWithPagination(limit, offset int, search, sort, orderBy string) ([]dto.AdminUserEmailResponse, int64, error)
 	GetUserDetailByID(userID string) (*dto.AdminUserDetailResponse, error)
 	LockUser(userID, reason, changedBy string) error
@@ -28,6 +28,15 @@ type UserAdminRepository interface {
 	IsUserLocked(userID string) (bool, error)
 	UpdateUserByAdmin(id string, updateUser dto.AdminUpdateUserRequest) error
 	DeleteUserPermanent(userID string) error
+}
+
+type AdminUserListFilters struct {
+	Search        string
+	Role          string
+	PremiumStatus string
+	LockStatus    string
+	Sort          string
+	OrderBy       string
 }
 
 type userAdminRepository struct {
@@ -42,20 +51,60 @@ func NewUserAdminRepository(db *gorm.DB) UserAdminRepository {
 }
 
 // GetAllUsersWithPagination retrieves all users with pagination (admin only)
-func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int, sort, orderBy string) ([]user.User, int64, error) {
+func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int, filters AdminUserListFilters) ([]user.User, int64, error) {
 	var users []user.User
 	var totalCount int64
 
-	// Get total count
-	countResult := uar.db.Model(&user.User{}).Where("deleted_at IS NULL").Count(&totalCount)
-	if countResult.Error != nil {
-		logger.Logger.Error("Error getting total user count", "error", countResult.Error)
+	query := uar.db.Model(&user.User{}).Where("deleted_at IS NULL")
+
+	if filters.Search != "" {
+		searchPattern := "%" + strings.ToLower(filters.Search) + "%"
+		query = query.Where(
+			"(LOWER(username) LIKE ? OR LOWER(email) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(CONCAT(first_name, ' ', last_name)) LIKE ?)",
+			searchPattern,
+			searchPattern,
+			searchPattern,
+			searchPattern,
+			searchPattern,
+		)
+	}
+	if filters.Role != "" {
+		query = query.Where("role = ?", filters.Role)
+	}
+	switch filters.PremiumStatus {
+	case "premium":
+		query = query.Where("is_premium = ?", true)
+	case "free":
+		query = query.Where("is_premium = ?", false).
+			Where("(premium_status IS NULL OR premium_status <> ?)", "revoked")
+	case "revoked":
+		query = query.Where("is_premium = ?", false).
+			Where("premium_status = ?", "revoked")
+	}
+	switch filters.LockStatus {
+	case "locked":
+		query = query.Where("is_locked = ?", true)
+	case "unlocked":
+		query = query.Where("is_locked = ?", false)
+	}
+
+	if err := query.Count(&totalCount).Error; err != nil {
+		logger.Logger.Error("Error getting total user count", "error", err)
 		return nil, 0, apperrors.ErrUserDatabaseError
 	}
 
-	// Get users with pagination
-	result := uar.db.Where("deleted_at IS NULL").
-		Order(sort + " " + orderBy).
+	sortColumn := filters.Sort
+	if sortColumn == "" {
+		sortColumn = "created_at"
+	}
+	sortDirection := strings.ToUpper(filters.OrderBy)
+	if sortDirection != "ASC" {
+		sortDirection = "DESC"
+	}
+
+	result := query.
+		Order(sortColumn + " " + sortDirection).
+		Order("id ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&users)
@@ -65,7 +114,15 @@ func (uar *userAdminRepository) GetAllUsersWithPagination(limit, offset int, sor
 		return nil, 0, apperrors.ErrUserDatabaseError
 	}
 
-	logger.Logger.Info("Retrieved paginated users", "count", len(users), "total", totalCount)
+	logger.Logger.Info(
+		"Retrieved paginated users",
+		"count", len(users),
+		"total", totalCount,
+		"has_search", filters.Search != "",
+		"role", filters.Role,
+		"premium_status", filters.PremiumStatus,
+		"lock_status", filters.LockStatus,
+	)
 	return users, totalCount, nil
 }
 

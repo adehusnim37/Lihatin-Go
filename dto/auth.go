@@ -428,6 +428,12 @@ type PaginatedUsersResponse struct {
 	Page       int                 `json:"page"`
 	Limit      int                 `json:"limit"`
 	TotalPages int                 `json:"total_pages"`
+	Sort       string              `json:"sort"`
+	OrderBy    string              `json:"order_by"`
+	Search     string              `json:"search,omitempty"`
+	Role       string              `json:"role,omitempty"`
+	Premium    string              `json:"premium_status,omitempty"`
+	LockStatus string              `json:"lock_status,omitempty"`
 }
 
 // PaginatedUserEmailsResponse represents paginated non-premium recipient results.
