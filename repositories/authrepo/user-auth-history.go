@@ -196,16 +196,27 @@ func (r *HistoryUserRepository) CreateHistoryUser(history *user.HistoryUser) err
 // Returns error if user has changed email or revoked in last 30 days
 func (r *HistoryUserRepository) CheckEmailChangeEligibility(userID string) (eligible bool, daysRemaining int, err error) {
 	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
-	roleAdmin := "admin"
+
+	var targetUser user.User
+	if err := r.db.First(&targetUser, "id = ?", userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, 0, apperrors.ErrUserNotFound
+		}
+		return false, 0, apperrors.ErrUserFindFailed
+	}
+
+	if targetUser.Role == "admin" || targetUser.Role == "super_admin" {
+		// Admins are always not eligible to change email at any circumstance, it's a security measure to prevent privilege escalation or misuse of admin accounts.
+		return false, 0, apperrors.ErrUserUpdateNotAllowed
+	}
 
 	var recentHistory user.HistoryUser
 	err = r.db.Where(
-		"user_id = ? AND action_type IN (?, ?) AND changed_at > ? AND role != ?",
+		"user_id = ? AND action_type IN (?, ?) AND changed_at > ?",
 		userID,
 		user.ActionEmailChange,
 		user.ActionEmailChangeRevoked,
 		thirtyDaysAgo,
-		roleAdmin,
 	).Order("changed_at DESC").First(&recentHistory).Error
 
 	if err != nil {
