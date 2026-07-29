@@ -162,7 +162,7 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.completeLogin(ctx, user, userAuth, "Login successful"); err != nil {
+	if err := c.CompleteLogin(ctx, user, userAuth, usermodel.LoginMethodEmailOTP, "Login successful"); err != nil {
 		return
 	}
 }

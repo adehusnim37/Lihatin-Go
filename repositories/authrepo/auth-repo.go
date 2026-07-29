@@ -13,6 +13,7 @@ type AuthRepository struct {
 	authMethodRepo    *AuthMethodRepository
 	apiKeyRepo        *apikeyrepo.APIKeyRepository
 	loginAttemptRepo  *LoginAttemptRepository
+	loginEventRepo    *LoginEventRepository
 	userAdminRepo     userrepo.UserAdminRepository
 	systemSettingRepo userrepo.SystemSettingRepository
 	historyUserRepo   *HistoryUserRepository
@@ -20,6 +21,7 @@ type AuthRepository struct {
 	// Public accessors for commonly used repositories
 	APIKeyRepo       *apikeyrepo.APIKeyRepository
 	LoginAttemptRepo *LoginAttemptRepository
+	LoginEventRepo   *LoginEventRepository
 }
 
 // NewAuthRepository creates a new auth repository
@@ -32,6 +34,7 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 
 	apiKeyRepo := apikeyrepo.NewAPIKeyRepository(gormDB)
 	loginAttemptRepo := NewLoginAttemptRepository(gormDB)
+	loginEventRepo := NewLoginEventRepository(gormDB)
 	userAdminRepo := userrepo.NewUserAdminRepository(gormDB)
 	systemSettingRepo := userrepo.NewSystemSettingRepository(gormDB)
 	historyUserRepo := NewHistoryUserRepository(gormDB)
@@ -42,6 +45,7 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 		authMethodRepo:    NewAuthMethodRepository(gormDB),
 		apiKeyRepo:        apiKeyRepo,
 		loginAttemptRepo:  loginAttemptRepo,
+		loginEventRepo:    loginEventRepo,
 		userAdminRepo:     userAdminRepo,
 		systemSettingRepo: systemSettingRepo,
 		historyUserRepo:   historyUserRepo,
@@ -49,7 +53,13 @@ func NewAuthRepository(gormDB *gorm.DB) *AuthRepository {
 		// Public accessors
 		APIKeyRepo:       apiKeyRepo,
 		LoginAttemptRepo: loginAttemptRepo,
+		LoginEventRepo:   loginEventRepo,
 	}
+}
+
+// GetLoginEventRepository returns the completed-login event repository.
+func (r *AuthRepository) GetLoginEventRepository() *LoginEventRepository {
+	return r.loginEventRepo
 }
 
 // GetUserRepository returns a GORM-based user repository

@@ -236,29 +236,65 @@ type PasswordGenericRequest struct {
 
 // UserAuthResponse represents user authentication details (without sensitive data)
 type UserAuthResponse struct {
-	ID              string `json:"id"`
-	UserID          string `json:"user_id"`
-	IsEmailVerified bool   `json:"is_email_verified"`
-	TOTPEnabled     bool   `json:"totp_enabled"`
-	AccountStatus   string `json:"account_status"`
-	LastLoginAt     string `json:"last_login_at"`
+	ID              string              `json:"id"`
+	UserID          string              `json:"user_id"`
+	IsEmailVerified bool                `json:"is_email_verified"`
+	TOTPEnabled     bool                `json:"totp_enabled"`
+	AccountStatus   string              `json:"account_status"`
+	LastLoginAt     string              `json:"last_login_at"`
+	PreviousLogin   *LoginEventResponse `json:"previous_login,omitempty"`
 }
 
 type CompletedUserAuthResponse struct {
-	ID                  string     `json:"id"`
-	UserID              string     `json:"user_id"`
-	IsEmailVerified     bool       `json:"is_email_verified"`
-	DeviceID            *string    `json:"device_id,omitempty"`
-	LastIP              *string    `json:"last_ip,omitempty"`
-	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
-	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
-	FailedLoginAttempts int        `json:"failed_login_attempts"`
-	LoginBlockedUntil   *time.Time `json:"login_blocked_until,omitempty"`
-	PasswordChangedAt   *time.Time `json:"password_changed_at,omitempty"`
-	AccountStatus       string     `json:"account_status"`
-	TOTPEnabled         bool       `json:"totp_enabled"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  string                  `json:"id"`
+	UserID              string                  `json:"user_id"`
+	IsEmailVerified     bool                    `json:"is_email_verified"`
+	DeviceID            *string                 `json:"device_id,omitempty"`
+	LastIP              *string                 `json:"last_ip,omitempty"`
+	LastLoginAt         *time.Time              `json:"last_login_at,omitempty"`
+	LastLogoutAt        *time.Time              `json:"last_logout_at,omitempty"`
+	FailedLoginAttempts int                     `json:"failed_login_attempts"`
+	LoginBlockedUntil   *time.Time              `json:"login_blocked_until,omitempty"`
+	PasswordChangedAt   *time.Time              `json:"password_changed_at,omitempty"`
+	AccountStatus       string                  `json:"account_status"`
+	TOTPEnabled         bool                    `json:"totp_enabled"`
+	CreatedAt           time.Time               `json:"created_at"`
+	UpdatedAt           time.Time               `json:"updated_at"`
+	PreviousLogin       *LoginEventResponse     `json:"previous_login,omitempty"`
+	CurrentSession      *CurrentSessionResponse `json:"current_session,omitempty"`
+}
+
+// LoginEventResponse describes a completed login without exposing its session ID.
+type LoginEventResponse struct {
+	Method          string    `json:"method"`
+	DeviceID        string    `json:"device_id,omitempty"`
+	IPAddress       string    `json:"ip_address,omitempty"`
+	UserAgent       string    `json:"user_agent,omitempty"`
+	AuthenticatedAt time.Time `json:"authenticated_at"`
+}
+
+func NewLoginEventResponse(event *user.LoginEvent) *LoginEventResponse {
+	if event == nil {
+		return nil
+	}
+	return &LoginEventResponse{
+		Method:          string(event.Method),
+		DeviceID:        event.DeviceID,
+		IPAddress:       event.IPAddress,
+		UserAgent:       event.UserAgent,
+		AuthenticatedAt: event.AuthenticatedAt,
+	}
+}
+
+// CurrentSessionResponse is sourced from the authenticated Redis session,
+// rather than the account-level "latest login" snapshot.
+type CurrentSessionResponse struct {
+	IPAddress string    `json:"ip_address"`
+	UserAgent string    `json:"user_agent"`
+	DeviceID  string    `json:"device_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	LastSeen  time.Time `json:"last_seen"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type ChangePasswordRequest struct {

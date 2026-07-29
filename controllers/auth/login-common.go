@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	pkgauth "github.com/adehusnim37/lihatin-go/internal/pkg/auth"
@@ -14,6 +13,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,14 +42,23 @@ func buildUserAuthResponse(ua *user.UserAuth) dto.UserAuthResponse {
 	}
 }
 
-func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.UserAuth, message string) error {
+// CompleteLogin is the single finalization path for every completed
+// authentication method. Challenges and refreshes must not call this method.
+func (c *Controller) CompleteLogin(ctx *gin.Context, u *user.User, ua *user.UserAuth, method user.LoginMethod, message string) error {
+	cookieSettings := pkgauth.ResolveAuthCookieSettings(ctx)
+	if cookieSettings.RejectInsecureRequest {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "INSECURE_TRANSPORT", "HTTPS is required in production", "auth")
+		return errors.New("insecure transport is not allowed in production")
+	}
+
 	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
+	requestContext := ctx.Request.Context()
 
 	sessionID, err := middleware.CreateSession(
-		context.Background(),
+		requestContext,
 		u.ID,
 		"login",
-		ctx.ClientIP(),
+		*lastIP,
 		ctx.GetHeader("User-Agent"),
 		*deviceID,
 	)
@@ -61,6 +70,17 @@ func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.User
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "SESSION_CREATION_FAILED", "Failed to create session", "server")
 		return err
 	}
+	loginCompleted := false
+	defer func() {
+		if !loginCompleted {
+			if cleanupErr := middleware.DeleteSession(context.Background(), sessionID); cleanupErr != nil {
+				logger.Logger.Warn("Failed to clean up incomplete login session",
+					"user_id", u.ID,
+					"error", cleanupErr.Error(),
+				)
+			}
+		}
+	}()
 
 	token, err := pkgauth.GenerateJWT(u.ID, sessionID, *deviceID, *lastIP, u.Username, u.Email, u.Role, ua.IsEmailVerified)
 	if err != nil {
@@ -70,7 +90,7 @@ func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.User
 
 	sessionManager := middleware.GetSessionManager()
 	refreshToken, err := pkgauth.GenerateRefreshToken(
-		context.Background(),
+		requestContext,
 		sessionManager.GetRedisClient(),
 		u.ID,
 		sessionID,
@@ -86,22 +106,32 @@ func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.User
 		return err
 	}
 
-	if err := c.repo.GetUserAuthRepository().UpdateLastLogin(u.ID, *deviceID, *lastIP); err != nil {
+	loginEvent, previousLogin, err := c.repo.GetLoginEventRepository().RecordSuccessfulLogin(authrepo.SuccessfulLogin{
+		UserID:    u.ID,
+		SessionID: sessionID,
+		Method:    method,
+		DeviceID:  *deviceID,
+		IPAddress: *lastIP,
+		UserAgent: ctx.GetHeader("User-Agent"),
+	})
+	if err != nil {
+		refreshTokenManager := pkgauth.NewRefreshTokenManager(sessionManager.GetRedisClient())
+		if cleanupErr := refreshTokenManager.DeleteRefreshToken(context.Background(), refreshToken); cleanupErr != nil {
+			logger.Logger.Warn("Failed to clean up refresh token after login persistence failure",
+				"user_id", u.ID,
+				"error", cleanupErr.Error(),
+			)
+		}
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LAST_LOGIN_UPDATE_FAILED", "Failed to update last login", "auth")
 		return err
 	}
+	ua.LastLoginAt = &loginEvent.AuthenticatedAt
 
+	userAgent := ctx.GetHeader("User-Agent")
+	clientIP := *lastIP
 	go func() {
-		userAgent := ctx.GetHeader("User-Agent")
-		clientIP := ctx.ClientIP()
 		c.emailService.SendLoginAlertEmail(u.Email, u.Username, clientIP, userAgent)
 	}()
-
-	cookieSettings := pkgauth.ResolveAuthCookieSettings(ctx)
-	if cookieSettings.RejectInsecureRequest {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "INSECURE_TRANSPORT", "HTTPS is required in production", "auth")
-		return errors.New("insecure transport is not allowed in production")
-	}
 
 	accessTokenCookie := &http.Cookie{
 		Name:     "access_token",
@@ -137,18 +167,17 @@ func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.User
 		"refresh_token_max_age_hours", config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168),
 	)
 
+	authResponse := buildUserAuthResponse(ua)
+	authResponse.PreviousLogin = dto.NewLoginEventResponse(previousLogin)
 	responseData := dto.LoginResponse{
 		User: buildUserProfile(u),
-		Auth: buildUserAuthResponse(ua),
+		Auth: authResponse,
 	}
 
 	if message == "" {
 		message = "Login successful"
 	}
-	if ua.LastLoginAt == nil {
-		now := time.Now()
-		ua.LastLoginAt = &now
-	}
+	loginCompleted = true
 	httputil.SendOKResponse(ctx, responseData, message)
 	return nil
 }

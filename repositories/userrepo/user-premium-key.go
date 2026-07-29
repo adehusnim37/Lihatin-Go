@@ -135,7 +135,7 @@ func (r *UserPremiumKeyRepository) RedeemPremiumCode(code string, userID string)
 			UserID:    userID,
 			Status:    user.PremiumAccessStatusActive,
 			Tier:      "premium",
-			Source:    "premium_code",
+			Source:    "premium_redemption",
 			GrantedAt: now,
 		}
 		result := tx.Where("user_id = ?", userID).FirstOrCreate(&access)

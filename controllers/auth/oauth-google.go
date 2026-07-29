@@ -250,7 +250,7 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.completeLogin(ctx, usr, userAuth, "Google sign-in successful"); err != nil {
+	if err := c.CompleteLogin(ctx, usr, userAuth, user.LoginMethodGoogleOAuth, "Google sign-in successful"); err != nil {
 		c.recordGoogleLoginAttempt(ctx, usr.Username, false, "Google sign-in failed")
 		return
 	}

@@ -7,13 +7,9 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
-	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	usermodel "github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
@@ -150,84 +146,6 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		)
 	}
 
-	// TOTP verified! Now issue JWT tokens (same as normal login)
-	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
-
-	// Create session in Redis
-	sessionID, err := middleware.CreateSession(
-		context.Background(),
-		user.ID,
-		"login",
-		ctx.ClientIP(),
-		ctx.GetHeader("User-Agent"),
-		*deviceID,
-	)
-	if err != nil {
-		logger.Logger.Error("Failed to create session after TOTP verification",
-			"user_id", user.ID,
-			"error", err.Error(),
-		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Message: "Failed to create session",
-			Error:   map[string]string{"server": "Session creation failed"},
-		})
-		return
-	}
-
-	logger.Logger.Info("Session created after TOTP verification",
-		"user_id", user.ID,
-		"session_preview", auth.GetKeyPreview(sessionID),
-		"device_id", *deviceID,
-	)
-
-	// Generate JWT token
-	token, err := auth.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, user.Role, userAuth.IsEmailVerified)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "Failed to generate authentication token"},
-		})
-		return
-	}
-
-	// Generate refresh token
-	sessionManager := middleware.GetSessionManager()
-	refreshToken, err := auth.GenerateRefreshToken(
-		context.Background(),
-		sessionManager.GetRedisClient(),
-		user.ID,
-		sessionID,
-		*deviceID,
-		*lastIP,
-	)
-	if err != nil {
-		logger.Logger.Error("Failed to generate refresh token after TOTP",
-			"user_id", user.ID,
-			"error", err.Error(),
-		)
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "Failed to generate refresh token"},
-		})
-		return
-	}
-
-	// Update last login
-	if err := c.repo.GetUserAuthRepository().UpdateLastLogin(user.ID, *deviceID, *lastIP); err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Data:    nil,
-			Message: "Login failed",
-			Error:   map[string]string{"error": "Failed to update last login"},
-		})
-		return
-	}
-
 	// Update TOTP auth method last_used_at
 	if err := c.repo.GetAuthMethodRepository().UpdateTOTPLastUsed(userAuth.ID); err != nil {
 		logger.Logger.Warn("Failed to update TOTP last_used_at",
@@ -237,74 +155,13 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		// Don't fail login for this
 	}
 
-	// Send login alert email (async)
-	go func() {
-		userAgent := ctx.GetHeader("User-Agent")
-		clientIP := ctx.ClientIP()
-		c.emailService.SendLoginAlertEmail(user.Email, user.Username, clientIP, userAgent)
-	}()
-
-	cookieSettings := auth.ResolveAuthCookieSettings(ctx)
-	if cookieSettings.RejectInsecureRequest {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "INSECURE_TRANSPORT", "HTTPS is required in production", "auth")
+	if err := c.loginController.CompleteLogin(
+		ctx,
+		user,
+		userAuth,
+		usermodel.LoginMethodTOTP,
+		"Two-factor authentication successful. Welcome back!",
+	); err != nil {
 		return
 	}
-
-	// Set Access Token Cookie
-	accessTokenCookie := &http.Cookie{
-		Name:     "access_token",
-		Value:    token,
-		Path:     "/",
-		Domain:   cookieSettings.Domain,
-		MaxAge:   config.GetEnvAsInt(config.EnvJWTExpired, 24) * 3600,
-		Secure:   cookieSettings.Secure,
-		HttpOnly: true,
-		SameSite: cookieSettings.SameSite,
-	}
-
-	// Set Refresh Token Cookie
-	refreshTokenCookie := &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken,
-		Path:     "/",
-		Domain:   cookieSettings.Domain,
-		MaxAge:   config.GetEnvAsInt(config.EnvRefreshTokenExpired, 168) * 3600,
-		Secure:   cookieSettings.Secure,
-		HttpOnly: true,
-		SameSite: cookieSettings.SameSite,
-	}
-
-	// Apply cookies to response
-	http.SetCookie(ctx.Writer, accessTokenCookie)
-	http.SetCookie(ctx.Writer, refreshTokenCookie)
-
-	logger.Logger.Info("TOTP login successful, tokens issued",
-		"user_id", user.ID,
-		"secure", cookieSettings.Secure,
-		"domain", cookieSettings.Domain,
-		"same_site", cookieSettings.SameSiteLabel,
-	)
-
-	// Prepare response
-	responseData := dto.LoginResponse{
-		User: dto.UserProfile{
-			ID:            user.ID,
-			Username:      user.Username,
-			FirstName:     user.FirstName,
-			LastName:      user.LastName,
-			Email:         user.Email,
-			Avatar:        user.Avatar,
-			PremiumAccess: dto.NewPremiumAccessResponse(user.PremiumAccess),
-			CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		},
-		Auth: dto.UserAuthResponse{
-			ID:              userAuth.ID,
-			UserID:          userAuth.UserID,
-			IsEmailVerified: userAuth.IsEmailVerified,
-			TOTPEnabled:     userAuth.HasEnabledTOTP(),
-			LastLoginAt:     userAuth.LastLoginAt.Format("2006-01-02T15:04:05Z07:00"),
-		},
-	}
-
-	httputil.SendOKResponse(ctx, responseData, "Two-factor authentication successful. Welcome back!")
 }

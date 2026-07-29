@@ -785,7 +785,7 @@ func DefaultOptions() Options {
 		FormField:          DefaultFormField,
 		SessionCookieNames: []string{"refresh_token", "access_token", "session_id"},
 		TrustedOrigins: strings.Split(
-			config.GetEnvOrDefault(config.EnvAllowedOrigins, ""),
+			config.GetEnvOrDefault(config.EnvAllowedOrigins, "http://localhost:3000,http://localhost:3001"),
 			",",
 		),
 	}
