@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -46,8 +47,8 @@ func NewAuthController(base *controllers.BaseController) *Controller {
 	}
 }
 
-// GetPremiumStatus returns premium subscription status
-func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
+// GetPremiumAccess returns the current premium entitlement and effective features.
+func (c *Controller) GetPremiumAccess(ctx *gin.Context) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
@@ -71,17 +72,15 @@ func (c *Controller) GetPremiumStatus(ctx *gin.Context) {
 		return
 	}
 
-	// Create premium status response
+	premiumActive := user.HasPremiumAccessAt(time.Now())
 	premiumStatus := map[string]interface{}{
-		"user_id":           user.ID,
-		"is_premium":        user.IsPremium,
-		"premium_since":     nil, // TODO: Add premium_since field to user model
-		"subscription_type": map[bool]string{true: "premium", false: "free"}[user.IsPremium],
+		"user_id":        user.ID,
+		"premium_access": dto.NewPremiumAccessResponse(user.PremiumAccess),
 		"features": map[string]interface{}{
-			"unlimited_uploads":  user.IsPremium,
-			"priority_support":   user.IsPremium,
-			"advanced_analytics": user.IsPremium,
-			"custom_branding":    user.IsPremium,
+			"unlimited_uploads":  premiumActive,
+			"priority_support":   premiumActive,
+			"advanced_analytics": premiumActive,
+			"custom_branding":    premiumActive,
 		},
 	}
 
@@ -131,7 +130,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 	}
 
 	// Check if user is already locked
-	if user.IsLocked {
+	if user.IsAccountLocked() {
 		ctx.JSON(http.StatusConflict, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -201,7 +200,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	}
 
 	// Check if user is actually locked
-	if !user.IsLocked {
+	if !user.IsAccountLocked() {
 		ctx.JSON(http.StatusConflict, common.APIResponse{
 			Success: false,
 			Data:    nil,
@@ -305,7 +304,6 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		user.Username,
 		user.Email,
 		role,
-		user.IsPremium,
 		userAuth.IsEmailVerified,
 	)
 	if err != nil {
@@ -456,21 +454,22 @@ func (c *Controller) GetCurrentUser(ctx *gin.Context) {
 
 	// Convert to DTO
 	userProfile := dto.UserProfile{
-		ID:        user.ID,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		Role:      user.Role,
-		IsPremium: user.IsPremium,
-		CreatedAt: user.CreatedAt.Format("2006-01-02 15:04:05"),
+		ID:            user.ID,
+		Username:      user.Username,
+		FirstName:     user.FirstName,
+		LastName:      user.LastName,
+		Email:         user.Email,
+		Avatar:        user.Avatar,
+		Role:          user.Role,
+		PremiumAccess: dto.NewPremiumAccessResponse(user.PremiumAccess),
+		CreatedAt:     user.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
 
 	authResponse := dto.UserAuthResponse{
 		ID:              userAuth.ID,
 		IsEmailVerified: userAuth.IsEmailVerified,
-		IsTOTPEnabled:   userAuth.IsTOTPEnabled,
+		TOTPEnabled:     userAuth.HasEnabledTOTP(),
+		AccountStatus:   string(userAuth.AccountStatus),
 	}
 
 	ctx.JSON(http.StatusOK, common.APIResponse{

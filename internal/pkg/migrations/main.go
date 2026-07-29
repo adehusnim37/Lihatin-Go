@@ -86,8 +86,17 @@ func RunMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate PremiumKeyUsage model: %w", err)
 	}
 
-	if err := db.AutoMigrate(&user.PremiumStatusEvent{}); err != nil {
-		return fmt.Errorf("failed to migrate PremiumStatusEvent model: %w", err)
+	if err := renamePremiumAccessEventTable(db); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&user.PremiumAccessEvent{}); err != nil {
+		return fmt.Errorf("failed to migrate PremiumAccessEvent model: %w", err)
+	}
+	if err := db.AutoMigrate(&user.PremiumAccess{}); err != nil {
+		return fmt.Errorf("failed to migrate PremiumAccess model: %w", err)
+	}
+	if err := normalizeUserAccountSchema(db); err != nil {
+		return err
 	}
 
 	// Migrate Support models
@@ -124,5 +133,24 @@ func normalizeSupportAttachmentSchema(db *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+func renamePremiumAccessEventTable(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("gorm DB is required")
+	}
+	migrator := db.Migrator()
+	hasLegacyTable := migrator.HasTable("premium_status_events")
+	hasCurrentTable := migrator.HasTable("premium_access_events")
+	if hasLegacyTable && hasCurrentTable {
+		return fmt.Errorf("both premium_status_events and premium_access_events exist; reconcile them before migration")
+	}
+	if !hasLegacyTable {
+		return nil
+	}
+	if err := migrator.RenameTable("premium_status_events", "premium_access_events"); err != nil {
+		return fmt.Errorf("rename premium status event table: %w", err)
+	}
 	return nil
 }

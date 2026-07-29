@@ -31,7 +31,7 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	}
 
 	// Check if user is actually locked
-	if !user.IsLocked {
+	if !user.IsAccountLocked() {
 		httputil.SendErrorResponse(ctx, http.StatusConflict, "USER_NOT_LOCKED", "User not locked", "user_id", userID)
 		return
 	}

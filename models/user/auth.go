@@ -17,33 +17,72 @@ const (
 	EmailSourceOther  EmailVerificationSource = "other"
 )
 
+type AccountStatus string
+
+const (
+	// AccountStatusActive allows authentication.
+	AccountStatusActive AccountStatus = "active"
+	// AccountStatusDisabled is an administrative or user-requested deactivation.
+	AccountStatusDisabled AccountStatus = "disabled"
+	// AccountStatusLocked is a persistent administrative security lock.
+	AccountStatusLocked AccountStatus = "locked"
+)
+
 // UserAuth represents authentication details for a user.
 type UserAuth struct {
-	ID                              string                  `json:"id" gorm:"primaryKey;type:char(36);"`                                               // Primary Key with UUID v7 auto-generation
-	UserID                          string                  `json:"user_id" gorm:"size:191;not null;uniqueIndex"`                                      // Foreign Key to User.ID, same size as User.ID
+	ID                              string                  `json:"id" gorm:"primaryKey;type:char(36)"`                                                // Primary Key with UUID v7 auto-generation
+	UserID                          string                  `json:"user_id" gorm:"size:191;not null;uniqueIndex"`                                      // One auth record per user
 	User                            *User                   `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"` // Optional: for eager loading user details
-	IsEmailVerified                 bool                    `json:"is_email_verified" gorm:"default:false"`
-	PasswordHash                    string                  `json:"password_hash" gorm:"type:text"`            // Hashed password for this auth method
-	PasswordChangedAt               *time.Time              `json:"password_changed_at,omitempty"`             // Timestamp of last password change
-	EmailVerificationToken          string                  `json:"-" gorm:"size:255"`                         // Token sent to user's email
-	EmailVerificationTokenExpiresAt *time.Time              `json:"-"`                                         // Expiry for the verification token
-	EmailVerificationSource         EmailVerificationSource `json:"-" gorm:"size:255"`                         // Source email before change, if applicable
-	LastEmailSendAt                 *time.Time              `json:"last_email_send_at,omitempty"`              // Timestamp of last verification email sent to prevent spamming
-	PasswordResetToken              string                  `json:"-" gorm:"size:255"`                         // Token for password reset
-	PasswordResetTokenExpiresAt     *time.Time              `json:"-"`                                         // Expiry for the reset token
-	DeviceID                        *string                 `json:"device_id,omitempty" gorm:"size:255;index"` // Current active device ID, if any
-	LastIP                          *string                 `json:"last_ip,omitempty" gorm:"size:45"`          // Last IP address used, if any
+	IsEmailVerified                 bool                    `json:"is_email_verified" gorm:"not null;default:false"`
+	PasswordHash                    string                  `json:"-" gorm:"type:varchar(255)"`                                      // The only persisted password hash
+	PasswordChangedAt               *time.Time              `json:"password_changed_at,omitempty"`                                   // Timestamp of last password change
+	EmailVerificationToken          string                  `json:"-" gorm:"size:255"`                                               // Token sent to user's email
+	EmailVerificationTokenExpiresAt *time.Time              `json:"-"`                                                               // Expiry for the verification token
+	EmailVerificationSource         EmailVerificationSource `json:"-" gorm:"size:255"`                                               // Source email before change, if applicable
+	LastEmailSendAt                 *time.Time              `json:"last_email_send_at,omitempty"`                                    // Timestamp of last verification email sent to prevent spamming
+	PasswordResetToken              string                  `json:"-" gorm:"size:255"`                                               // Token for password reset
+	PasswordResetTokenExpiresAt     *time.Time              `json:"-"`                                                               // Expiry for the reset token
+	DeviceID                        *string                 `json:"device_id,omitempty" gorm:"column:last_device_id;size:255;index"` // Most recently authenticated device
+	LastIP                          *string                 `json:"last_ip,omitempty" gorm:"column:last_login_ip;size:45"`           // Most recent login IP
 	LastLoginAt                     *time.Time              `json:"last_login_at,omitempty"`
 	LastLogoutAt                    *time.Time              `json:"last_logout_at,omitempty"`
-	FailedLoginAttempts             int                     `json:"failed_login_attempts,omitempty" gorm:"default:0"` // Counter for failed login attempts
-	LockoutUntil                    *time.Time              `json:"lockout_until,omitempty"`                          // Timestamp until which the account is locked
-	IsActive                        bool                    `json:"is_active" gorm:"default:true"`                    // General account active status
-	IsTOTPEnabled                   bool                    `json:"is_totp_enabled" gorm:"default:false"`             // Whether TOTP is enabled for this user
+	FailedLoginAttempts             int                     `json:"failed_login_attempts,omitempty" gorm:"not null;default:0"`
+	LoginBlockedUntil               *time.Time              `json:"login_blocked_until,omitempty" gorm:"index"` // Temporary, self-expiring failed-login block
+	AccountStatus                   AccountStatus           `json:"account_status" gorm:"size:20;not null;default:active;index"`
+	StatusReason                    string                  `json:"status_reason,omitempty" gorm:"size:500"`
+	StatusChangedAt                 *time.Time              `json:"status_changed_at,omitempty"`
+	StatusChangedBy                 *string                 `json:"status_changed_by,omitempty" gorm:"type:char(36);index"`
 	CreatedAt                       time.Time               `json:"created_at"`
 	UpdatedAt                       time.Time               `json:"updated_at"`
-	DeletedAt                       *time.Time              `json:"deleted_at,omitempty" gorm:"index"` // For soft deletes
+	DeletedAt                       *time.Time              `json:"deleted_at,omitempty" gorm:"index"`
 	// Relationships
 	AuthMethods []AuthMethod `json:"auth_methods,omitempty" gorm:"foreignKey:UserAuthID"`
+}
+
+func (a *UserAuth) HydrateDerivedState() {
+	if a == nil {
+		return
+	}
+	if a.AccountStatus == "" {
+		a.AccountStatus = AccountStatusActive
+	}
+}
+
+func (a *UserAuth) HasEnabledTOTP() bool {
+	if a == nil {
+		return false
+	}
+	for i := range a.AuthMethods {
+		method := a.AuthMethods[i]
+		if method.Type == AuthMethodTypeTOTP && method.IsEnabled && method.IsVerified && method.DeletedAt == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *UserAuth) IsLoginBlockedAt(now time.Time) bool {
+	return a != nil && a.LoginBlockedUntil != nil && now.Before(*a.LoginBlockedUntil)
 }
 
 // TableName specifies the table name for GORM

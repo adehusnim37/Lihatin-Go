@@ -143,15 +143,48 @@ type ChangeEmailRequest struct {
 
 // UserProfile represents user information returned after login (without sensitive data)
 type UserProfile struct {
-	ID        string `json:"id"`
-	Username  string `json:"username"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Avatar    string `json:"avatar"`
-	Role      string `json:"role"`
-	IsPremium bool   `json:"is_premium"`
-	CreatedAt string `json:"created_at"`
+	ID            string                 `json:"id"`
+	Username      string                 `json:"username"`
+	FirstName     string                 `json:"first_name"`
+	LastName      string                 `json:"last_name"`
+	Email         string                 `json:"email"`
+	Avatar        string                 `json:"avatar"`
+	Role          string                 `json:"role"`
+	PremiumAccess *PremiumAccessResponse `json:"premium_access"`
+	CreatedAt     string                 `json:"created_at"`
+}
+
+type PremiumAccessResponse struct {
+	Status          string     `json:"status"`
+	Tier            string     `json:"tier"`
+	Source          string     `json:"source"`
+	GrantedAt       time.Time  `json:"granted_at"`
+	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
+	RevokeType      string     `json:"revoke_type,omitempty"`
+	StatusChangedAt *time.Time `json:"status_changed_at,omitempty"`
+	StatusChangedBy *string    `json:"status_changed_by,omitempty"`
+	StatusReason    string     `json:"status_reason,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+func NewPremiumAccessResponse(access *user.PremiumAccess) *PremiumAccessResponse {
+	if access == nil {
+		return nil
+	}
+	return &PremiumAccessResponse{
+		Status:          string(access.Status),
+		Tier:            access.Tier,
+		Source:          access.Source,
+		GrantedAt:       access.GrantedAt,
+		ExpiresAt:       access.ExpiresAt,
+		RevokeType:      string(access.RevokeType),
+		StatusChangedAt: access.StatusChangedAt,
+		StatusChangedBy: access.StatusChangedBy,
+		StatusReason:    access.StatusReason,
+		CreatedAt:       access.CreatedAt,
+		UpdatedAt:       access.UpdatedAt,
+	}
 }
 
 // RegisterRequest represents the user registration request payload
@@ -206,7 +239,8 @@ type UserAuthResponse struct {
 	ID              string `json:"id"`
 	UserID          string `json:"user_id"`
 	IsEmailVerified bool   `json:"is_email_verified"`
-	IsTOTPEnabled   bool   `json:"is_totp_enabled"`
+	TOTPEnabled     bool   `json:"totp_enabled"`
+	AccountStatus   string `json:"account_status"`
 	LastLoginAt     string `json:"last_login_at"`
 }
 
@@ -219,10 +253,10 @@ type CompletedUserAuthResponse struct {
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
 	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
 	FailedLoginAttempts int        `json:"failed_login_attempts"`
-	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`
+	LoginBlockedUntil   *time.Time `json:"login_blocked_until,omitempty"`
 	PasswordChangedAt   *time.Time `json:"password_changed_at,omitempty"`
-	IsActive            bool       `json:"is_active"`
-	IsTOTPEnabled       bool       `json:"is_totp_enabled"`
+	AccountStatus       string     `json:"account_status"`
+	TOTPEnabled         bool       `json:"totp_enabled"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
@@ -271,25 +305,18 @@ type AdminUpdateUserRequest struct {
 
 // AdminUserResponse represents the response format for admin user data
 type AdminUserResponse struct {
-	ID                       string     `json:"id"`
-	Username                 string     `json:"username"`
-	FirstName                string     `json:"first_name"`
-	LastName                 string     `json:"last_name"`
-	Email                    string     `json:"email"`
-	CreatedAt                time.Time  `json:"created_at"`
-	UpdatedAt                time.Time  `json:"updated_at"`
-	IsPremium                bool       `json:"is_premium"`
-	IsLocked                 bool       `json:"is_locked"`
-	LockedAt                 *time.Time `json:"locked_at,omitempty"`
-	LockedReason             string     `json:"locked_reason,omitempty"`
-	Role                     string     `json:"role"`
-	PremiumRevokeType        string     `json:"premium_revoke_type,omitempty"`
-	PremiumRevokedAt         *time.Time `json:"premium_revoked_at,omitempty"`
-	PremiumRevokedBy         *string    `json:"premium_revoked_by,omitempty"`
-	PremiumRevokedReason     string     `json:"premium_revoked_reason,omitempty"`
-	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
-	PremiumReactivatedBy     *string    `json:"premium_reactivated_by,omitempty"`
-	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty"`
+	ID                     string                 `json:"id"`
+	Username               string                 `json:"username"`
+	FirstName              string                 `json:"first_name"`
+	LastName               string                 `json:"last_name"`
+	Email                  string                 `json:"email"`
+	CreatedAt              time.Time              `json:"created_at"`
+	UpdatedAt              time.Time              `json:"updated_at"`
+	AccountStatus          string                 `json:"account_status"`
+	AccountStatusChangedAt *time.Time             `json:"account_status_changed_at,omitempty"`
+	AccountStatusReason    string                 `json:"account_status_reason,omitempty"`
+	Role                   string                 `json:"role"`
+	PremiumAccess          *PremiumAccessResponse `json:"premium_access"`
 }
 
 // AdminUserAuthDetailResponse represents detailed user_auth section for admin user detail.
@@ -304,9 +331,9 @@ type AdminUserAuthDetailResponse struct {
 	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
 	LastLogoutAt        *time.Time `json:"last_logout_at,omitempty"`
 	FailedLoginAttempts int        `json:"failed_login_attempts"`
-	LockoutUntil        *time.Time `json:"lockout_until,omitempty"`
-	IsActive            bool       `json:"is_active"`
-	IsTOTPEnabled       bool       `json:"is_totp_enabled"`
+	LoginBlockedUntil   *time.Time `json:"login_blocked_until,omitempty"`
+	AccountStatus       string     `json:"account_status"`
+	TOTPEnabled         bool       `json:"totp_enabled"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 	DeletedAt           *time.Time `json:"deleted_at,omitempty"`
@@ -335,7 +362,7 @@ type AdminUserDetailStatsResponse struct {
 	APIKeysActive            int64 `json:"api_keys_active"`
 	HistoryEventsTotal       int64 `json:"history_events_total"`
 	PremiumKeyUsageTotal     int64 `json:"premium_key_usage_total"`
-	PremiumStatusEventsTotal int64 `json:"premium_status_events_total"`
+	PremiumAccessEventsTotal int64 `json:"premium_access_events_total"`
 	LoginAttempts24h         int64 `json:"login_attempts_24h"`
 	LoginAttempts7d          int64 `json:"login_attempts_7d"`
 }
@@ -363,68 +390,51 @@ type AdminUserRecentLoginAttemptResponse struct {
 }
 
 // AdminUserDetailResponse represents very detailed admin user payload for user detail endpoint.
-// Existing fields from AdminUserResponse are kept for backward compatibility.
 type AdminUserDetailResponse struct {
-	ID                       string                                `json:"id"`
-	Username                 string                                `json:"username"`
-	FirstName                string                                `json:"first_name"`
-	LastName                 string                                `json:"last_name"`
-	Email                    string                                `json:"email"`
-	Avatar                   string                                `json:"avatar,omitempty"`
-	CreatedAt                time.Time                             `json:"created_at"`
-	UpdatedAt                time.Time                             `json:"updated_at"`
-	DeletedAt                *time.Time                            `json:"deleted_at,omitempty"`
-	UsernameChanged          bool                                  `json:"username_changed"`
-	IsPremium                bool                                  `json:"is_premium"`
-	IsLocked                 bool                                  `json:"is_locked"`
-	LockedAt                 *time.Time                            `json:"locked_at,omitempty"`
-	LockedReason             string                                `json:"locked_reason,omitempty"`
-	Role                     string                                `json:"role"`
-	PremiumStatus            string                                `json:"premium_status"`
-	PremiumRevokeType        string                                `json:"premium_revoke_type,omitempty"`
-	PremiumRevokedAt         *time.Time                            `json:"premium_revoked_at,omitempty"`
-	PremiumRevokedBy         *string                               `json:"premium_revoked_by,omitempty"`
-	PremiumRevokedReason     string                                `json:"premium_revoked_reason,omitempty"`
-	PremiumReactivatedAt     *time.Time                            `json:"premium_reactivated_at,omitempty"`
-	PremiumReactivatedBy     *string                               `json:"premium_reactivated_by,omitempty"`
-	PremiumReactivatedReason string                                `json:"premium_reactivated_reason,omitempty"`
-	UserAuth                 *AdminUserAuthDetailResponse          `json:"user_auth,omitempty"`
-	AuthMethods              []AdminAuthMethodDetailResponse       `json:"auth_methods,omitempty"`
-	Stats                    AdminUserDetailStatsResponse          `json:"stats"`
-	RecentHistory            []AdminUserRecentHistoryResponse      `json:"recent_history,omitempty"`
-	RecentLoginAttempts      []AdminUserRecentLoginAttemptResponse `json:"recent_login_attempts,omitempty"`
+	ID                     string                                `json:"id"`
+	Username               string                                `json:"username"`
+	FirstName              string                                `json:"first_name"`
+	LastName               string                                `json:"last_name"`
+	Email                  string                                `json:"email"`
+	Avatar                 string                                `json:"avatar,omitempty"`
+	CreatedAt              time.Time                             `json:"created_at"`
+	UpdatedAt              time.Time                             `json:"updated_at"`
+	DeletedAt              *time.Time                            `json:"deleted_at,omitempty"`
+	UsernameChanged        bool                                  `json:"username_changed"`
+	AccountStatus          string                                `json:"account_status"`
+	AccountStatusChangedAt *time.Time                            `json:"account_status_changed_at,omitempty"`
+	AccountStatusReason    string                                `json:"account_status_reason,omitempty"`
+	Role                   string                                `json:"role"`
+	PremiumAccess          *PremiumAccessResponse                `json:"premium_access"`
+	UserAuth               *AdminUserAuthDetailResponse          `json:"user_auth,omitempty"`
+	AuthMethods            []AdminAuthMethodDetailResponse       `json:"auth_methods,omitempty"`
+	Stats                  AdminUserDetailStatsResponse          `json:"stats"`
+	RecentHistory          []AdminUserRecentHistoryResponse      `json:"recent_history,omitempty"`
+	RecentLoginAttempts    []AdminUserRecentLoginAttemptResponse `json:"recent_login_attempts,omitempty"`
 }
 
-type AdminPremiumStatusMutationResponse struct {
-	UserID                   string     `json:"user_id"`
-	IsPremium                bool       `json:"is_premium"`
-	Role                     string     `json:"role"`
-	PremiumRevokeType        string     `json:"premium_revoke_type,omitempty"`
-	PremiumRevokedAt         *time.Time `json:"premium_revoked_at,omitempty"`
-	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
-	PremiumRevokedReason     string     `json:"premium_revoked_reason,omitempty"`
-	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty"`
+type AdminPremiumAccessMutationResponse struct {
+	UserID        string                `json:"user_id"`
+	PremiumAccess PremiumAccessResponse `json:"premium_access"`
 }
 
-type AdminPremiumStatusEventResponse struct {
-	ID          uint      `json:"id"`
-	UserID      string    `json:"user_id"`
-	Action      string    `json:"action"`
-	OldStatus   string    `json:"old_status"`
-	NewStatus   string    `json:"new_status"`
-	OldRole     string    `json:"old_role"`
-	NewRole     string    `json:"new_role"`
-	RevokeType  string    `json:"revoke_type,omitempty"`
-	Reason      string    `json:"reason"`
-	ChangedBy   *string   `json:"changed_by,omitempty"`
-	ChangedRole string    `json:"changed_role"`
-	CreatedAt   time.Time `json:"created_at"`
+type AdminPremiumAccessEventResponse struct {
+	ID         uint      `json:"id"`
+	UserID     string    `json:"user_id"`
+	Action     string    `json:"action"`
+	OldStatus  string    `json:"old_status"`
+	NewStatus  string    `json:"new_status"`
+	RevokeType string    `json:"revoke_type,omitempty"`
+	Reason     string    `json:"reason"`
+	ActorID    *string   `json:"actor_id,omitempty"`
+	ActorRole  string    `json:"actor_role"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
-type AdminPremiumStatusEventsListResponse struct {
+type AdminPremiumAccessEventsListResponse struct {
 	UserID string                            `json:"user_id"`
 	Total  int                               `json:"total"`
-	Items  []AdminPremiumStatusEventResponse `json:"items"`
+	Items  []AdminPremiumAccessEventResponse `json:"items"`
 }
 
 // PaginatedUsersResponse represents paginated user results
@@ -438,8 +448,8 @@ type PaginatedUsersResponse struct {
 	OrderBy    string              `json:"order_by"`
 	Search     string              `json:"search,omitempty"`
 	Role       string              `json:"role,omitempty"`
-	Premium    string              `json:"premium_status,omitempty"`
-	LockStatus string              `json:"lock_status,omitempty"`
+	PremiumAccessStatus string              `json:"premium_access_status,omitempty"`
+	LockStatus          string              `json:"lock_status,omitempty"`
 }
 
 // PaginatedUserEmailsResponse represents paginated non-premium recipient results.

@@ -1,7 +1,7 @@
 package admin
 
 import (
-	"strings"
+	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/models/user"
@@ -9,29 +9,38 @@ import (
 
 func toAdminUserResponse(u user.User) dto.AdminUserResponse {
 	return dto.AdminUserResponse{
-		ID:                       u.ID,
-		Username:                 u.Username,
-		FirstName:                u.FirstName,
-		LastName:                 u.LastName,
-		Email:                    u.Email,
-		CreatedAt:                u.CreatedAt,
-		UpdatedAt:                u.UpdatedAt,
-		IsPremium:                u.IsPremium,
-		IsLocked:                 u.IsLocked,
-		LockedAt:                 u.LockedAt,
-		LockedReason:             u.LockedReason,
-		Role:                     u.Role,
-		PremiumRevokeType:        normalizePremiumRevokeType(u.PremiumRevokeType),
-		PremiumRevokedAt:         u.PremiumRevokedAt,
-		PremiumRevokedBy:         u.PremiumRevokedBy,
-		PremiumRevokedReason:     u.PremiumRevokedReason,
-		PremiumReactivatedAt:     u.PremiumReactivatedAt,
-		PremiumReactivatedBy:     u.PremiumReactivatedBy,
-		PremiumReactivatedReason: u.PremiumReactivatedReason,
+		ID:                     u.ID,
+		Username:               u.Username,
+		FirstName:              u.FirstName,
+		LastName:               u.LastName,
+		Email:                  u.Email,
+		CreatedAt:              u.CreatedAt,
+		UpdatedAt:              u.UpdatedAt,
+		AccountStatus:          accountStatus(u.UserAuth),
+		AccountStatusChangedAt: accountStatusChangedAt(u.UserAuth),
+		AccountStatusReason:    accountStatusReason(u.UserAuth),
+		Role:                   u.Role,
+		PremiumAccess:          dto.NewPremiumAccessResponse(u.PremiumAccess),
 	}
 }
 
-func normalizePremiumRevokeType(raw string) string {
-	normalized := strings.ToLower(strings.TrimSpace(raw))
-	return normalized
+func accountStatus(auth *user.UserAuth) string {
+	if auth == nil {
+		return ""
+	}
+	return string(auth.AccountStatus)
+}
+
+func accountStatusChangedAt(auth *user.UserAuth) *time.Time {
+	if auth == nil {
+		return nil
+	}
+	return auth.StatusChangedAt
+}
+
+func accountStatusReason(auth *user.UserAuth) string {
+	if auth == nil {
+		return ""
+	}
+	return auth.StatusReason
 }

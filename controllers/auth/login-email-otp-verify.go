@@ -11,6 +11,7 @@ import (
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	usermodel "github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -70,22 +71,22 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 		return
 	}
 
-	if user.IsLocked {
+	if user.IsAccountLocked() {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
 		return
 	}
 
-	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLockout(user.ID)
+	temporarilyBlocked, err := c.repo.GetUserAuthRepository().IsLoginTemporarilyBlocked(user.ID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
 	}
-	if isLocked {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account is locked. Please try again later.", "auth")
+	if temporarilyBlocked {
+		httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "LOGIN_TEMPORARILY_BLOCKED", "Too many failed login attempts. Please try again later.", "auth")
 		return
 	}
 
-	if !userAuth.IsActive {
+	if userAuth.AccountStatus != usermodel.AccountStatusActive {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
 		return
 	}
@@ -95,7 +96,7 @@ func (c *Controller) VerifyLoginEmailOTP(ctx *gin.Context) {
 		return
 	}
 
-	if isPrivilegedRole(user.Role) && !userAuth.IsTOTPEnabled && isPrivilegedTOTPEnforced() {
+	if isPrivilegedRole(user.Role) && !userAuth.HasEnabledTOTP() && isPrivilegedTOTPEnforced() {
 		_ = auth.DeleteEmailOTPChallenge(context.Background(), req.ChallengeToken)
 		logger.Logger.Warn("Blocked privileged email OTP login due to missing TOTP",
 			"user_id", user.ID,

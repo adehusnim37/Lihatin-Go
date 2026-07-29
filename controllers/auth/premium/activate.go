@@ -41,13 +41,13 @@ func (c *Controller) ActivatePremium(ctx *gin.Context) {
 	}
 
 	// 1.5 Check if user is already premium
-	isPremium, err := c.userRepo.CheckPremiumByUsernameOrEmail(username)
+	hasPremiumAccess, err := c.userRepo.HasActivePremiumAccessByIdentifier(username)
 	if err != nil {
 		httputil.HandleError(ctx, err, nil)
 		return
 	}
 
-	if isPremium {
+	if hasPremiumAccess {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "USER_ALREADY_PREMIUM", "User is already premium", "user_id")
 		return
 	}

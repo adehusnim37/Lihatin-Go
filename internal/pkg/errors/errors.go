@@ -236,6 +236,12 @@ var (
 		http.StatusBadRequest,
 		"premium",
 	)
+	ErrPremiumAccessNotFound = NewAppError(
+		"PREMIUM_ACCESS_NOT_FOUND",
+		"User does not have premium access",
+		http.StatusBadRequest,
+		"premium",
+	)
 	ErrPermanentRevokeCannotReactivate = NewAppError(
 		"PERMANENT_REVOKE_CANNOT_REACTIVATE",
 		"Permanently revoked premium cannot be reactivated by current role",
@@ -248,9 +254,9 @@ var (
 		http.StatusBadRequest,
 		"premium",
 	)
-	ErrInvalidPremiumRevokeType = NewAppError(
-		"INVALID_PREMIUM_REVOKE_TYPE",
-		"Invalid premium revoke type",
+	ErrInvalidPremiumAccessRevokeType = NewAppError(
+		"INVALID_PREMIUM_ACCESS_REVOKE_TYPE",
+		"Invalid premium access revoke type",
 		http.StatusBadRequest,
 		"premium",
 	)

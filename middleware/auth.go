@@ -108,12 +108,22 @@ func AuthMiddleware(userRepo userrepo.UserRepository, userAuthRepo *authrepo.Use
 			return
 		}
 
-		if user.IsLocked {
+		if user.IsAccountLocked() {
 			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
 				Message: "User account is locked",
 				Error:   map[string]string{"auth": "Your account has been locked. Please contact support."},
+			})
+			c.Abort()
+			return
+		}
+		if user.UserAuth != nil && user.UserAuth.AccountStatus == "disabled" {
+			c.JSON(http.StatusForbidden, common.APIResponse{
+				Success: false,
+				Data:    nil,
+				Message: "User account is disabled",
+				Error:   map[string]string{"auth": "Your account has been disabled. Please contact support."},
 			})
 			c.Abort()
 			return
@@ -191,7 +201,7 @@ func AuthMiddleware(userRepo userrepo.UserRepository, userAuthRepo *authrepo.Use
 		c.Set("username", user.Username)
 		c.Set("email", user.Email)
 		c.Set("role", user.Role)
-		c.Set("is_premium", user.IsPremium)
+		c.Set("premium_access_active", user.HasPremiumAccessAt(time.Now()))
 		c.Set("is_verified", isVerified)
 		c.Set("user", user)
 		c.Set("session_id", claims.SessionID)
@@ -221,8 +231,8 @@ func RequireEmailVerification() gin.HandlerFunc {
 // RequirePremium middleware ensures user has premium access
 func RequirePremium() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		isPremium, exists := c.Get("is_premium")
-		if !exists || !isPremium.(bool) {
+		premiumAccessActive, exists := c.Get("premium_access_active")
+		if !exists || !premiumAccessActive.(bool) {
 			c.JSON(http.StatusForbidden, common.APIResponse{
 				Success: false,
 				Data:    nil,
@@ -283,13 +293,14 @@ func OptionalAuth(userRepo userrepo.UserRepository) gin.HandlerFunc {
 					c.Set("username", claims.Username)
 					c.Set("email", claims.Email)
 					c.Set("role", claims.Role)
-					c.Set("is_premium", claims.IsPremium)
 					c.Set("is_verified", claims.IsVerified)
 					c.Set("is_authenticated", true)
 
-					// Optionally get full user object
-					if user, err := userRepo.GetUserByID(claims.UserID); err == nil {
-						c.Set("user", user)
+					if account, err := userRepo.GetUserByID(claims.UserID); err == nil {
+						c.Set("user", account)
+						c.Set("premium_access_active", account.HasPremiumAccessAt(time.Now()))
+					} else {
+						c.Set("is_authenticated", false)
 					}
 				}
 			}
@@ -480,7 +491,7 @@ func APIKeyMiddleware(apiKeyRepo *apikeyrepo.APIKeyRepository) gin.HandlerFunc {
 		c.Set("username", user.Username)
 		c.Set("email", user.Email)
 		c.Set("role", user.Role)
-		c.Set("is_premium", user.IsPremium)
+		c.Set("premium_access_active", user.HasPremiumAccessAt(time.Now()))
 		c.Set("user", user)
 		c.Set("api_key", apiKeyRecord)
 		c.Set("api_key_id", apiKeyRecord.ID)
@@ -612,7 +623,7 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.Handl
 		c.Set("username", user.Username)
 		c.Set("email", user.Email)
 		c.Set("role", user.Role)
-		c.Set("is_premium", user.IsPremium)
+		c.Set("premium_access_active", user.HasPremiumAccessAt(time.Now()))
 		c.Set("user", user)
 		c.Set("api_key", apiKeyRecord)
 		c.Set("api_key_id", apiKeyRecord.ID)

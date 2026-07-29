@@ -15,7 +15,6 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/premium"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,7 +24,6 @@ import (
 func (c *Controller) Register(ctx *gin.Context) {
 	var req dto.RegisterRequest
 	var premiumReservationKey string
-	isPremiumFromCode := false
 
 	// Bind and validate request
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -88,7 +86,6 @@ func (c *Controller) Register(ctx *gin.Context) {
 		}
 
 		premiumReservationKey = key
-		isPremiumFromCode = true
 	}
 
 	// Create user
@@ -97,8 +94,22 @@ func (c *Controller) Register(ctx *gin.Context) {
 		LastName:  req.LastName,
 		Email:     req.Email,
 		Username:  req.Username,
-		Password:  req.Password,
-		IsPremium: isPremiumFromCode,
+	}
+	hashedPassword, err := auth.HashPassword(req.Password)
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "PASSWORD_HASHING_FAILED", "Failed to process password", "password")
+		return
+	}
+	authID, err := uuid.NewV7()
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "AUTH_RECORD_CREATION_FAILED", "Failed to create user authentication record", "auth")
+		return
+	}
+	userAuth := &user.UserAuth{
+		ID:              authID.String(),
+		PasswordHash:    hashedPassword,
+		AccountStatus:   user.AccountStatusActive,
+		IsEmailVerified: false,
 	}
 
 	notificationPreferences := &user.NotificationPreference{
@@ -107,7 +118,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 		ConsentSource:      req.ConsentSource,
 	}
 
-	if err := c.repo.GetUserRepository().CreateUser(newUser, notificationPreferences); err != nil {
+	if err := c.repo.GetUserRepository().CreateUser(newUser, userAuth, notificationPreferences, nil); err != nil {
 		if premiumReservationKey != "" {
 			manager := middleware.GetSessionManager()
 			if manager != nil {
@@ -192,29 +203,13 @@ func (c *Controller) Register(ctx *gin.Context) {
 		"session_preview", auth.GetKeyPreview(sessionID),
 	)
 
-	uuidV7, err := uuid.NewV7()
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
-			Success: false,
-			Message: "Failed to create user authentication record",
-			Error:   map[string]string{"server": "Failed to generate UUID"},
-		})
-		return
-	}
-	userAuth := &user.UserAuth{
-		ID:                              uuidV7.String(),
-		DeviceID:                        deviceID,
-		LastIP:                          lastIP,
-		UserID:                          newUser.ID,
-		PasswordHash:                    newUser.Password,
-		IsEmailVerified:                 false,
-		EmailVerificationToken:          token,
-		EmailVerificationTokenExpiresAt: &expirationTime,
-		EmailVerificationSource:         user.EmailSourceSignup,
-		IsActive:                        true,
-	}
+	userAuth.DeviceID = deviceID
+	userAuth.LastIP = lastIP
+	userAuth.EmailVerificationToken = token
+	userAuth.EmailVerificationTokenExpiresAt = &expirationTime
+	userAuth.EmailVerificationSource = user.EmailSourceSignup
 
-	if err := c.repo.GetUserAuthRepository().CreateUserAuth(userAuth); err != nil {
+	if err := c.repo.GetUserAuthRepository().UpdateUserAuth(userAuth); err != nil {
 		httputil.HandleError(ctx, err, newUser.ID)
 		return
 	}

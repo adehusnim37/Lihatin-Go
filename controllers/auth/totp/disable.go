@@ -38,7 +38,7 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 	}
 
 	// Check if TOTP is enabled
-	if !userAuth.IsTOTPEnabled {
+	if !userAuth.HasEnabledTOTP() {
 		logger.Logger.Warn("TOTP disable attempted for user without TOTP enabled",
 			"user_id", userID,
 		)

@@ -24,13 +24,12 @@ type JWTClaims struct {
 	Username   string `json:"username"`
 	Email      string `json:"email"`
 	Role       string `json:"role"`
-	IsPremium  bool   `json:"is_premium"`
 	IsVerified bool   `json:"is_verified"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT creates a new JWT token for a user with unique JTI for blacklist support
-func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role string, isPremium, isVerified bool) (string, error) {
+func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role string, isVerified bool) (string, error) {
 	// Generate unique JTI (JWT ID) for blacklist tracking
 	jti, err := GenerateSecureToken(32)
 	if err != nil {
@@ -45,7 +44,6 @@ func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role s
 		Username:   username,
 		Email:      email,
 		Role:       role,
-		IsPremium:  isPremium,
 		IsVerified: isVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,                                                                                                         // JWT ID for blacklist

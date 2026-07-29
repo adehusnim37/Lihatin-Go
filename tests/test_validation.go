@@ -12,7 +12,8 @@ import (
 func testValidation() {
 	baseURL := "http://localhost:8080"
 
-	fmt.Println("=== TEST VALIDATION SYSTEM ===\n")
+	fmt.Println("=== TEST VALIDATION SYSTEM ===")
+	fmt.Println()
 
 	testCases := []struct {
 		name        string

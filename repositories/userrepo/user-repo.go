@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/user"
@@ -20,13 +19,11 @@ type UserRepository interface {
 	GetUserByID(id string) (*user.User, error)
 	GetUserByEmail(email string) (*user.User, error)
 	GetUserByEmailOrUsername(input string) (*user.User, error)
-	CheckPremiumByUsernameOrEmail(inputs string) (bool, error)
-	CreateUser(user *user.User, notificationPreference *user.NotificationPreference) error
+	HasActivePremiumAccessByIdentifier(identifier string) (bool, error)
+	CreateUser(account *user.User, accountAuth *user.UserAuth, notificationPreference *user.NotificationPreference, premiumAccess *user.PremiumAccess) error
 	UpdateUser(id string, user dto.UpdateProfileRequest) error
-	SetPremium(id string, isPremium bool) error
 	CheckUsernameChangeEligibility(userID string) error
 	ChangeUsername(userID string, newUsername string) (string, error)
-	IsAccountLocked(userID string) (bool, error)
 }
 
 type userRepository struct {
@@ -51,30 +48,24 @@ func userFindError(err error) error {
 func (ur *userRepository) GetAllUsers() ([]user.User, error) {
 	var users []user.User
 
-	result := ur.db.Where("deleted_at IS NULL").Find(&users)
+	result := ur.withAccountState(ur.db).Where("users.deleted_at IS NULL").Find(&users)
 	if result.Error != nil {
 		logger.Logger.Error("Failed to get all users", "error", result.Error)
 		return nil, apperrors.ErrUserFindFailed.WithError(result.Error)
+	}
+	for i := range users {
+		users[i].HydrateDerivedState()
 	}
 
 	logger.Logger.Info("Successfully retrieved users", "count", len(users))
 	return users, nil
 }
 
-func (ur *userRepository) IsAccountLocked(userID string) (bool, error) {
-	var user user.User
-	result := ur.db.Select("is_locked").Where("id = ? AND deleted_at IS NULL", userID).First(&user)
-	if result.Error != nil {
-		return false, userFindError(result.Error)
-	}
-	return user.IsLocked, nil
-}
-
 func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
 	logger.Logger.Info("Getting user by ID", "user_id", id)
 
 	var user user.User
-	result := ur.db.Where("id = ? AND deleted_at IS NULL", id).First(&user)
+	result := ur.withAccountState(ur.db).Where("users.id = ? AND users.deleted_at IS NULL", id).First(&user)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -83,40 +74,47 @@ func (ur *userRepository) GetUserByID(id string) (*user.User, error) {
 		logger.Logger.Error("Database error while getting user", "user_id", id, "error", result.Error)
 		return nil, userFindError(result.Error)
 	}
+	user.HydrateDerivedState()
 
 	logger.Logger.Info("User found successfully", "user_id", user.ID, "username", user.Username)
 	return &user, nil
 }
 
-func (ur *userRepository) CheckPremiumByUsernameOrEmail(inputs string) (bool, error) {
-	var user user.User
-	result := ur.db.Select("is_premium").Where("(username = ? OR email = ?) AND deleted_at IS NULL", inputs, inputs).First(&user)
+func (ur *userRepository) HasActivePremiumAccessByIdentifier(identifier string) (bool, error) {
+	var account user.User
+	result := ur.withAccountState(ur.db).
+		Where("(users.username = ? OR users.email = ?) AND users.deleted_at IS NULL", identifier, identifier).
+		First(&account)
 
 	if result.Error != nil {
 		return false, userFindError(result.Error)
 	}
-
-	return user.IsPremium, nil
+	account.HydrateDerivedState()
+	return account.HasPremiumAccessAt(time.Now()), nil
 }
 
 func (ur *userRepository) GetUserByEmail(email string) (*user.User, error) {
 	var user user.User
-	result := ur.db.Where("LOWER(email) = LOWER(?) AND deleted_at IS NULL", email).First(&user)
+	result := ur.withAccountState(ur.db).Where("LOWER(users.email) = LOWER(?) AND users.deleted_at IS NULL", email).First(&user)
 
 	if result.Error != nil {
 		return nil, userFindError(result.Error)
 	}
+	user.HydrateDerivedState()
 
 	return &user, nil
 }
 
 func (ur *userRepository) GetUserByEmailOrUsername(input string) (*user.User, error) {
 	var user user.User
-	result := ur.db.Select("id, email, username, is_locked").Where("(email = ? OR username = ?) AND deleted_at IS NULL AND is_locked = false", input, input).First(&user)
+	result := ur.withAccountState(ur.db).
+		Where("(users.email = ? OR users.username = ?) AND users.deleted_at IS NULL", input, input).
+		First(&user)
 
 	if result.Error != nil {
 		return nil, userFindError(result.Error)
 	}
+	user.HydrateDerivedState()
 
 	return &user, nil
 }
@@ -181,32 +179,33 @@ func (ur *userRepository) ChangeUsername(userID string, newUsername string) (str
 	return oldUsername, nil
 }
 
-func (ur *userRepository) CreateUser(user *user.User, notificationPreference *user.NotificationPreference) error {
-	// Hash the password before storing
-	hashedPassword, err := auth.HashPassword(user.Password)
-	if err != nil {
-		logger.Logger.Error("Error hashing password", "error", err)
-		return apperrors.ErrUserPasswordHashFailed
-	}
-
+func (ur *userRepository) CreateUser(account *user.User, accountAuth *user.UserAuth, notificationPreference *user.NotificationPreference, premiumAccess *user.PremiumAccess) error {
 	// Generate UUID if not provided
-	if user.ID == "" {
+	if account.ID == "" {
 		newUUID, err := uuid.NewV7()
 		if err != nil {
 			logger.Logger.Error("Error generating UUID", "error", err)
 			return apperrors.ErrUserCreationFailed
 		}
-		user.ID = newUUID.String()
+		account.ID = newUUID.String()
 	}
 
-	// Set hashed password and timestamps
-	user.Password = hashedPassword
 	now := time.Now()
-	user.CreatedAt = now
-	user.UpdatedAt = now
+	account.CreatedAt = now
+	account.UpdatedAt = now
+
+	if accountAuth == nil {
+		return apperrors.ErrUserCreationFailed
+	}
+	accountAuth.UserID = account.ID
+	accountAuth.CreatedAt = now
+	accountAuth.UpdatedAt = now
+	if accountAuth.AccountStatus == "" {
+		accountAuth.AccountStatus = user.AccountStatusActive
+	}
 
 	if notificationPreference != nil {
-		notificationPreference.UserID = user.ID
+		notificationPreference.UserID = account.ID
 		notificationPreference.CreatedAt = now
 		notificationPreference.UpdatedAt = now
 
@@ -227,8 +226,29 @@ func (ur *userRepository) CreateUser(user *user.User, notificationPreference *us
 		}
 	}
 
-	err = ur.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(user).Error; err != nil {
+	if premiumAccess != nil {
+		premiumAccess.UserID = account.ID
+		if premiumAccess.Status == "" {
+			premiumAccess.Status = user.PremiumAccessStatusActive
+		}
+		if premiumAccess.Tier == "" {
+			premiumAccess.Tier = "premium"
+		}
+		if premiumAccess.Source == "" {
+			premiumAccess.Source = "system"
+		}
+		if premiumAccess.GrantedAt.IsZero() {
+			premiumAccess.GrantedAt = now
+		}
+		premiumAccess.CreatedAt = now
+		premiumAccess.UpdatedAt = now
+	}
+
+	err := ur.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(account).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(accountAuth).Error; err != nil {
 			return err
 		}
 		if notificationPreference != nil {
@@ -236,10 +256,15 @@ func (ur *userRepository) CreateUser(user *user.User, notificationPreference *us
 				return err
 			}
 		}
+		if premiumAccess != nil {
+			if err := tx.Create(premiumAccess).Error; err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
-		logger.Logger.Error("Failed to create user", "error", err, "email", user.Email)
+		logger.Logger.Error("Failed to create user", "error", err, "email", account.Email)
 		// Check for duplicate entry errors
 		if fmt.Sprintf("%v", err) == "Error 1062 (23000): Duplicate entry" ||
 			err.Error() == "UNIQUE constraint failed: users.email" ||
@@ -249,7 +274,10 @@ func (ur *userRepository) CreateUser(user *user.User, notificationPreference *us
 		return apperrors.ErrUserCreationFailed.WithError(err)
 	}
 
-	logger.Logger.Info("User created successfully", "user_id", user.ID, "email", user.Email)
+	account.UserAuth = accountAuth
+	account.PremiumAccess = premiumAccess
+	account.HydrateDerivedState()
+	logger.Logger.Info("User created successfully", "user_id", account.ID, "email", account.Email)
 	return nil
 }
 
@@ -293,20 +321,8 @@ func (ur *userRepository) UpdateUser(id string, updateUser dto.UpdateProfileRequ
 	return nil
 }
 
-func (ur *userRepository) SetPremium(id string, isPremium bool) error {
-	result := ur.db.Model(&user.User{}).
-		Where("id = ? AND deleted_at IS NULL", id).
-		Update("is_premium", isPremium)
-
-	if result.Error != nil {
-		logger.Logger.Error("Failed to update premium status", "user_id", id, "error", result.Error)
-		return apperrors.ErrUserUpdateFailed.WithError(result.Error)
-	}
-
-	if result.RowsAffected == 0 {
-		return apperrors.ErrUserNotFound
-	}
-
-	logger.Logger.Info("Premium status updated", "user_id", id, "is_premium", isPremium)
-	return nil
+func (ur *userRepository) withAccountState(db *gorm.DB) *gorm.DB {
+	return db.
+		Preload("UserAuth.AuthMethods").
+		Preload("PremiumAccess")
 }

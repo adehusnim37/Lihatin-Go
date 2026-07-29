@@ -74,7 +74,7 @@ func (c *Controller) SendPremiumCodeEmail(ctx *gin.Context) {
 	}
 
 	if targetUser != nil {
-		if targetUser.IsLocked {
+		if targetUser.IsAccountLocked() {
 			httputil.SendErrorResponse(
 				ctx,
 				http.StatusForbidden,
@@ -84,7 +84,7 @@ func (c *Controller) SendPremiumCodeEmail(ctx *gin.Context) {
 			)
 			return
 		}
-		if targetUser.PremiumRevokedReason != "" {
+		if targetUser.PremiumAccess != nil && targetUser.PremiumAccess.Status == user.PremiumAccessStatusRevoked {
 			httputil.SendErrorResponse(
 				ctx,
 				http.StatusForbidden,
@@ -94,7 +94,7 @@ func (c *Controller) SendPremiumCodeEmail(ctx *gin.Context) {
 			)
 			return
 		}
-		if targetUser.IsPremium {
+		if targetUser.HasPremiumAccessAt(time.Now()) {
 			httputil.SendErrorResponse(
 				ctx,
 				http.StatusBadRequest,

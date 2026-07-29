@@ -30,7 +30,7 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 		return
 	}
 
-	if userAuth.IsTOTPEnabled {
+	if userAuth.HasEnabledTOTP() {
 		logger.Logger.Warn("TOTP setup attempted for user who already has TOTP enabled",
 			"user_id", userID,
 		)

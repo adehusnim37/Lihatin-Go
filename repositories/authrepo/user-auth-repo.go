@@ -27,41 +27,29 @@ func NewUserAuthRepository(db *gorm.DB) *UserAuthRepository {
 	return &UserAuthRepository{db: db}
 }
 
-// CreateUserAuth creates a new UserAuth record
-func (r *UserAuthRepository) CreateUserAuth(userAuth *user.UserAuth) error {
-	//check if user with the userID already exists
-	var existingUserAuth user.UserAuth
-	if err := r.db.Where("user_id = ?", userAuth.UserID).First(&existingUserAuth).Error; err == nil {
-		return apperrors.ErrUserAlreadyExists
-	}
-
-	if err := r.db.Create(userAuth).Error; err != nil {
-		return apperrors.ErrUserCreationFailed
-	}
-	return nil
-}
-
 // GetUserAuthByUserID retrieves UserAuth by user ID
 func (r *UserAuthRepository) GetUserAuthByUserID(userID string) (*user.UserAuth, error) {
 	var userAuth user.UserAuth
-	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
+	if err := r.db.Preload("AuthMethods").Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, apperrors.ErrUserFindFailed
 	}
+	userAuth.HydrateDerivedState()
 	return &userAuth, nil
 }
 
 // GetUserAuthByID retrieves UserAuth by ID
 func (r *UserAuthRepository) GetUserAuthByID(id string) (*user.UserAuth, error) {
 	var userAuth user.UserAuth
-	if err := r.db.First(&userAuth, "id = ?", id).Error; err != nil {
+	if err := r.db.Preload("AuthMethods").First(&userAuth, "id = ?", id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, sql.ErrNoRows
 		}
 		return nil, apperrors.ErrUserNotFound
 	}
+	userAuth.HydrateDerivedState()
 	return &userAuth, nil
 }
 
@@ -70,6 +58,7 @@ func (r *UserAuthRepository) UpdateUserAuth(userAuth *user.UserAuth) error {
 	if err := r.db.Save(userAuth).Error; err != nil {
 		return apperrors.ErrUserAuthUpdateFailed
 	}
+	userAuth.HydrateDerivedState()
 	return nil
 }
 
@@ -246,9 +235,10 @@ func (r *UserAuthRepository) ChangeEmail(userID, newEmail, ipAddress, userAgent 
 	if !userAuth.IsEmailVerified {
 		return apperrors.ErrUserEmailNotVerified
 	}
+	userAuth.HydrateDerivedState()
 
 	// Check if account is active
-	if !userAuth.IsActive {
+	if userAuth.AccountStatus == user.AccountStatusDisabled {
 		return apperrors.ErrUserAccountDeactivated
 	}
 
@@ -518,7 +508,7 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 			"password_reset_token":            "",
 			"password_reset_token_expires_at": nil,
 			"failed_login_attempts":           0,
-			"lockout_until":                   nil,
+			"login_blocked_until":             nil,
 			"password_changed_at":             time.Now(),
 			"last_email_send_at":              nil,
 		})
@@ -544,9 +534,9 @@ func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) er
 		Updates(map[string]any{
 			"last_login_at":         &now,
 			"failed_login_attempts": 0,
-			"lockout_until":         nil,
-			"device_id":             deviceId,
-			"last_ip":               LastIp,
+			"login_blocked_until":   nil,
+			"last_device_id":        deviceId,
+			"last_login_ip":         LastIp,
 			"last_email_send_at":    nil,
 		}).Error; err != nil {
 		return apperrors.ErrUserAuthUpdateFailed
@@ -572,7 +562,7 @@ func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 	if newAttempts >= 5 {
 		lockoutDuration := time.Duration(newAttempts-4) * 15 * time.Minute // Escalating lockout
 		lockoutUntil := time.Now().Add(lockoutDuration)
-		updates["lockout_until"] = &lockoutUntil
+		updates["login_blocked_until"] = &lockoutUntil
 	}
 
 	err := r.db.Model(&user.UserAuth{}).
@@ -596,28 +586,30 @@ func (r *UserAuthRepository) IsEmailVerified(userID string) (bool, error) {
 	return userAuth.IsEmailVerified, nil
 }
 
-// IsAccountLockout checks if account is currently locked
-func (r *UserAuthRepository) IsAccountLockout(userID string) (bool, error) {
+// IsLoginTemporarilyBlocked checks the self-expiring failed-login block. It
+// does not inspect persistent administrative account status.
+func (r *UserAuthRepository) IsLoginTemporarilyBlocked(userID string) (bool, error) {
 	var userAuth user.UserAuth
 
 	if err := r.db.Where("user_id = ?", userID).First(&userAuth).Error; err != nil {
 		return false, apperrors.ErrUserAuthFindFailed
 	}
 
-	if userAuth.LockoutUntil != nil && time.Now().Before(*userAuth.LockoutUntil) {
+	if userAuth.IsLoginBlockedAt(time.Now()) {
 		return true, nil
 	}
 
 	return false, nil
 }
 
-// UnlockAccount removes account lockout
-func (r *UserAuthRepository) UnlockAccount(userID string) error {
+// ClearLoginBlock clears only failed-login counters and the temporary block.
+// It never unlocks a persistently locked account.
+func (r *UserAuthRepository) ClearLoginBlock(userID string) error {
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"failed_login_attempts": 0,
-			"lockout_until":         nil,
+			"login_blocked_until":   nil,
 		}).Error
 
 	if err != nil {
@@ -630,7 +622,12 @@ func (r *UserAuthRepository) UnlockAccount(userID string) error {
 func (r *UserAuthRepository) ActivateAccount(userID string) error {
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
-		Update("is_active", true).Error
+		Updates(map[string]any{
+			"account_status":    user.AccountStatusActive,
+			"status_reason":     "",
+			"status_changed_at": time.Now(),
+			"status_changed_by": nil,
+		}).Error
 
 	if err != nil {
 		return apperrors.ErrUserAuthUpdateFailed
@@ -642,7 +639,10 @@ func (r *UserAuthRepository) ActivateAccount(userID string) error {
 func (r *UserAuthRepository) DeactivateAccount(userID string) error {
 	err := r.db.Model(&user.UserAuth{}).
 		Where("user_id = ?", userID).
-		Update("is_active", false).Error
+		Updates(map[string]any{
+			"account_status":    user.AccountStatusDisabled,
+			"status_changed_at": time.Now(),
+		}).Error
 
 	if err != nil {
 		return apperrors.ErrUserAuthUpdateFailed
@@ -657,7 +657,7 @@ func (r *UserAuthRepository) UpdatePassword(userID, hashedPassword string) error
 		Updates(map[string]any{
 			"password_hash":         hashedPassword,
 			"failed_login_attempts": 0,
-			"lockout_until":         nil,
+			"login_blocked_until":   nil,
 			"password_changed_at":   time.Now(),
 		}).Error
 
@@ -673,7 +673,10 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 	var userAuth user.UserAuth
 
 	// First get the user
-	err := r.db.Where("email = ? OR username = ?", emailOrUsername, emailOrUsername).First(&userx).Error
+	err := r.db.
+		Preload("PremiumAccess").
+		Where("email = ? OR username = ?", emailOrUsername, emailOrUsername).
+		First(&userx).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, apperrors.ErrUserNotFound
@@ -682,13 +685,16 @@ func (r *UserAuthRepository) GetUserForLogin(emailOrUsername string) (*user.User
 	}
 
 	// Then get the auth data
-	err = r.db.Where("user_id = ?", userx.ID).First(&userAuth).Error
+	err = r.db.Preload("AuthMethods").Where("user_id = ?", userx.ID).First(&userAuth).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, apperrors.ErrUserAuthFindFailed
 		}
 		return nil, nil, apperrors.ErrUserAuthFindFailed
 	}
+	userAuth.HydrateDerivedState()
+	userx.UserAuth = &userAuth
+	userx.HydrateDerivedState()
 
 	return &userx, &userAuth, nil
 }
@@ -705,7 +711,7 @@ func (r *UserAuthRepository) DeleteUserAuth(userID string) error {
 // GetActiveUserAuthCount gets count of active user auth records
 func (r *UserAuthRepository) GetActiveUserAuthCount() (int64, error) {
 	var count int64
-	err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&count).Error
+	err := r.db.Model(&user.UserAuth{}).Where("account_status = ?", user.AccountStatusActive).Count(&count).Error
 	if err != nil {
 		return 0, apperrors.ErrUserAuthFindFailed
 	}
@@ -725,7 +731,7 @@ func (r *UserAuthRepository) GetUserAuthStats() (map[string]interface{}, error) 
 
 	// Active users
 	var activeUsers int64
-	if err := r.db.Model(&user.UserAuth{}).Where("is_active = ?", true).Count(&activeUsers).Error; err != nil {
+	if err := r.db.Model(&user.UserAuth{}).Where("account_status = ?", user.AccountStatusActive).Count(&activeUsers).Error; err != nil {
 		return nil, apperrors.ErrUserAuthFindFailed
 	}
 	stats["active_users"] = activeUsers
@@ -737,12 +743,25 @@ func (r *UserAuthRepository) GetUserAuthStats() (map[string]interface{}, error) 
 	}
 	stats["verified_users"] = verifiedUsers
 
-	// Locked users
+	// Persistently admin-locked users.
 	var lockedUsers int64
-	if err := r.db.Model(&user.UserAuth{}).Where("lockout_until > ?", time.Now()).Count(&lockedUsers).Error; err != nil {
+	if err := r.db.Model(&user.UserAuth{}).Where("account_status = ?", user.AccountStatusLocked).Count(&lockedUsers).Error; err != nil {
 		return nil, apperrors.ErrUserAuthFindFailed
 	}
 	stats["locked_users"] = lockedUsers
+
+	// Users temporarily blocked by the failed-login policy.
+	var temporarilyBlockedUsers int64
+	if err := r.db.Model(&user.UserAuth{}).Where("login_blocked_until > ?", time.Now()).Count(&temporarilyBlockedUsers).Error; err != nil {
+		return nil, apperrors.ErrUserAuthFindFailed
+	}
+	stats["temporarily_blocked_users"] = temporarilyBlockedUsers
+
+	var disabledUsers int64
+	if err := r.db.Model(&user.UserAuth{}).Where("account_status = ?", user.AccountStatusDisabled).Count(&disabledUsers).Error; err != nil {
+		return nil, apperrors.ErrUserAuthFindFailed
+	}
+	stats["disabled_users"] = disabledUsers
 
 	return stats, nil
 }
@@ -761,7 +780,7 @@ func (ur *UserAuthRepository) Logout(userID string) error {
 	}
 
 	result = ur.db.Model(&userAuth).Updates(map[string]any{
-		"device_id":      nil,
+		"last_device_id": nil,
 		"last_logout_at": time.Now(),
 	})
 

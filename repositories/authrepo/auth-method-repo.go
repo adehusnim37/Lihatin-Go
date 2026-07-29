@@ -104,19 +104,13 @@ func (r *AuthMethodRepository) DisableAuthMethod(id string) error {
 	if err := r.db.Model(&user.AuthMethod{}).
 		Where("id = ?", id).
 		Updates(map[string]any{
-			"is_enabled":  false,
-			"disabled_at": &now,
-			"is_verified": false,
-			"secret":      "",
+			"is_enabled":     false,
+			"disabled_at":    &now,
+			"is_verified":    false,
+			"secret":         "",
 			"recovery_codes": nil,
 		}).Error; err != nil {
 		return errors.ErrAuthMethodUpdateFailed
-	}
-
-	if err := r.db.Model(&user.UserAuth{}).
-		Where("id = (SELECT user_auth_id FROM auth_methods WHERE id = ?)", id).
-		Update("is_totp_enabled", false).Error; err != nil {
-		return errors.ErrUserAuthUpdateFailed
 	}
 
 	return nil
@@ -132,12 +126,6 @@ func (r *AuthMethodRepository) VerifyAuthMethod(id string) error {
 			"verified_at": &now,
 		}).Error; err != nil {
 		return errors.ErrAuthMethodUpdateFailed
-	}
-
-	if err := r.db.Model(&user.UserAuth{}).
-		Where("id = (SELECT user_auth_id FROM auth_methods WHERE id = ?)", id).
-		Update("is_totp_enabled", true).Error; err != nil {
-		return errors.ErrUserAuthUpdateFailed
 	}
 
 	return nil

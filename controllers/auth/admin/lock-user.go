@@ -33,7 +33,7 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 	}
 
 	// Check if user is already locked
-	if user.IsLocked {
+	if user.IsAccountLocked() {
 		httputil.SendErrorResponse(ctx, http.StatusConflict, "USER_ALREADY_LOCKED", "User account is already locked", "user_id", userID)
 		return
 	}

@@ -19,15 +19,15 @@ import (
 
 func buildUserProfile(u *user.User) dto.UserProfile {
 	return dto.UserProfile{
-		ID:        u.ID,
-		Username:  u.Username,
-		FirstName: u.FirstName,
-		LastName:  u.LastName,
-		Email:     u.Email,
-		Avatar:    u.Avatar,
-		Role:      u.Role,
-		IsPremium: u.IsPremium,
-		CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:            u.ID,
+		Username:      u.Username,
+		FirstName:     u.FirstName,
+		LastName:      u.LastName,
+		Email:         u.Email,
+		Avatar:        u.Avatar,
+		Role:          u.Role,
+		PremiumAccess: dto.NewPremiumAccessResponse(u.PremiumAccess),
+		CreatedAt:     u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 
@@ -36,7 +36,8 @@ func buildUserAuthResponse(ua *user.UserAuth) dto.UserAuthResponse {
 		ID:              ua.ID,
 		UserID:          ua.UserID,
 		IsEmailVerified: ua.IsEmailVerified,
-		IsTOTPEnabled:   ua.IsTOTPEnabled,
+		TOTPEnabled:     ua.HasEnabledTOTP(),
+		AccountStatus:   string(ua.AccountStatus),
 		LastLoginAt:     formatTimeOrEmpty(ua.LastLoginAt),
 	}
 }
@@ -61,7 +62,7 @@ func (c *Controller) completeLogin(ctx *gin.Context, u *user.User, ua *user.User
 		return err
 	}
 
-	token, err := pkgauth.GenerateJWT(u.ID, sessionID, *deviceID, *lastIP, u.Username, u.Email, u.Role, u.IsPremium, ua.IsEmailVerified)
+	token, err := pkgauth.GenerateJWT(u.ID, sessionID, *deviceID, *lastIP, u.Username, u.Email, u.Role, ua.IsEmailVerified)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "JWT_GENERATION_FAILED", "Failed to generate authentication token", "auth")
 		return err

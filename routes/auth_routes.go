@@ -74,7 +74,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		protectedAuth.GET("/me", authController.GetCurrentUser)
 
 		// Account management
-		protectedAuth.GET("/premium-status", authController.GetPremiumStatus)
+		protectedAuth.GET("/premium-access", authController.GetPremiumAccess)
 		protectedAuth.GET("/profile", authController.GetProfile)
 		protectedAuth.GET("/check-email-change-eligibility", middleware.RateLimitMiddleware(10, 0, 10), emailController.CheckEmailChangeEligibility)
 		protectedAuth.GET("/email-change-history", emailController.GetEmailChangeHistory)
@@ -137,7 +137,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		adminAuth.POST("/users/:id/unlock", adminController.UnlockUser)
 		adminAuth.POST("/users/:id/revoke-premium", adminController.RevokePremiumAccess)
 		adminAuth.POST("/users/:id/reactivate-premium", adminController.ReactivatePremiumAccess)
-		adminAuth.GET("/users/:id/premium-status-events", adminController.GetPremiumStatusEvents)
+		adminAuth.GET("/users/:id/premium-access-events", adminController.GetPremiumAccessEvents)
 		adminAuth.GET("/security/disposable-email", adminController.GetDisposableEmailPolicy)
 		adminAuth.PUT("/security/disposable-email", adminController.UpdateDisposableEmailPolicy)
 		adminAuth.POST("/premium-codes", premiumController.GeneratePremiumCode)

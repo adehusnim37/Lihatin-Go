@@ -129,15 +129,21 @@ func (r *UserPremiumKeyRepository) RedeemPremiumCode(code string, userID string)
 			return apperrors.ErrPremiumCodeRedeemFailed
 		}
 
-		// Keep redemption and premium-upgrade atomic.
-		result := tx.Model(&user.User{}).
-			Where("id = ? AND deleted_at IS NULL", userID).
-			Update("is_premium", true)
+		// Keep redemption and premium entitlement creation atomic.
+		now := time.Now()
+		access := user.PremiumAccess{
+			UserID:    userID,
+			Status:    user.PremiumAccessStatusActive,
+			Tier:      "premium",
+			Source:    "premium_code",
+			GrantedAt: now,
+		}
+		result := tx.Where("user_id = ?", userID).FirstOrCreate(&access)
 		if result.Error != nil {
 			return apperrors.ErrPremiumCodeRedeemFailed
 		}
-		if result.RowsAffected == 0 {
-			return apperrors.ErrUserNotFound
+		if result.RowsAffected == 0 && access.Status == user.PremiumAccessStatusRevoked {
+			return apperrors.ErrPremiumAlreadyRevoked
 		}
 
 		return nil

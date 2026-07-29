@@ -21,7 +21,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	orderBy := ctx.DefaultQuery("order_by", "desc")
 	search := strings.TrimSpace(ctx.Query("search"))
 	role := strings.ToLower(strings.TrimSpace(ctx.Query("role")))
-	premiumStatus := strings.ToLower(strings.TrimSpace(ctx.Query("premium_status")))
+	premiumAccessStatus := strings.ToLower(strings.TrimSpace(ctx.Query("premium_access_status")))
 	lockStatus := strings.ToLower(strings.TrimSpace(ctx.Query("lock_status")))
 
 	page, limit, sort, orderBy, vErrs := httputil.PaginateValidateAdminUsers(pageStr, limitStr, sort, orderBy)
@@ -37,8 +37,8 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	if role != "" && role != "user" && role != "admin" && role != "super_admin" {
 		filterErrors["role"] = "Role must be one of: user, admin, super_admin"
 	}
-	if premiumStatus != "" && premiumStatus != "free" && premiumStatus != "premium" && premiumStatus != "revoked" {
-		filterErrors["premium_status"] = "Premium status must be one of: free, premium, revoked"
+	if premiumAccessStatus != "" && premiumAccessStatus != "free" && premiumAccessStatus != "premium" && premiumAccessStatus != "revoked" {
+		filterErrors["premium_access_status"] = "Premium access status must be one of: free, premium, revoked"
 	}
 	if lockStatus != "" && lockStatus != "locked" && lockStatus != "unlocked" {
 		filterErrors["lock_status"] = "Lock status must be one of: locked, unlocked"
@@ -57,7 +57,7 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		"order_by", orderBy,
 		"has_search", search != "",
 		"role", role,
-		"premium_status", premiumStatus,
+		"premium_access_status", premiumAccessStatus,
 		"lock_status", lockStatus,
 	)
 
@@ -67,10 +67,10 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		userrepo.AdminUserListFilters{
 			Search:        search,
 			Role:          role,
-			PremiumStatus: premiumStatus,
-			LockStatus:    lockStatus,
-			Sort:          sort,
-			OrderBy:       orderBy,
+			PremiumAccessStatus: premiumAccessStatus,
+			LockStatus:          lockStatus,
+			Sort:                sort,
+			OrderBy:             orderBy,
 		},
 	)
 	if err != nil {
@@ -95,8 +95,8 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		OrderBy:    orderBy,
 		Search:     search,
 		Role:       role,
-		Premium:    premiumStatus,
-		LockStatus: lockStatus,
+		PremiumAccessStatus: premiumAccessStatus,
+		LockStatus:          lockStatus,
 	}
 
 	httputil.SendOKResponse(ctx, response, "Users retrieved successfully")

@@ -24,7 +24,6 @@ import (
 func (c *Controller) SignupComplete(ctx *gin.Context) {
 	var req dto.SignupCompleteRequest
 	var premiumReservationKey string
-	isPremiumFromCode := false
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		validator.SendValidationError(ctx, err, &req)
@@ -80,7 +79,6 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 		}
 
 		premiumReservationKey = key
-		isPremiumFromCode = true
 	}
 
 	newUser := &user.User{
@@ -88,17 +86,35 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 		LastName:  req.LastName,
 		Email:     email,
 		Username:  req.Username,
-		Password:  req.Password,
-		IsPremium: isPremiumFromCode,
 	}
 
+	hashedPassword, err := auth.HashPassword(req.Password)
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "PASSWORD_HASHING_FAILED", "Failed to process password", "password")
+		return
+	}
+
+	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
+	authID, err := uuid.NewV7()
+	if err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "AUTH_RECORD_CREATION_FAILED", "Failed to create user authentication record", "auth")
+		return
+	}
+	userAuth := &user.UserAuth{
+		ID:              authID.String(),
+		DeviceID:        deviceID,
+		LastIP:          lastIP,
+		PasswordHash:    hashedPassword,
+		IsEmailVerified: true,
+		AccountStatus:   user.AccountStatusActive,
+	}
 	notificationPreference := &user.NotificationPreference{
 		PromotionalEmail:   req.OptInPromotionalEmails,
 		WeeklySummaryEmail: req.OptInWeeklySummaryEmails,
 		ConsentSource:      req.ConsentSource,
 	}
 
-	if err := c.repo.GetUserRepository().CreateUser(newUser, notificationPreference); err != nil {
+	if err := c.repo.GetUserRepository().CreateUser(newUser, userAuth, notificationPreference, nil); err != nil {
 		if premiumReservationKey != "" {
 			manager := middleware.GetSessionManager()
 			if manager != nil {
@@ -129,28 +145,6 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 			httputil.HandleError(ctx, err, nil)
 			return
 		}
-	}
-
-	deviceID, lastIP := ip.GetDeviceAndIPInfo(ctx)
-	uuidV7, err := uuid.NewV7()
-	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "AUTH_RECORD_CREATION_FAILED", "Failed to create user authentication record", "auth")
-		return
-	}
-
-	userAuth := &user.UserAuth{
-		ID:              uuidV7.String(),
-		DeviceID:        deviceID,
-		LastIP:          lastIP,
-		UserID:          newUser.ID,
-		PasswordHash:    newUser.Password,
-		IsEmailVerified: true,
-		IsActive:        true,
-	}
-
-	if err := c.repo.GetUserAuthRepository().CreateUserAuth(userAuth); err != nil {
-		httputil.HandleError(ctx, err, newUser.ID)
-		return
 	}
 
 	if err := auth.DeleteSignupCompletionToken(ctx.Request.Context(), req.SignupToken); err != nil {

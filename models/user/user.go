@@ -8,40 +8,47 @@ import (
 )
 
 type User struct {
-	ID                       string     `json:"id" gorm:"primaryKey"`
-	Username                 string     `json:"username" gorm:"uniqueIndex;size:50;not null" validate:"required,min=3,max=50"`
-	FirstName                string     `json:"first_name" gorm:"size:50" validate:"required,min=3,max=50"`
-	LastName                 string     `json:"last_name" gorm:"size:50" validate:"required,min=3,max=50"`
-	Email                    string     `json:"email" gorm:"uniqueIndex;size:100;not null" validate:"required,email"`
-	Password                 string     `json:"password" gorm:"size:255" validate:"required,min=8,max=50,pwdcomplex"`
-	CreatedAt                time.Time  `json:"created_at"`
-	UpdatedAt                time.Time  `json:"updated_at"`
-	DeletedAt                *time.Time `json:"deleted_at,omitempty" gorm:"index"`
-	UsernameChanged          bool       `json:"username_changed,omitempty" gorm:"default:false"`
-	IsPremium                bool       `json:"is_premium" gorm:"default:false"`
-	Avatar                   string     `json:"avatar" gorm:"size:255"`
-	IsLocked                 bool       `json:"is_locked" gorm:"default:false"`
-	LockedAt                 *time.Time `json:"locked_at,omitempty"`
-	LockedReason             string     `json:"locked_reason,omitempty" gorm:"size:500"`
-	Role                     string     `json:"role" gorm:"size:20;default:user"`                   // user, admin, super_admin
-	PremiumStatus            string     `json:"premium_status" gorm:"size:20;default:active;index"` // active, revoked
-	PremiumRevokeType        string     `json:"premium_revoke_type,omitempty" gorm:"size:20"`       // temporary, permanent
-	PremiumRevokedAt         *time.Time `json:"premium_revoked_at,omitempty"`
-	PremiumRevokedBy         *string    `json:"premium_revoked_by,omitempty" gorm:"size:50;index"`
-	PremiumRevokedReason     string     `json:"premium_revoked_reason,omitempty" gorm:"size:500"`
-	PremiumReactivatedAt     *time.Time `json:"premium_reactivated_at,omitempty"`
-	PremiumReactivatedBy     *string    `json:"premium_reactivated_by,omitempty" gorm:"size:50;index"`
-	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty" gorm:"size:500"`
+	ID              string     `json:"id" gorm:"primaryKey"`
+	Username        string     `json:"username" gorm:"uniqueIndex;size:50;not null" validate:"required,min=3,max=50"`
+	FirstName       string     `json:"first_name" gorm:"size:50" validate:"required,min=3,max=50"`
+	LastName        string     `json:"last_name" gorm:"size:50" validate:"required,min=3,max=50"`
+	Email           string     `json:"email" gorm:"uniqueIndex;size:191;not null" validate:"required,email"`
+	Avatar          string     `json:"avatar" gorm:"size:1000"`
+	Role            string     `json:"role" gorm:"size:20;not null;default:user"` // user, admin, super_admin
+	UsernameChanged bool       `json:"username_changed,omitempty" gorm:"not null;default:false"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty" gorm:"index"`
 
 	// Relationships
-	UserAuth                []UserAuth                 `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
+	UserAuth                *UserAuth                  `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
+	PremiumAccess           *PremiumAccess             `json:"premium_access,omitempty" gorm:"foreignKey:UserID"`
 	APIKeys                 []APIKey                   `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
 	HistoryUsers            []HistoryUser              `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
 	PremiumKeyUsage         []PremiumKeyUsage          `json:"premium_key_usage,omitempty" gorm:"foreignKey:UserID"`
-	PremiumStatusEvents     []PremiumStatusEvent       `json:"premium_status_events,omitempty" gorm:"foreignKey:UserID"`
+	PremiumAccessEvents     []PremiumAccessEvent       `json:"premium_access_events,omitempty" gorm:"foreignKey:UserID"`
 	NotificationPreference  *NotificationPreference    `json:"notification_preference,omitempty" gorm:"foreignKey:UserID"`
 	WeeklySummaryDeliveries []WeeklySummaryDelivery    `json:"-" gorm:"foreignKey:UserID"`
 	PromotionalDeliveries   []PromotionalEmailDelivery `json:"-" gorm:"foreignKey:UserID"`
+}
+
+// HydrateDerivedState normalizes loaded relationships without copying their
+// state into the users model.
+func (u *User) HydrateDerivedState() {
+	if u == nil {
+		return
+	}
+	if u.UserAuth != nil {
+		u.UserAuth.HydrateDerivedState()
+	}
+}
+
+func (u *User) HasPremiumAccessAt(now time.Time) bool {
+	return u != nil && u.PremiumAccess.IsActiveAt(now)
+}
+
+func (u *User) IsAccountLocked() bool {
+	return u != nil && u.UserAuth != nil && u.UserAuth.AccountStatus == AccountStatusLocked
 }
 
 // TableName specifies the table name for GORM

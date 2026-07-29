@@ -1,5 +1,9 @@
 # Authentication System Documentation
 
+> **Schema note:** The database examples below describe the legacy schema.
+> Use [USER_ACCOUNT_SCHEMA_V2.md](USER_ACCOUNT_SCHEMA_V2.md) for the current
+> normalized `users`, `user_auth`, account lock, and premium-access design.
+
 ## Overview
 
 This document describes the comprehensive authentication system implemented for the Lihatin-Go application. The system includes JWT-based authentication, TOTP (Time-based One-Time Password) for 2FA, email verification, admin user management, API key management, and detailed security monitoring.

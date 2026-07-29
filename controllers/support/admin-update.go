@@ -106,14 +106,17 @@ func (c *Controller) applyAdminAction(action string, ticket *supportmodel.Suppor
 		if err := c.authRepo.GetUserAdminRepository().UnlockUser(targetUser.ID, reason, actorID); err != nil {
 			return "", fmt.Errorf("failed to unlock user account")
 		}
-		if err := c.authRepo.GetUserAuthRepository().UnlockAccount(targetUser.ID); err != nil {
+		if err := c.authRepo.GetUserAuthRepository().ClearLoginBlock(targetUser.ID); err != nil {
 			return "", fmt.Errorf("failed to clear login lockout")
 		}
 		return "unlock_user", nil
 
 	case "activate_user":
-		if targetAuth.IsActive {
+		switch targetAuth.AccountStatus {
+		case user.AccountStatusActive:
 			return "activate_user", nil
+		case user.AccountStatusLocked:
+			return "", fmt.Errorf("locked account must be unlocked with the unlock action")
 		}
 		if err := c.authRepo.GetUserAuthRepository().ActivateAccount(targetUser.ID); err != nil {
 			return "", fmt.Errorf("failed to activate account")

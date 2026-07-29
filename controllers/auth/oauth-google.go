@@ -231,32 +231,22 @@ func (c *Controller) GoogleOAuthCallback(ctx *gin.Context) {
 		return
 	}
 
-	if usr.IsLocked {
+	if usr.IsAccountLocked() {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
 		return
 	}
 
-	isLockout, err := c.repo.GetUserAuthRepository().IsAccountLockout(usr.ID)
+	temporarilyBlocked, err := c.repo.GetUserAuthRepository().IsLoginTemporarilyBlocked(usr.ID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
 	}
-	if isLockout {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account has been lockout for security reasons. Please try again later.", "auth")
+	if temporarilyBlocked {
+		httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "LOGIN_TEMPORARILY_BLOCKED", "Too many failed login attempts. Please try again later.", "auth")
 		return
 	}
-	if !userAuth.IsActive {
+	if userAuth.AccountStatus != user.AccountStatusActive {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
-		return
-	}
-
-	isLocked, err := c.repo.GetUserRepository().IsAccountLocked(usr.ID)
-	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
-		return
-	}
-	if isLocked {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
 		return
 	}
 
@@ -473,16 +463,28 @@ func (c *Controller) createGoogleOAuthUser(ctx context.Context, email, providerU
 	if err != nil {
 		return nil, nil, err
 	}
+	hashedPassword, err := auth.HashPassword(placeholderPassword)
+	if err != nil {
+		return nil, nil, err
+	}
+	authUUID, err := uuid.NewV7()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	createdUser := &user.User{
 		FirstName: firstName,
 		LastName:  lastName,
 		Email:     email,
-		Password:  placeholderPassword,
 		Avatar:    strings.TrimSpace(tokenInfo.Picture),
 	}
 
-	var userAuth *user.UserAuth
+	userAuth := &user.UserAuth{
+		ID:              authUUID.String(),
+		PasswordHash:    hashedPassword,
+		IsEmailVerified: true,
+		AccountStatus:   user.AccountStatusActive,
+	}
 	created := false
 	for attempt := 0; attempt < 6; attempt++ {
 		username, usernameErr := c.generateGoogleUsername(email)
@@ -490,9 +492,8 @@ func (c *Controller) createGoogleOAuthUser(ctx context.Context, email, providerU
 			return nil, nil, usernameErr
 		}
 		createdUser.Username = username
-		createdUser.Password = placeholderPassword
 
-		createErr := c.repo.GetUserRepository().CreateUser(createdUser, nil)
+		createErr := c.repo.GetUserRepository().CreateUser(createdUser, userAuth, nil, nil)
 		if createErr == nil {
 			created = true
 			break
@@ -520,27 +521,6 @@ func (c *Controller) createGoogleOAuthUser(ctx context.Context, email, providerU
 
 	if !created {
 		return nil, nil, errors.New("failed to create google oauth user")
-	}
-
-	authUUID, err := uuid.NewV7()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	userAuth = &user.UserAuth{
-		ID:              authUUID.String(),
-		UserID:          createdUser.ID,
-		PasswordHash:    createdUser.Password,
-		IsEmailVerified: true,
-		IsActive:        true,
-	}
-
-	if err := c.repo.GetUserAuthRepository().CreateUserAuth(userAuth); err != nil {
-		existingAuth, lookupErr := c.repo.GetUserAuthRepository().GetUserAuthByUserID(createdUser.ID)
-		if lookupErr != nil {
-			return nil, nil, err
-		}
-		userAuth = existingAuth
 	}
 
 	if upsertErr := c.upsertGoogleAuthMethod(userAuth.ID, providerUserID, metadata); upsertErr != nil {

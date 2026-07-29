@@ -14,6 +14,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
+	usermodel "github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -69,22 +70,22 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
-	if user.IsLocked {
+	if user.IsAccountLocked() {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "USER_LOCKED", "Your account has been locked. Please contact support.", "auth")
 		return
 	}
 
-	isLocked, err := c.repo.GetUserAuthRepository().IsAccountLockout(userID)
+	temporarilyBlocked, err := c.repo.GetUserAuthRepository().IsLoginTemporarilyBlocked(userID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOGIN_FAILED", "An error occurred during login", "auth")
 		return
 	}
-	if isLocked {
-		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_LOCKED", "Your account is locked. Please try again later.", "auth")
+	if temporarilyBlocked {
+		httputil.SendErrorResponse(ctx, http.StatusTooManyRequests, "LOGIN_TEMPORARILY_BLOCKED", "Too many failed login attempts. Please try again later.", "auth")
 		return
 	}
 
-	if !userAuth.IsActive {
+	if userAuth.AccountStatus != usermodel.AccountStatusActive {
 		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact support.", "auth")
 		return
 	}
@@ -181,7 +182,7 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	)
 
 	// Generate JWT token
-	token, err := auth.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, user.Role, user.IsPremium, userAuth.IsEmailVerified)
+	token, err := auth.GenerateJWT(user.ID, sessionID, *deviceID, *lastIP, user.Username, user.Email, user.Role, userAuth.IsEmailVerified)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -287,20 +288,20 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 	// Prepare response
 	responseData := dto.LoginResponse{
 		User: dto.UserProfile{
-			ID:        user.ID,
-			Username:  user.Username,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Email:     user.Email,
-			Avatar:    user.Avatar,
-			IsPremium: user.IsPremium,
-			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:            user.ID,
+			Username:      user.Username,
+			FirstName:     user.FirstName,
+			LastName:      user.LastName,
+			Email:         user.Email,
+			Avatar:        user.Avatar,
+			PremiumAccess: dto.NewPremiumAccessResponse(user.PremiumAccess),
+			CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		},
 		Auth: dto.UserAuthResponse{
 			ID:              userAuth.ID,
 			UserID:          userAuth.UserID,
 			IsEmailVerified: userAuth.IsEmailVerified,
-			IsTOTPEnabled:   userAuth.IsTOTPEnabled,
+			TOTPEnabled:     userAuth.HasEnabledTOTP(),
 			LastLoginAt:     userAuth.LastLoginAt.Format("2006-01-02T15:04:05Z07:00"),
 		},
 	}

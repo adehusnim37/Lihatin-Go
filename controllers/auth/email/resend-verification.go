@@ -53,11 +53,11 @@ func (c *Controller) ResendVerificationEmail(ctx *gin.Context) {
 	stage := getResendStage(ctx, userAccount.Email)
 
 	// Do not reveal account existence/verification state in response
-	if userAuth.IsEmailVerified || !userAuth.IsActive {
+	if userAuth.IsEmailVerified || userAuth.AccountStatus != user.AccountStatusActive {
 		logger.Logger.Info("Resend verification skipped due to account state",
 			"user_id", userAccount.ID,
 			"is_verified", userAuth.IsEmailVerified,
-			"is_active", userAuth.IsActive,
+			"account_status", userAuth.AccountStatus,
 		)
 		httputil.SendOKResponse(ctx, genericData, genericMessage)
 		return

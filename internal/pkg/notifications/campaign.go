@@ -109,8 +109,8 @@ func (s *CampaignService) processCampaign(ctx context.Context, campaignID string
 		Joins("JOIN notification_preferences ON notification_preferences.user_id = users.id").
 		Joins("JOIN user_auth ON user_auth.user_id = users.id").
 		Where("notification_preferences.promotional_email = ?", true).
-		Where("users.deleted_at IS NULL AND users.is_locked = ?", false).
-		Where("user_auth.deleted_at IS NULL AND user_auth.is_active = ? AND user_auth.is_email_verified = ?", true, true).
+		Where("users.deleted_at IS NULL").
+		Where("user_auth.deleted_at IS NULL AND user_auth.account_status = ? AND user_auth.is_email_verified = ?", user.AccountStatusActive, true).
 		Scan(&recipients).Error; err != nil {
 		return s.failCampaign(ctx, campaignID, err)
 	}

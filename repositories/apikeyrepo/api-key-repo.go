@@ -71,8 +71,8 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 	err = r.db.Transaction(func(tx *gorm.DB) error {
 		// 1. Validate user exists, is active, and verified (single query)
 		var userAuth user.UserAuth
-		if err := tx.Where("user_id = ? AND is_email_verified = ? AND is_active = ?",
-			userID, true, true).First(&userAuth).Error; err != nil {
+		if err := tx.Where("user_id = ? AND is_email_verified = ? AND account_status = ?",
+			userID, true, user.AccountStatusActive).First(&userAuth).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				logger.Logger.Warn("User not found or not eligible for API key creation",
 					"user_id", userID)
@@ -351,10 +351,14 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 	}
 
 	// Get the associated user
-	var user user.User
-	if err := r.db.First(&user, "id = ?", apiKey.UserID).Error; err != nil {
+	var account user.User
+	if err := r.db.Preload("UserAuth.AuthMethods").Preload("PremiumAccess").First(&account, "id = ?", apiKey.UserID).Error; err != nil {
 		logger.Logger.Error("User not found for valid API key", "user_id", apiKey.UserID, "key_id", keyID)
 		return nil, nil, apperrors.ErrUserNotFound
+	}
+	account.HydrateDerivedState()
+	if account.UserAuth == nil || account.UserAuth.AccountStatus != user.AccountStatusActive {
+		return nil, nil, apperrors.ErrUserAccountDeactivated
 	}
 
 	// Update last used timestamp and increment usage count asynchronously and get last IP Used
@@ -369,12 +373,12 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 	}()
 
 	logger.Logger.Info("API key validated successfully",
-		"user_id", user.ID,
+		"user_id", account.ID,
 		"key_id", keyID,
 		"key_name", apiKey.Name,
 	)
 
-	return &user, &apiKey, nil
+	return &account, &apiKey, nil
 }
 
 // repositories/api-key-repo.go - Add these methods

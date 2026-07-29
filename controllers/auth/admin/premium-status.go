@@ -44,15 +44,9 @@ func (c *Controller) RevokePremiumAccess(ctx *gin.Context) {
 
 	go c.sendPremiumRevokedEmail(updatedUser, req.Reason, req.RevokeType)
 
-	response := dto.AdminPremiumStatusMutationResponse{
-		UserID:                   updatedUser.ID,
-		IsPremium:                updatedUser.IsPremium,
-		Role:                     updatedUser.Role,
-		PremiumRevokeType:        normalizePremiumRevokeType(updatedUser.PremiumRevokeType),
-		PremiumRevokedAt:         updatedUser.PremiumRevokedAt,
-		PremiumReactivatedAt:     updatedUser.PremiumReactivatedAt,
-		PremiumRevokedReason:     updatedUser.PremiumRevokedReason,
-		PremiumReactivatedReason: updatedUser.PremiumReactivatedReason,
+	response := dto.AdminPremiumAccessMutationResponse{
+		UserID:        updatedUser.ID,
+		PremiumAccess: *dto.NewPremiumAccessResponse(updatedUser.PremiumAccess),
 	}
 
 	httputil.SendOKResponse(ctx, response, "Premium access revoked successfully")
@@ -88,21 +82,15 @@ func (c *Controller) ReactivatePremiumAccess(ctx *gin.Context) {
 
 	go c.sendPremiumReactivatedEmail(updatedUser, req.Reason)
 
-	response := dto.AdminPremiumStatusMutationResponse{
-		UserID:                   updatedUser.ID,
-		IsPremium:                updatedUser.IsPremium,
-		Role:                     updatedUser.Role,
-		PremiumRevokeType:        normalizePremiumRevokeType(updatedUser.PremiumRevokeType),
-		PremiumRevokedAt:         updatedUser.PremiumRevokedAt,
-		PremiumReactivatedAt:     updatedUser.PremiumReactivatedAt,
-		PremiumRevokedReason:     updatedUser.PremiumRevokedReason,
-		PremiumReactivatedReason: updatedUser.PremiumReactivatedReason,
+	response := dto.AdminPremiumAccessMutationResponse{
+		UserID:        updatedUser.ID,
+		PremiumAccess: *dto.NewPremiumAccessResponse(updatedUser.PremiumAccess),
 	}
 
 	httputil.SendOKResponse(ctx, response, "Premium access reactivated successfully")
 }
 
-func (c *Controller) GetPremiumStatusEvents(ctx *gin.Context) {
+func (c *Controller) GetPremiumAccessEvents(ctx *gin.Context) {
 	userID := strings.TrimSpace(ctx.Param("id"))
 	if userID == "" {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "USER_ID_REQUIRED", "User ID is required", "user_id")
@@ -130,31 +118,29 @@ func (c *Controller) GetPremiumStatusEvents(ctx *gin.Context) {
 		return
 	}
 
-	events, err := c.repo.GetUserAdminRepository().GetPremiumStatusEvents(userID, limit)
+	events, err := c.repo.GetUserAdminRepository().GetPremiumAccessEvents(userID, limit)
 	if err != nil {
 		httputil.HandleError(ctx, err, userID)
 		return
 	}
 
-	items := make([]dto.AdminPremiumStatusEventResponse, len(events))
+	items := make([]dto.AdminPremiumAccessEventResponse, len(events))
 	for i, item := range events {
-		items[i] = dto.AdminPremiumStatusEventResponse{
-			ID:          item.ID,
-			UserID:      item.UserID,
-			Action:      string(item.Action),
-			OldStatus:   item.OldStatus,
-			NewStatus:   item.NewStatus,
-			OldRole:     item.OldRole,
-			NewRole:     item.NewRole,
-			RevokeType:  item.RevokeType,
-			Reason:      item.Reason,
-			ChangedBy:   item.ChangedBy,
-			ChangedRole: item.ChangedRole,
-			CreatedAt:   item.CreatedAt,
+		items[i] = dto.AdminPremiumAccessEventResponse{
+			ID:         item.ID,
+			UserID:     item.UserID,
+			Action:     string(item.Action),
+			OldStatus:  item.OldStatus,
+			NewStatus:  item.NewStatus,
+			RevokeType: item.RevokeType,
+			Reason:     item.Reason,
+			ActorID:    item.ActorID,
+			ActorRole:  item.ActorRole,
+			CreatedAt:  item.CreatedAt,
 		}
 	}
 
-	httputil.SendOKResponse(ctx, dto.AdminPremiumStatusEventsListResponse{
+	httputil.SendOKResponse(ctx, dto.AdminPremiumAccessEventsListResponse{
 		UserID: userID,
 		Total:  len(items),
 		Items:  items,
@@ -172,8 +158,8 @@ func (c *Controller) sendPremiumRevokedEmail(targetUser *user.User, reason, revo
 	}
 
 	revokedAt := time.Now()
-	if targetUser.PremiumRevokedAt != nil {
-		revokedAt = *targetUser.PremiumRevokedAt
+	if targetUser.PremiumAccess != nil && targetUser.PremiumAccess.StatusChangedAt != nil {
+		revokedAt = *targetUser.PremiumAccess.StatusChangedAt
 	}
 
 	if err := c.emailService.SendPremiumAccessRevokedEmail(
@@ -201,8 +187,8 @@ func (c *Controller) sendPremiumReactivatedEmail(targetUser *user.User, reason s
 	}
 
 	reactivatedAt := time.Now()
-	if targetUser.PremiumReactivatedAt != nil {
-		reactivatedAt = *targetUser.PremiumReactivatedAt
+	if targetUser.PremiumAccess != nil && targetUser.PremiumAccess.StatusChangedAt != nil {
+		reactivatedAt = *targetUser.PremiumAccess.StatusChangedAt
 	}
 
 	if err := c.emailService.SendPremiumAccessReactivatedEmail(
