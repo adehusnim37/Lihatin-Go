@@ -50,13 +50,11 @@ This document describes the comprehensive authentication system implemented for 
 
 ## Database Schema
 
-### Users Table (Enhanced)
+### Users Table
 ```sql
--- New admin fields added to existing users table
-ALTER TABLE users 
-ADD COLUMN is_locked BOOLEAN DEFAULT FALSE,
-ADD COLUMN locked_at TIMESTAMP NULL,
-ADD COLUMN locked_reason VARCHAR(500),
+-- Profile and authorization identity only.
+-- Password, account state, and premium access are stored separately.
+ALTER TABLE users
 ADD COLUMN role ENUM('user', 'admin', 'super_admin') DEFAULT 'user';
 ```
 
@@ -73,15 +71,20 @@ CREATE TABLE UserAuth (
     password_reset_token_expires_at TIMESTAMP NULL,
     last_login_at TIMESTAMP NULL,
     failed_login_attempts INT DEFAULT 0,
-    lockout_until TIMESTAMP NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    is_totp_enabled BOOLEAN DEFAULT FALSE,
+    login_blocked_until TIMESTAMP NULL,
+    account_status ENUM('active', 'disabled', 'locked') DEFAULT 'active',
+    status_changed_at TIMESTAMP NULL,
+    status_changed_by VARCHAR(36),
+    status_reason VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
+
+TOTP availability is derived from verified, enabled rows in `auth_methods`.
+Current premium entitlement is stored in `user_premium_access`.
 
 ### APIKeys Table
 ```sql

@@ -81,8 +81,11 @@ A comprehensive Go REST API application with enterprise-grade authentication, ad
 ## 📊 SYSTEM METRICS
 
 ### Database Tables (All Applied ✅)
-- **users**: Enhanced with admin fields (is_locked, role, etc.)
-- **UserAuth**: Authentication data with 2FA support
+- **users**: Profile and authorization identity
+- **user_auth**: Password and account-state data
+- **user_premium_access**: Current premium entitlement
+- **premium_access_events**: Premium entitlement audit history
+- **AuthMethod**: TOTP and OAuth authentication methods
 - **AuthMethod**: Multi-factor authentication methods
 - **APIKeys**: API key management with permissions
 - **LoginAttempts**: Security monitoring and analytics

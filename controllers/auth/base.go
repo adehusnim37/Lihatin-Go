@@ -73,7 +73,7 @@ func (c *Controller) GetPremiumAccess(ctx *gin.Context) {
 	}
 
 	premiumActive := user.HasPremiumAccessAt(time.Now())
-	premiumStatus := map[string]interface{}{
+	premiumAccessData := map[string]interface{}{
 		"user_id":        user.ID,
 		"premium_access": dto.NewPremiumAccessResponse(user.PremiumAccess),
 		"features": map[string]interface{}{
@@ -86,8 +86,8 @@ func (c *Controller) GetPremiumAccess(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
-		Data:    premiumStatus,
-		Message: "Premium status retrieved successfully",
+		Data:    premiumAccessData,
+		Message: "Premium access retrieved successfully",
 		Error:   nil,
 	})
 }

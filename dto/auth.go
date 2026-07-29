@@ -439,15 +439,15 @@ type AdminPremiumAccessEventsListResponse struct {
 
 // PaginatedUsersResponse represents paginated user results
 type PaginatedUsersResponse struct {
-	Users      []AdminUserResponse `json:"users"`
-	TotalCount int64               `json:"total_count"`
-	Page       int                 `json:"page"`
-	Limit      int                 `json:"limit"`
-	TotalPages int                 `json:"total_pages"`
-	Sort       string              `json:"sort"`
-	OrderBy    string              `json:"order_by"`
-	Search     string              `json:"search,omitempty"`
-	Role       string              `json:"role,omitempty"`
+	Users               []AdminUserResponse `json:"users"`
+	TotalCount          int64               `json:"total_count"`
+	Page                int                 `json:"page"`
+	Limit               int                 `json:"limit"`
+	TotalPages          int                 `json:"total_pages"`
+	Sort                string              `json:"sort"`
+	OrderBy             string              `json:"order_by"`
+	Search              string              `json:"search,omitempty"`
+	Role                string              `json:"role,omitempty"`
 	PremiumAccessStatus string              `json:"premium_access_status,omitempty"`
 	LockStatus          string              `json:"lock_status,omitempty"`
 }

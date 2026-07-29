@@ -147,7 +147,7 @@ When API key authentication succeeds, the following variables are available in t
 - `username` - Username of the associated user
 - `email` - Email of the associated user
 - `role` - Role of the associated user
-- `is_premium` - Premium status of the user
+- `premium_access_active` - Current premium entitlement, loaded from the database
 - `user` - Complete user object
 - `api_key` - Complete API key record
 - `api_key_id` - ID of the API key

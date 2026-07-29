@@ -144,7 +144,7 @@ func (c *Controller) GetPremiumAccessEvents(ctx *gin.Context) {
 		UserID: userID,
 		Total:  len(items),
 		Items:  items,
-	}, "Premium status events retrieved successfully")
+	}, "Premium access events retrieved successfully")
 }
 
 func (c *Controller) sendPremiumRevokedEmail(targetUser *user.User, reason, revokeType string) {

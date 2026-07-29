@@ -65,8 +65,8 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 		limit,
 		offset,
 		userrepo.AdminUserListFilters{
-			Search:        search,
-			Role:          role,
+			Search:              search,
+			Role:                role,
 			PremiumAccessStatus: premiumAccessStatus,
 			LockStatus:          lockStatus,
 			Sort:                sort,
@@ -86,15 +86,15 @@ func (c *Controller) GetAllUsers(ctx *gin.Context) {
 	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
 
 	response := dto.PaginatedUsersResponse{
-		Users:      adminUsers,
-		TotalCount: totalCount,
-		Page:       page,
-		Limit:      limit,
-		TotalPages: totalPages,
-		Sort:       sort,
-		OrderBy:    orderBy,
-		Search:     search,
-		Role:       role,
+		Users:               adminUsers,
+		TotalCount:          totalCount,
+		Page:                page,
+		Limit:               limit,
+		TotalPages:          totalPages,
+		Sort:                sort,
+		OrderBy:             orderBy,
+		Search:              search,
+		Role:                role,
 		PremiumAccessStatus: premiumAccessStatus,
 		LockStatus:          lockStatus,
 	}

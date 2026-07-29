@@ -1,7 +1,7 @@
 # Email notifications
 
 Optional email is disabled by default. Security, authentication, account,
-premium-status, and support emails are transactional and do not use these
+premium-access, and support emails are transactional and do not use these
 preferences.
 
 ## User preferences

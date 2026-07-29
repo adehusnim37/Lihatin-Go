@@ -297,7 +297,7 @@ token, err := utils.GenerateJWT(
     user.Username,        // "bakaban"
     user.Email,           // "adehusni37@gmail.com"
     user.Role,            // "admin"
-    user.IsPremium,       // true
+    user.HasPremiumAccessAt(time.Now()), // true
     userAuth.IsEmailVerified, // true
 )
 ```
@@ -312,7 +312,6 @@ token, err := utils.GenerateJWT(
   "username": "bakaban",
   "email": "adehusni37@gmail.com",
   "role": "admin",
-  "is_premium": true,
   "is_verified": true,
   "iss": "lihatin-go",
   "sub": "92aabb21-3597-4f3f-9fa5-bb82868f7039",
@@ -357,7 +356,10 @@ ctx.JSON(http.StatusOK, common.APIResponse{
       "username": "bakaban",
       "email": "adehusni37@gmail.com",
       "role": "admin",
-      "is_premium": true
+      "premium_access": {
+        "status": "active",
+        "tier": "premium"
+      }
     },
     "token": "eyJhbGci...",
     "refresh_token": "eyJhbGci...",

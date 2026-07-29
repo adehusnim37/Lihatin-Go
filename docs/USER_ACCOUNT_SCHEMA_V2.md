@@ -10,7 +10,7 @@ account-state, and premium-access schema.
    place that stores `password_hash`.
 3. `user_premium_access` stores the current premium entitlement. Premium is not
    a role and is not stored on `users`.
-4. `premium_status_events` is the append-only premium audit history.
+4. `premium_access_events` is the append-only premium audit history.
 5. `auth_methods` is the source of truth for TOTP and OAuth methods. TOTP
    availability is derived, not cached in `user_auth`.
 6. Optional email subscriptions live in `notification_preferences` and do not

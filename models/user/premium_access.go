@@ -20,19 +20,19 @@ const (
 // row means the user has never received premium access and is on the free tier.
 // PremiumAccessEvent remains the append-only audit trail.
 type PremiumAccess struct {
-	UserID          string            `json:"user_id" gorm:"primaryKey;size:191"`
-	User            *User             `json:"-" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+	UserID          string                  `json:"user_id" gorm:"primaryKey;size:191"`
+	User            *User                   `json:"-" gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	Status          PremiumAccessStatus     `json:"status" gorm:"size:20;not null;index"`
-	Tier            string            `json:"tier" gorm:"size:30;not null;default:premium"`
-	Source          string            `json:"source" gorm:"size:50;not null"`
-	GrantedAt       time.Time         `json:"granted_at" gorm:"not null"`
-	ExpiresAt       *time.Time        `json:"expires_at,omitempty" gorm:"index"`
+	Tier            string                  `json:"tier" gorm:"size:30;not null;default:premium"`
+	Source          string                  `json:"source" gorm:"size:50;not null"`
+	GrantedAt       time.Time               `json:"granted_at" gorm:"not null"`
+	ExpiresAt       *time.Time              `json:"expires_at,omitempty" gorm:"index"`
 	RevokeType      PremiumAccessRevokeType `json:"revoke_type,omitempty" gorm:"size:20"`
-	StatusChangedAt *time.Time        `json:"status_changed_at,omitempty" gorm:"index"`
-	StatusChangedBy *string           `json:"status_changed_by,omitempty" gorm:"size:191;index"`
-	StatusReason    string            `json:"status_reason,omitempty" gorm:"size:500"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	StatusChangedAt *time.Time              `json:"status_changed_at,omitempty" gorm:"index"`
+	StatusChangedBy *string                 `json:"status_changed_by,omitempty" gorm:"size:191;index"`
+	StatusReason    string                  `json:"status_reason,omitempty" gorm:"size:500"`
+	CreatedAt       time.Time               `json:"created_at"`
+	UpdatedAt       time.Time               `json:"updated_at"`
 }
 
 func (PremiumAccess) TableName() string {

@@ -25,18 +25,17 @@ type UserAdminRepository interface {
 	RevokePremiumAccess(userID, reason, revokeType, changedBy, changedByRole string) (*user.User, error)
 	ReactivatePremiumAccess(userID, reason, changedBy, changedByRole string, overridePermanent bool) (*user.User, error)
 	GetPremiumAccessEvents(userID string, limit int) ([]user.PremiumAccessEvent, error)
-	IsUserLocked(userID string) (bool, error)
 	UpdateUserByAdmin(id string, updateUser dto.AdminUpdateUserRequest) error
 	DeleteUserPermanent(userID string) error
 }
 
 type AdminUserListFilters struct {
-	Search        string
-	Role          string
+	Search              string
+	Role                string
 	PremiumAccessStatus string
-	LockStatus    string
-	Sort          string
-	OrderBy       string
+	LockStatus          string
+	Sort                string
+	OrderBy             string
 }
 
 type userAdminRepository struct {
@@ -553,7 +552,7 @@ func (uar *userAdminRepository) RevokePremiumAccess(userID, reason, revokeType, 
 	return updatedUser, nil
 }
 
-// ReactivatePremiumAccess restores premium status and writes audit event.
+// ReactivatePremiumAccess restores premium access and writes an audit event.
 func (uar *userAdminRepository) ReactivatePremiumAccess(userID, reason, changedBy, changedByRole string, overridePermanent bool) (*user.User, error) {
 	normalizedRole := normalizeRole(changedByRole)
 	changedBy = strings.TrimSpace(changedBy)
@@ -667,7 +666,7 @@ func (uar *userAdminRepository) GetPremiumAccessEvents(userID string, limit int)
 		Find(&events)
 
 	if result.Error != nil {
-		logger.Logger.Error("Failed to get premium status events", "user_id", userID, "error", result.Error)
+		logger.Logger.Error("Failed to get premium access events", "user_id", userID, "error", result.Error)
 		return nil, apperrors.ErrUserDatabaseError
 	}
 
@@ -756,24 +755,6 @@ func (uar *userAdminRepository) UpdateUserByAdmin(id string, updateUser dto.Admi
 
 	logger.Logger.Info("Admin user updated successfully", "user_id", id, "fields_updated", updatedFields)
 	return nil
-}
-
-// IsUserLocked checks if a user account is locked
-func (uar *userAdminRepository) IsUserLocked(userID string) (bool, error) {
-	var auth user.UserAuth
-	result := uar.db.Select("account_status").
-		Where("user_id = ? AND deleted_at IS NULL", userID).
-		First(&auth)
-
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return false, apperrors.ErrUserNotFound
-		}
-		logger.Logger.Error("Error checking user lock status", "user_id", userID, "error", result.Error)
-		return false, apperrors.ErrUserDatabaseError
-	}
-
-	return auth.AccountStatus == user.AccountStatusLocked, nil
 }
 
 // DeleteUserPermanent permanently deletes a user from the database (admin only)

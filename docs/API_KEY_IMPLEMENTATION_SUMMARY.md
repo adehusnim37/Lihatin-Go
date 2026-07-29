@@ -31,7 +31,7 @@ Added new API routes under `/v1/api/short/*` with API key authentication:
 
 ### 4. **Context Variables Set**
 When API key authentication succeeds, these variables are available:
-- `user_id`, `username`, `email`, `role`, `is_premium`
+- `user_id`, `username`, `email`, `role`, `premium_access_active`
 - `user` (complete user object)
 - `api_key` (complete API key record)
 - `api_key_id`, `api_key_name`, `api_key_permissions`
