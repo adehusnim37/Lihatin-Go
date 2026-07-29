@@ -21,7 +21,7 @@ type UserRepository interface {
 	GetUserByEmail(email string) (*user.User, error)
 	GetUserByEmailOrUsername(input string) (*user.User, error)
 	CheckPremiumByUsernameOrEmail(inputs string) (bool, error)
-	CreateUser(user *user.User) error
+	CreateUser(user *user.User, notificationPreference *user.NotificationPreference) error
 	UpdateUser(id string, user dto.UpdateProfileRequest) error
 	SetPremium(id string, isPremium bool) error
 	CheckUsernameChangeEligibility(userID string) error
@@ -181,7 +181,7 @@ func (ur *userRepository) ChangeUsername(userID string, newUsername string) (str
 	return oldUsername, nil
 }
 
-func (ur *userRepository) CreateUser(user *user.User) error {
+func (ur *userRepository) CreateUser(user *user.User, notificationPreference *user.NotificationPreference) error {
 	// Hash the password before storing
 	hashedPassword, err := auth.HashPassword(user.Password)
 	if err != nil {
@@ -205,17 +205,48 @@ func (ur *userRepository) CreateUser(user *user.User) error {
 	user.CreatedAt = now
 	user.UpdatedAt = now
 
-	// Create user using GORM
-	result := ur.db.Create(user)
-	if result.Error != nil {
-		logger.Logger.Error("Failed to create user", "error", result.Error, "email", user.Email)
-		// Check for duplicate entry errors
-		if fmt.Sprintf("%v", result.Error) == "Error 1062 (23000): Duplicate entry" ||
-			result.Error.Error() == "UNIQUE constraint failed: users.email" ||
-			result.Error.Error() == "UNIQUE constraint failed: users.username" {
-			return apperrors.ErrUserDuplicateEntry.WithError(result.Error)
+	if notificationPreference != nil {
+		notificationPreference.UserID = user.ID
+		notificationPreference.CreatedAt = now
+		notificationPreference.UpdatedAt = now
+
+		if notificationPreference.WeeklySummaryEmail {
+			notificationPreference.WeeklySummaryOptInAt = &now
+			notificationPreference.WeeklySummaryOptOutAt = nil
+		} else {
+			notificationPreference.WeeklySummaryOptInAt = nil
+			notificationPreference.WeeklySummaryOptOutAt = &now
 		}
-		return apperrors.ErrUserCreationFailed.WithError(result.Error)
+
+		if notificationPreference.PromotionalEmail {
+			notificationPreference.PromotionalOptInAt = &now
+			notificationPreference.PromotionalOptOutAt = nil
+		} else {
+			notificationPreference.PromotionalOptInAt = nil
+			notificationPreference.PromotionalOptOutAt = &now
+		}
+	}
+
+	err = ur.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		if notificationPreference != nil {
+			if err := tx.Create(notificationPreference).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Logger.Error("Failed to create user", "error", err, "email", user.Email)
+		// Check for duplicate entry errors
+		if fmt.Sprintf("%v", err) == "Error 1062 (23000): Duplicate entry" ||
+			err.Error() == "UNIQUE constraint failed: users.email" ||
+			err.Error() == "UNIQUE constraint failed: users.username" {
+			return apperrors.ErrUserDuplicateEntry.WithError(err)
+		}
+		return apperrors.ErrUserCreationFailed.WithError(err)
 	}
 
 	logger.Logger.Info("User created successfully", "user_id", user.ID, "email", user.Email)

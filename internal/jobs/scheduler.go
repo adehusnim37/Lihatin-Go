@@ -17,6 +17,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
@@ -67,7 +68,10 @@ func NewScheduler(db *gorm.DB) (*Scheduler, error) {
 
 // Register adds a job to the scheduler
 func (s *Scheduler) Register(job Job) error {
-	_, err := s.cron.AddFunc(job.Schedule(), func() {
+	rawSchedule := job.Schedule()
+	schedule := normalizeScheduleSpec(rawSchedule)
+
+	_, err := s.cron.AddFunc(schedule, func() {
 		s.wg.Add(1)
 		defer s.wg.Done()
 
@@ -84,16 +88,42 @@ func (s *Scheduler) Register(job Job) error {
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid schedule %q (raw: %q): %w", schedule, rawSchedule, err)
 	}
 
 	s.jobs = append(s.jobs, job)
-	logger.Logger.Info("Registered cron job",
-		"job", job.Name(),
-		"schedule", job.Schedule(),
-	)
+	if schedule == rawSchedule {
+		logger.Logger.Info("Registered cron job",
+			"job", job.Name(),
+			"schedule", schedule,
+		)
+	} else {
+		logger.Logger.Info("Registered cron job",
+			"job", job.Name(),
+			"schedule", schedule,
+			"raw_schedule", rawSchedule,
+		)
+	}
 
 	return nil
+}
+
+func normalizeScheduleSpec(spec string) string {
+	normalized := strings.TrimSpace(spec)
+	normalized = strings.ReplaceAll(normalized, `\"`, `"`)
+	normalized = strings.ReplaceAll(normalized, `\'`, `'`)
+
+	for len(normalized) >= 2 {
+		first := normalized[0]
+		last := normalized[len(normalized)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			normalized = strings.TrimSpace(normalized[1 : len(normalized)-1])
+			continue
+		}
+		break
+	}
+
+	return normalized
 }
 
 // RegisterMany adds multiple jobs and returns an error with job context when one fails.

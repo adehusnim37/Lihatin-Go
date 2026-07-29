@@ -83,12 +83,6 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 		isPremiumFromCode = true
 	}
 
-	hashedPassword, err := auth.HashPassword(req.Password)
-	if err != nil {
-		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "PASSWORD_HASHING_FAILED", "Failed to process password", "password")
-		return
-	}
-
 	newUser := &user.User{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
@@ -98,7 +92,13 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 		IsPremium: isPremiumFromCode,
 	}
 
-	if err := c.repo.GetUserRepository().CreateUser(newUser); err != nil {
+	notificationPreference := &user.NotificationPreference{
+		PromotionalEmail:   req.OptInPromotionalEmails,
+		WeeklySummaryEmail: req.OptInWeeklySummaryEmails,
+		ConsentSource:      req.ConsentSource,
+	}
+
+	if err := c.repo.GetUserRepository().CreateUser(newUser, notificationPreference); err != nil {
 		if premiumReservationKey != "" {
 			manager := middleware.GetSessionManager()
 			if manager != nil {
@@ -143,7 +143,7 @@ func (c *Controller) SignupComplete(ctx *gin.Context) {
 		DeviceID:        deviceID,
 		LastIP:          lastIP,
 		UserID:          newUser.ID,
-		PasswordHash:    hashedPassword,
+		PasswordHash:    newUser.Password,
 		IsEmailVerified: true,
 		IsActive:        true,
 	}

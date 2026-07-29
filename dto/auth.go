@@ -62,12 +62,15 @@ type SignupResendOTPRequest struct {
 
 // SignupCompleteRequest finalizes signup after OTP verification.
 type SignupCompleteRequest struct {
-	SignupToken string `json:"signup_token" binding:"required,min=10,max=255,no_space"`
-	FirstName   string `json:"first_name" binding:"required,min=3,max=50"`
-	LastName    string `json:"last_name" binding:"required,min=3,max=50"`
-	Username    string `json:"username" binding:"required,min=3,max=30,alphanum"`
-	Password    string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
-	SecretCode  string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
+	SignupToken              string `json:"signup_token" binding:"required,min=10,max=255,no_space"`
+	FirstName                string `json:"first_name" binding:"required,min=3,max=50"`
+	LastName                 string `json:"last_name" binding:"required,min=3,max=50"`
+	Username                 string `json:"username" binding:"required,min=3,max=30,alphanum"`
+	Password                 string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
+	SecretCode               string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
+	OptInPromotionalEmails   bool   `json:"opt_in_promotional_emails"`
+	OptInWeeklySummaryEmails bool   `json:"opt_in_weekly_summary_emails"`
+	ConsentSource            string `json:"consent_source" binding:"required,oneof=signup_page"`
 }
 
 // ResendVerificationRequest represents request payload to resend email verification link
@@ -153,12 +156,15 @@ type UserProfile struct {
 
 // RegisterRequest represents the user registration request payload
 type RegisterRequest struct {
-	FirstName  string `json:"first_name" binding:"required,min=3,max=50"`
-	LastName   string `json:"last_name" binding:"required,min=3,max=50"`
-	Username   string `json:"username" binding:"required,min=3,max=30,alphanum"`
-	Email      string `json:"email" binding:"required,email"`
-	Password   string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
-	SecretCode string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
+	FirstName                string `json:"first_name" binding:"required,min=3,max=50"`
+	LastName                 string `json:"last_name" binding:"required,min=3,max=50"`
+	Username                 string `json:"username" binding:"required,min=3,max=30,alphanum"`
+	Email                    string `json:"email" binding:"required,email"`
+	Password                 string `json:"password" binding:"required,min=8,max=50,pwdcomplex"`
+	SecretCode               string `json:"secret_code,omitempty" binding:"omitempty,secret_code"`
+	OptInPromotionalEmails   bool   `json:"opt_in_promotional_emails"`
+	OptInWeeklySummaryEmails bool   `json:"opt_in_weekly_summary_emails"`
+	ConsentSource            string `json:"consent_source" binding:"required,oneof=signup_page"`
 }
 
 // UpdateProfileRequest represents the user profile update request payload

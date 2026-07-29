@@ -490,8 +490,9 @@ func (c *Controller) createGoogleOAuthUser(ctx context.Context, email, providerU
 			return nil, nil, usernameErr
 		}
 		createdUser.Username = username
+		createdUser.Password = placeholderPassword
 
-		createErr := c.repo.GetUserRepository().CreateUser(createdUser)
+		createErr := c.repo.GetUserRepository().CreateUser(createdUser, nil)
 		if createErr == nil {
 			created = true
 			break
@@ -521,11 +522,6 @@ func (c *Controller) createGoogleOAuthUser(ctx context.Context, email, providerU
 		return nil, nil, errors.New("failed to create google oauth user")
 	}
 
-	hashedPassword, err := auth.HashPassword(placeholderPassword)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	authUUID, err := uuid.NewV7()
 	if err != nil {
 		return nil, nil, err
@@ -534,7 +530,7 @@ func (c *Controller) createGoogleOAuthUser(ctx context.Context, email, providerU
 	userAuth = &user.UserAuth{
 		ID:              authUUID.String(),
 		UserID:          createdUser.ID,
-		PasswordHash:    hashedPassword,
+		PasswordHash:    createdUser.Password,
 		IsEmailVerified: true,
 		IsActive:        true,
 	}

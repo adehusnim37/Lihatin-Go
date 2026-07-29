@@ -91,31 +91,23 @@ func (c *Controller) Register(ctx *gin.Context) {
 		isPremiumFromCode = true
 	}
 
-	// Hash password
-	hashedPassword, err := auth.HashPassword(req.Password)
-	if err != nil {
-		httputil.SendErrorResponse(
-			ctx,
-			http.StatusInternalServerError,
-			"Registration failed",
-			"Failed to process password",
-			"PASSWORD_HASHING_FAILED",
-			map[string]string{"server": "Failed to process password"},
-		)
-		return
-	}
-
 	// Create user
 	newUser := &user.User{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Email:     req.Email,
 		Username:  req.Username,
-		Password:  hashedPassword,
+		Password:  req.Password,
 		IsPremium: isPremiumFromCode,
 	}
 
-	if err := c.repo.GetUserRepository().CreateUser(newUser); err != nil {
+	notificationPreferences := &user.NotificationPreference{
+		PromotionalEmail:   req.OptInPromotionalEmails,
+		WeeklySummaryEmail: req.OptInWeeklySummaryEmails,
+		ConsentSource:      req.ConsentSource,
+	}
+
+	if err := c.repo.GetUserRepository().CreateUser(newUser, notificationPreferences); err != nil {
 		if premiumReservationKey != "" {
 			manager := middleware.GetSessionManager()
 			if manager != nil {
@@ -214,7 +206,7 @@ func (c *Controller) Register(ctx *gin.Context) {
 		DeviceID:                        deviceID,
 		LastIP:                          lastIP,
 		UserID:                          newUser.ID,
-		PasswordHash:                    hashedPassword, // Use the same hashed password
+		PasswordHash:                    newUser.Password,
 		IsEmailVerified:                 false,
 		EmailVerificationToken:          token,
 		EmailVerificationTokenExpiresAt: &expirationTime,

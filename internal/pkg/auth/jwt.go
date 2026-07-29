@@ -11,7 +11,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var jwtSecret = []byte(config.GetRequiredEnv(config.EnvJWTSecret))
+func jwtSigningSecret() []byte {
+	return []byte(config.GetRequiredEnv(config.EnvJWTSecret))
+}
 
 // JWTClaims represents the JWT claims structure
 type JWTClaims struct {
@@ -56,7 +58,7 @@ func GenerateJWT(userID, session_id, device_id, last_ip, username, email, role s
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(jwtSigningSecret())
 }
 
 // GenerateRefreshToken creates a refresh token and stores it in Redis
@@ -94,7 +96,7 @@ func ValidateJWT(tokenString string) (*JWTClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("invalid signing method")
 		}
-		return jwtSecret, nil
+		return jwtSigningSecret(), nil
 	})
 
 	if err != nil {
@@ -114,7 +116,7 @@ func ValidateRefreshToken(tokenString string) (string, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("invalid signing method")
 		}
-		return jwtSecret, nil
+		return jwtSigningSecret(), nil
 	})
 
 	if err != nil {
