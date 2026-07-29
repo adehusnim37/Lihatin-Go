@@ -10,6 +10,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // SuccessfulLogin contains the data captured only after authentication completes.
@@ -52,6 +53,17 @@ func (r *LoginEventRepository) RecordSuccessfulLogin(input SuccessfulLogin) (*us
 
 	var previous *user.LoginEvent
 	err := r.db.Transaction(func(tx *gorm.DB) error {
+		// Serialize completed logins per user so concurrent devices get a
+		// deterministic previous-login chain and cannot regress the snapshot.
+		var lockedAuth user.UserAuth
+		if err := tx.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id").
+			Where("user_id = ?", input.UserID).
+			First(&lockedAuth).Error; err != nil {
+			return fmt.Errorf("lock user authentication record: %w", err)
+		}
+
 		var found user.LoginEvent
 		findErr := tx.
 			Where("user_id = ?", input.UserID).

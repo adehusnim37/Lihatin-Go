@@ -524,27 +524,6 @@ func (r *UserAuthRepository) ResetPassword(token, hashedPassword string) error {
 	return nil
 }
 
-// UpdateLastLogin updates last login timestamp
-func (r *UserAuthRepository) UpdateLastLogin(userID, deviceId, LastIp string) error {
-	now := time.Now()
-
-	// Update user auth fields
-	if err := r.db.Model(&user.UserAuth{}).
-		Where("user_id = ?", userID).
-		Updates(map[string]any{
-			"last_login_at":         &now,
-			"failed_login_attempts": 0,
-			"login_blocked_until":   nil,
-			"last_device_id":        deviceId,
-			"last_login_ip":         LastIp,
-			"last_email_send_at":    nil,
-		}).Error; err != nil {
-		return apperrors.ErrUserAuthUpdateFailed
-	}
-
-	return nil
-}
-
 // IncrementFailedLogin increments failed login attempts
 func (r *UserAuthRepository) IncrementFailedLogin(userID string) error {
 	// Get current failed attempts

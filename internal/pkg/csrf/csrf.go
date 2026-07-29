@@ -715,7 +715,9 @@ func defaultErrorHandler(c *gin.Context) {
 	c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 		"success": false,
 		"message": "CSRF validation failed",
-		"error":   "Invalid or missing CSRF token",
+		"error": gin.H{
+			"csrf": "Invalid or missing CSRF token",
+		},
 	})
 }
 

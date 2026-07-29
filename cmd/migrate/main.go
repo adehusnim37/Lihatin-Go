@@ -98,6 +98,7 @@ func dropAllTables(db *gorm.DB) {
 		&shortlink.ShortLinkDetail{},
 		&shortlink.ShortLink{},
 		&user.APIKey{},
+		&user.LoginEvent{},
 		&user.LoginAttempt{},
 		&user.AuthMethod{},
 		&user.UserAuth{},
@@ -136,6 +137,8 @@ func showMigrationStatus(db *gorm.DB) {
 	models := []interface{}{
 		&user.User{},
 		&user.UserAuth{},
+		&user.LoginEvent{},
+		&user.LoginAttempt{},
 		&user.AuthMethod{},
 		&user.APIKey{},
 		&shortlink.ShortLink{},
