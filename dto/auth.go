@@ -55,6 +55,15 @@ type SignupVerifyOTPResponse struct {
 	SignupToken string `json:"signup_token"`
 }
 
+// SignupCompletionStatusRequest validates access to the profile completion page.
+type SignupCompletionStatusRequest struct {
+	SignupToken string `form:"signup_token" binding:"required,len=48,hexadecimal"`
+}
+
+type SignupCompletionStatusResponse struct {
+	Valid bool `json:"valid"`
+}
+
 // SignupResendOTPRequest triggers OTP resend for pending signup challenge.
 type SignupResendOTPRequest struct {
 	ChallengeToken string `json:"challenge_token" binding:"required,min=10,max=255,no_space"`
