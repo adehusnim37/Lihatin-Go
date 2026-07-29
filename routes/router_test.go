@@ -53,3 +53,15 @@ func TestAPIKeyMutationRoutesSkipOnlyTokenValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestOneClickUnsubscribeAllowsProviderPOST(t *testing.T) {
+	for _, rule := range csrfTokenSkipRules() {
+		if rule.Method == http.MethodPost && rule.Path == "/v1/notifications/unsubscribe" {
+			if !rule.SkipOriginCheck {
+				t.Fatal("one-click unsubscribe must accept signed server-to-server POST requests")
+			}
+			return
+		}
+	}
+	t.Fatal("missing one-click unsubscribe CSRF skip rule")
+}

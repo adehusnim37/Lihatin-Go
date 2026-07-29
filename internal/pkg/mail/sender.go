@@ -10,6 +10,10 @@ import (
 
 // sendEmail sends an email using SMTP
 func (es *EmailService) sendEmail(to, subject, textBody, htmlBody string) error {
+	return es.sendEmailWithHeaders(to, subject, textBody, htmlBody, nil)
+}
+
+func (es *EmailService) sendEmailWithHeaders(to, subject, textBody, htmlBody string, headers map[string]string) error {
 	if es.config.SMTPUsername == "" || es.config.SMTPPassword == "" {
 		// Skip sending email if SMTP is not configured
 		fmt.Printf("Email would be sent to %s with subject: %s\n", to, subject)
@@ -22,6 +26,9 @@ func (es *EmailService) sendEmail(to, subject, textBody, htmlBody string) error 
 	e.Subject = subject
 	e.Text = []byte(textBody)
 	e.HTML = []byte(htmlBody)
+	for key, value := range headers {
+		e.Headers.Set(key, value)
+	}
 
 	auth := smtp.PlainAuth("", es.config.SMTPUsername, es.config.SMTPPassword, es.config.SMTPHost)
 	addr := fmt.Sprintf("%s:%s", es.config.SMTPHost, es.config.SMTPPort)

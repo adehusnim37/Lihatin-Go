@@ -34,11 +34,14 @@ type User struct {
 	PremiumReactivatedReason string     `json:"premium_reactivated_reason,omitempty" gorm:"size:500"`
 
 	// Relationships
-	UserAuth            []UserAuth           `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
-	APIKeys             []APIKey             `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
-	HistoryUsers        []HistoryUser        `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
-	PremiumKeyUsage     []PremiumKeyUsage    `json:"premium_key_usage,omitempty" gorm:"foreignKey:UserID"`
-	PremiumStatusEvents []PremiumStatusEvent `json:"premium_status_events,omitempty" gorm:"foreignKey:UserID"`
+	UserAuth                []UserAuth                 `json:"user_auth,omitempty" gorm:"foreignKey:UserID"`
+	APIKeys                 []APIKey                   `json:"api_keys,omitempty" gorm:"foreignKey:UserID"`
+	HistoryUsers            []HistoryUser              `json:"history_users,omitempty" gorm:"foreignKey:UserID"`
+	PremiumKeyUsage         []PremiumKeyUsage          `json:"premium_key_usage,omitempty" gorm:"foreignKey:UserID"`
+	PremiumStatusEvents     []PremiumStatusEvent       `json:"premium_status_events,omitempty" gorm:"foreignKey:UserID"`
+	NotificationPreference  *NotificationPreference    `json:"notification_preference,omitempty" gorm:"foreignKey:UserID"`
+	WeeklySummaryDeliveries []WeeklySummaryDelivery    `json:"-" gorm:"foreignKey:UserID"`
+	PromotionalDeliveries   []PromotionalEmailDelivery `json:"-" gorm:"foreignKey:UserID"`
 }
 
 // TableName specifies the table name for GORM

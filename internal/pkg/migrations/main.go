@@ -43,6 +43,22 @@ func RunMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate SystemSetting model: %w", err)
 	}
 
+	if err := db.AutoMigrate(&user.NotificationPreference{}); err != nil {
+		return fmt.Errorf("failed to migrate NotificationPreference model: %w", err)
+	}
+
+	if err := db.AutoMigrate(&user.WeeklySummaryDelivery{}); err != nil {
+		return fmt.Errorf("failed to migrate WeeklySummaryDelivery model: %w", err)
+	}
+
+	if err := db.AutoMigrate(&user.PromotionalCampaign{}); err != nil {
+		return fmt.Errorf("failed to migrate PromotionalCampaign model: %w", err)
+	}
+
+	if err := db.AutoMigrate(&user.PromotionalEmailDelivery{}); err != nil {
+		return fmt.Errorf("failed to migrate PromotionalEmailDelivery model: %w", err)
+	}
+
 	// Migrate ShortLink models
 	if err := db.AutoMigrate(&shortlink.ShortLink{}); err != nil {
 		return fmt.Errorf("failed to migrate ShortLink model: %w", err)

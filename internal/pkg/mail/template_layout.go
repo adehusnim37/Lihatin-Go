@@ -19,18 +19,22 @@ type emailDetail struct {
 }
 
 type emailTemplate struct {
-	Badge         string
-	Title         string
-	Subtitle      string
-	Greeting      string
-	Intro         string
-	Details       []emailDetail
-	Sections      []string
-	Actions       []emailAction
-	Notice        string
-	FallbackURL   string
-	FallbackLabel string
-	FooterBaseURL string
+	Badge                string
+	Title                string
+	Subtitle             string
+	Greeting             string
+	Intro                string
+	HeroImageURL         string
+	HeroImageAlt         string
+	Details              []emailDetail
+	Sections             []string
+	Actions              []emailAction
+	Notice               string
+	FallbackURL          string
+	FallbackLabel        string
+	FooterBaseURL        string
+	FooterPreferencesURL string
+	FooterUnsubscribeURL string
 }
 
 func renderEmailTemplate(t emailTemplate) string {
@@ -43,6 +47,14 @@ func renderEmailTemplate(t emailTemplate) string {
 	detailsHTML := renderDetailsSection(t.Details)
 	sectionsHTML := strings.Join(t.Sections, "\n")
 	actionsHTML := renderActionsSection(t.Actions)
+	heroImageHTML := ""
+	if t.HeroImageURL != "" {
+		heroImageHTML = fmt.Sprintf(
+			`<div class="hero"><img src="%s" alt="%s" width="640" style="display:block;width:100%%;max-width:640px;height:auto;border:0;"></div>`,
+			html.EscapeString(t.HeroImageURL),
+			html.EscapeString(t.HeroImageAlt),
+		)
+	}
 
 	noticeHTML := ""
 	if t.Notice != "" {
@@ -62,6 +74,20 @@ func renderEmailTemplate(t emailTemplate) string {
 </div>`, html.EscapeString(t.FallbackURL), html.EscapeString(linkText))
 	}
 
+	footerLinksHTML := ""
+	if t.FooterPreferencesURL != "" {
+		footerLinksHTML += fmt.Sprintf(
+			` | <a href="%s">Email preferences</a>`,
+			html.EscapeString(t.FooterPreferencesURL),
+		)
+	}
+	if t.FooterUnsubscribeURL != "" {
+		footerLinksHTML += fmt.Sprintf(
+			` | <a href="%s">Unsubscribe</a>`,
+			html.EscapeString(t.FooterUnsubscribeURL),
+		)
+	}
+
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -75,9 +101,11 @@ func renderEmailTemplate(t emailTemplate) string {
     .badge { display: inline-block; margin-bottom: 14px; background: #e9f2fc; color: #2f5f8c; border: 1px solid #d4e6f7; border-radius: 999px; font-size: 12px; font-weight: 600; padding: 6px 10px; letter-spacing: 0.2px; }
     .header h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.25; font-weight: 700; color: #111827; }
     .header p { margin: 0; font-size: 14px; color: #64748b; }
+    .hero { border-bottom: 1px solid #edf1f7; line-height: 0; }
+    .hero img { display: block; width: 100%%; max-width: 640px; height: auto; border: 0; }
     .content { padding: 24px 28px 22px; line-height: 1.6; font-size: 15px; }
     .greeting { margin: 0 0 10px; color: #111827; }
-    .intro { margin: 0 0 16px; color: #334155; }
+    .intro { margin: 0 0 16px; color: #334155; white-space: pre-line; }
     .summary { background: #f8fafc; border: 1px solid #e5eaf2; border-radius: 10px; padding: 12px 14px; margin: 0 0 16px; }
     .summary-table { width: 100%%; border-collapse: collapse; table-layout: fixed; }
     .summary-label { width: 44%%; color: #64748b; font-size: 13px; line-height: 1.5; vertical-align: top; padding: 0 12px 8px 0; white-space: normal; }
@@ -122,6 +150,7 @@ func renderEmailTemplate(t emailTemplate) string {
         <h1>%s</h1>
         <p>%s</p>
       </div>
+      %s
       <div class="content">
         <p class="greeting">%s</p>
         <p class="intro">%s</p>
@@ -132,7 +161,7 @@ func renderEmailTemplate(t emailTemplate) string {
         %s
       </div>
       <div class="footer">
-        Need help? <a href="%s/support">Support</a> | <a href="%s/privacy">Privacy Policy</a> | <a href="%s/terms">Terms</a><br>
+        Need help? <a href="%s/support">Support</a> | <a href="%s/privacy">Privacy Policy</a> | <a href="%s/terms">Terms</a>%s<br>
         © %d Lihatin. All rights reserved.
       </div>
     </div>
@@ -142,6 +171,7 @@ func renderEmailTemplate(t emailTemplate) string {
 		badgeHTML,
 		html.EscapeString(t.Title),
 		html.EscapeString(t.Subtitle),
+		heroImageHTML,
 		html.EscapeString(t.Greeting),
 		html.EscapeString(t.Intro),
 		detailsHTML,
@@ -152,6 +182,7 @@ func renderEmailTemplate(t emailTemplate) string {
 		html.EscapeString(t.FooterBaseURL),
 		html.EscapeString(t.FooterBaseURL),
 		html.EscapeString(t.FooterBaseURL),
+		footerLinksHTML,
 		year,
 	)
 }

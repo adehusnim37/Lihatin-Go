@@ -1097,20 +1097,20 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 	}, nil
 }
 
-func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (bool, error) {
+func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (*dto.ShortLinkPreviewResponse, error) {
 	var link shortlink.ShortLink
 	var detail shortlink.ShortLinkDetail
 
 	err := r.db.Where("short_code = ?", code.Code).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil // Code does not exist
+			return nil, nil // Code does not exist
 		}
 		logger.Logger.Error("Database error while checking short code",
 			"short_code", code.Code,
 			"error", err.Error(),
 		)
-		return false, apperrors.ErrShortCheckFailed.WithError(err)
+		return nil, apperrors.ErrShortCheckFailed.WithError(err)
 	}
 
 	q := r.db.Where("short_link_id = ?", link.ID)
@@ -1121,16 +1121,37 @@ func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (bool, error
 	err = q.First(&detail).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil // Code does not exist
+			return nil, nil // Code or supplied passcode does not exist
 		}
 		logger.Logger.Error("Database error while checking short code",
 			"short_code", code.Code,
 			"error", err.Error(),
 		)
-		return false, apperrors.ErrShortCheckFailed.WithError(err)
+		return nil, apperrors.ErrShortCheckFailed.WithError(err)
 	}
 
-	return true, nil // Code exists
+	destination, err := url.Parse(link.OriginalURL)
+	if err != nil {
+		logger.Logger.Warn("Unable to parse destination URL for public preview",
+			"short_code", code.Code,
+			"error", err.Error(),
+		)
+	}
+
+	var destinationHost, destinationScheme string
+	if destination != nil {
+		destinationHost = destination.Hostname()
+		destinationScheme = strings.ToLower(destination.Scheme)
+	}
+
+	return &dto.ShortLinkPreviewResponse{
+		ShortCode:         link.ShortCode,
+		DestinationHost:   destinationHost,
+		DestinationScheme: destinationScheme,
+		Title:             link.Title,
+		Description:       link.Description,
+		RequiresPasscode:  detail.Passcode != 0,
+	}, nil
 }
 
 func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in *dto.UpdateShortLinkRequest) error {

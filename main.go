@@ -102,6 +102,8 @@ func main() {
 		jobs.NewDeactivateExpiredLinksJob(gormDB),
 		jobs.NewCleanupLoginAttemptsJob(gormDB),
 		jobs.NewRefreshDisposableDomainsJob(),
+		jobs.NewWeeklySummaryJob(gormDB),
+		jobs.NewPromotionalCampaignJob(gormDB),
 	); err != nil {
 		log.Printf("Failed to register scheduler jobs: %v", err)
 		panic(err)

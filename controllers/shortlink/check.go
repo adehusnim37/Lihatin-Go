@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	httpPkg "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,17 +16,16 @@ func (c *Controller) CheckShortLink(ctx *gin.Context) {
 		return
 	}
 
-	exists, err := c.repo.CheckShortCode(&codeData)
+	preview, err := c.repo.CheckShortCode(&codeData)
 	if err != nil {
 		httpPkg.HandleError(ctx, err, nil)
 		return
 	}
 
-	// Check the boolean return value - if exists is false, the code doesn't exist
-	if !exists {
+	if preview == nil {
 		httpPkg.SendErrorResponse(ctx, http.StatusNotFound, "Short code does not exist.", "code", "Short code does not exist.")
 		return
 	}
 
-	httpPkg.SendOKResponse(ctx, nil, "Short code exists.")
+	httpPkg.SendOKResponse(ctx, preview, "Short code exists.")
 }

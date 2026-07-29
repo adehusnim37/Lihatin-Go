@@ -225,6 +225,18 @@ type CodeRequest struct {
 	Passcode string `json:"passcode" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit" uri:"passcode"`
 }
 
+// ShortLinkPreviewResponse contains only the public information needed to let a
+// visitor review a destination before following a short link. It intentionally
+// omits the destination path, query string, and user information.
+type ShortLinkPreviewResponse struct {
+	ShortCode         string `json:"short_code"`
+	DestinationHost   string `json:"destination_host"`
+	DestinationScheme string `json:"destination_scheme"`
+	Title             string `json:"title,omitempty"`
+	Description       string `json:"description,omitempty"`
+	RequiresPasscode  bool   `json:"requires_passcode"`
+}
+
 type IsActiveRequest struct {
 	IsActive bool `json:"is_active" label:"Status Aktif" binding:"required"`
 }

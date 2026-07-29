@@ -38,6 +38,9 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 		{Method: http.MethodPost, Path: "/v1/auth/forgot-password"},
 		{Method: http.MethodPost, Path: "/v1/auth/reset-password"},
 		{Method: http.MethodPost, Path: "/v1/auth/verify-totp-login"},
+		// Signed one-click email endpoint. It does not use cookies and must also
+		// accept server-to-server POST requests from email providers.
+		{Method: http.MethodPost, Path: "/v1/notifications/unsubscribe", SkipOriginCheck: true},
 
 		// Public support access & conversation.
 		{Method: http.MethodPost, Path: "/v1/support/tickets"},
@@ -111,6 +114,7 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	RegisterSupportRoutes(v1, userRepo, userAuthRepo, baseController)
 	RegisterLoggerRoutes(v1, userRepo, userAuthRepo, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, userAuthRepo, authRepo)
+	RegisterNotificationRoutes(v1, baseController, userRepo, userAuthRepo)
 
 	// Route health check
 	v1.GET("/health", func(c *gin.Context) {
