@@ -41,7 +41,7 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/signup/start", middleware.RateLimitMiddleware(5, 0, 10), authController.SignupStart)
 		authGroup.POST("/signup/resend-otp", middleware.RateLimitMiddleware(20, 0, 10), authController.SignupResendOTP)
 		authGroup.POST("/signup/verify-otp", middleware.RateLimitMiddleware(20, 0, 10), authController.SignupVerifyOTP)
-		authGroup.GET("/signup/complete/status", authController.SignupCompletionStatus)
+		authGroup.GET("/signup/complete/status", middleware.RateLimitMiddleware(5, 0, 10), authController.SignupCompletionStatus)
 		authGroup.POST("/signup/complete", middleware.RateLimitMiddleware(5, 0, 10), authController.SignupComplete)
 
 		// Basic authentication

@@ -212,7 +212,7 @@ func (r *ShortLinkRepository) generateCustomCode(url string) string {
 
 	code := make([]byte, 4)
 	max := big.NewInt(int64(len(encodedString))) // Use the length of the encoded string for random index generation
-	for i := range code { // Generate 4 random characters
+	for i := range code {                        // Generate 4 random characters
 		idx, err := rand.Int(rand.Reader, max)
 		if err != nil { // Fallback to deterministic character if random generation fails
 			logger.Logger.Error("Failed to generate random index for short code", "error", err)
@@ -1187,7 +1187,7 @@ func (r *ShortLinkRepository) UpdateShortLink(code, userID, userRole string, in 
 	if in.IsActive != nil {
 		linkUpd["is_active"] = *in.IsActive
 	}
-	if in.ExpiresAt != nil {
+	if in.ExpiresAtSet {
 		linkUpd["expires_at"] = in.ExpiresAt
 	}
 	if in.ShortCode != nil {

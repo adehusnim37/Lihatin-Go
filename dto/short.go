@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"bytes"
+	"encoding/json"
+	"time"
+)
 
 // CreateShortLinkRequest represents request to create short link
 type CreateShortLinkRequest struct {
@@ -179,6 +183,7 @@ type UpdateShortLinkRequest struct {
 	ShortCode    *string    `json:"short_code,omitempty" label:"Kode Pendek" binding:"omitempty,min=3,max=100,no_space,saveurlshort"`
 	IsActive     *bool      `json:"is_active,omitempty" label:"Status Aktif" binding:"omitempty"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`
+	ExpiresAtSet bool       `json:"-"`
 	Passcode     *string    `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit"`
 	ClickLimit   *int       `json:"click_limit,omitempty" label:"Batas Klik" binding:"omitempty,min=0"` // 0 means unlimited
 	EnableStats  *bool      `json:"enable_stats,omitempty" label:"Aktifkan Statistik" binding:"omitempty"`
@@ -188,6 +193,40 @@ type UpdateShortLinkRequest struct {
 	UTMCampaign  *string    `json:"utm_campaign,omitempty" label:"UTM Campaign" binding:"omitempty"`
 	UTMTerm      *string    `json:"utm_term,omitempty" label:"UTM Term" binding:"omitempty"`
 	UTMContent   *string    `json:"utm_content,omitempty" label:"UTM Content" binding:"omitempty"`
+}
+
+// UnmarshalJSON records whether expires_at was present in the payload.
+// A *time.Time alone cannot distinguish an omitted field (leave unchanged)
+// from an explicit null (remove the existing expiration).
+func (r *UpdateShortLinkRequest) UnmarshalJSON(data []byte) error {
+	type requestAlias UpdateShortLinkRequest
+	decoded := struct {
+		requestAlias
+		ExpiresAt json.RawMessage `json:"expires_at"`
+	}{}
+
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+
+	*r = UpdateShortLinkRequest(decoded.requestAlias)
+	if decoded.ExpiresAt == nil {
+		return nil
+	}
+
+	r.ExpiresAtSet = true
+	if bytes.Equal(bytes.TrimSpace(decoded.ExpiresAt), []byte("null")) {
+		r.ExpiresAt = nil
+		return nil
+	}
+
+	var expiresAt time.Time
+	if err := json.Unmarshal(decoded.ExpiresAt, &expiresAt); err != nil {
+		return err
+	}
+	r.ExpiresAt = &expiresAt
+
+	return nil
 }
 
 // PaginatedShortLinksResponse represents paginated short links
