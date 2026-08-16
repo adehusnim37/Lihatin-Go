@@ -62,6 +62,7 @@ Check health:
 docker compose ps
 docker compose logs -f mariadb
 docker compose logs -f valkey
+docker compose logs -f postgres
 ```
 
 ## 4) App Connection Strings
