@@ -37,6 +37,14 @@ func (c *Controller) DisableTOTP(ctx *gin.Context) {
 		return
 	}
 
+	if userAuth.User.Role == "admin" {
+		logger.Logger.Warn("TOTP disable attempted for admin user",
+			"user_id", userID,
+		)
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "ADMIN_TOTP_DISABLE_FORBIDDEN", "Disabling TOTP is not allowed for admin users", "auth", userID)
+		return
+	}
+
 	// Check if TOTP is enabled
 	if !userAuth.HasEnabledTOTP() {
 		logger.Logger.Warn("TOTP disable attempted for user without TOTP enabled",
