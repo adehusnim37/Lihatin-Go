@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
+	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -153,6 +153,18 @@ func DeleteAllUserSessions(ctx context.Context, userID string) error {
 	return manager.DeleteAllUserSessions(ctx, userID)
 }
 
+// DeleteDeviceSessions removes all sessions for a user that match a device ID.
+func DeleteDeviceSessions(ctx context.Context, userID, deviceID string) error {
+	manager := GetSessionManager()
+	return manager.DeleteByDeviceID(ctx, userID, deviceID)
+}
+
+// ListUserSessions returns all active sessions for a user.
+func ListUserSessions(ctx context.Context, userID string) ([]*session.Session, error) {
+	manager := GetSessionManager()
+	return manager.ListActiveSessions(ctx, userID)
+}
+
 // GetSession retrieves session data
 func GetSession(ctx context.Context, sessionID string) (*session.Session, error) {
 	manager := GetSessionManager()
@@ -215,4 +227,39 @@ func ClearSessionCookie(c *gin.Context) {
 		false,
 		true,
 	)
+}
+
+// ClearAuthCookies expires every browser cookie that can keep an auth session
+// alive. This is used when Redis says the session no longer exists (for
+// example, after another device revoked it).
+func ClearAuthCookies(c *gin.Context) {
+	cookieSettings := auth.ResolveAuthCookieSettings(c)
+	expiredAt := time.Unix(1, 0)
+
+	for _, name := range []string{"access_token", "refresh_token", "session_id"} {
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			Domain:   cookieSettings.Domain,
+			Expires:  expiredAt,
+			MaxAge:   -1,
+			Secure:   cookieSettings.Secure,
+			HttpOnly: true,
+			SameSite: cookieSettings.SameSite,
+		})
+	}
+
+	// The CSRF cookie is host-only, so it must be expired without the shared
+	// auth-cookie domain. A fresh token will be issued on the next login.
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "_csrf",
+		Value:    "",
+		Path:     "/",
+		Expires:  expiredAt,
+		MaxAge:   -1,
+		Secure:   cookieSettings.Secure,
+		HttpOnly: true,
+		SameSite: cookieSettings.SameSite,
+	})
 }

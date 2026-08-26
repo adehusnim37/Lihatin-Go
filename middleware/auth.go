@@ -85,6 +85,7 @@ func AuthMiddleware(userRepo userrepo.UserRepository, userAuthRepo *authrepo.Use
 		}
 
 		if isBlacklisted {
+			ClearAuthCookies(c)
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
@@ -133,6 +134,7 @@ func AuthMiddleware(userRepo userrepo.UserRepository, userAuthRepo *authrepo.Use
 			// Basic validation
 			_, isValid := session.ValidateSessionID(claims.SessionID)
 			if !isValid {
+				ClearAuthCookies(c)
 				c.JSON(http.StatusUnauthorized, common.APIResponse{
 					Success: false,
 					Data:    nil,
@@ -156,6 +158,7 @@ func AuthMiddleware(userRepo userrepo.UserRepository, userAuthRepo *authrepo.Use
 					"user_id", claims.UserID,
 					"error", err.Error(),
 				)
+				ClearAuthCookies(c)
 				c.JSON(http.StatusUnauthorized, common.APIResponse{
 					Success: false,
 					Data:    nil,

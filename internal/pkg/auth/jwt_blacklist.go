@@ -177,6 +177,32 @@ func (m *RefreshTokenManager) DeleteAllUserRefreshTokens(ctx context.Context, us
 	return nil
 }
 
+// DeleteSessionRefreshTokens removes refresh tokens matching a given session ID
+// (used when revoking a single device so its refresh tokens can no longer be
+// surrendered for a new access token).
+func (m *RefreshTokenManager) DeleteSessionRefreshTokens(ctx context.Context, sessionID string) error {
+	iter := m.redisClient.Scan(ctx, 0, refreshTokenPrefix+"*", 0).Iterator()
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+
+		tokenSessionID, err := m.redisClient.HGet(ctx, key, "session_id").Result()
+		if err != nil {
+			continue
+		}
+
+		if tokenSessionID == sessionID {
+			m.redisClient.Del(ctx, key)
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return fmt.Errorf("failed to scan refresh tokens by session: %w", err)
+	}
+
+	return nil
+}
+
 // Helper function to parse int64 from string
 func parseInt64(s string) int64 {
 	value, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)

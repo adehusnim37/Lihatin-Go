@@ -169,6 +169,29 @@ func (m *Manager) DeleteAllUserSessions(ctx context.Context, userID string) erro
 	return nil
 }
 
+// DeleteByDeviceID removes all sessions for a user that match a device ID.
+func (m *Manager) DeleteByDeviceID(ctx context.Context, userID, deviceID string) error {
+	if err := m.store.DeleteByDeviceID(ctx, userID, deviceID); err != nil {
+		return fmt.Errorf("failed to delete device sessions: %w", err)
+	}
+
+	logger.Logger.Info("Device sessions deleted",
+		"user_id", userID,
+		"device_id", getSessionPreview(deviceID),
+	)
+
+	return nil
+}
+
+// ListActiveSessions returns all active sessions for a user.
+func (m *Manager) ListActiveSessions(ctx context.Context, userID string) ([]*Session, error) {
+	sessions, err := m.store.ListActiveSessions(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list user sessions: %w", err)
+	}
+	return sessions, nil
+}
+
 // Validate checks if a session is valid
 func (m *Manager) Validate(ctx context.Context, sessionID string) (*Session, error) {
 	session, err := m.Get(ctx, sessionID)

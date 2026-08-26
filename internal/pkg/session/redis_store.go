@@ -161,6 +161,45 @@ func (s *RedisStore) DeleteByUserID(ctx context.Context, userID string) error {
 	return nil
 }
 
+// DeleteByDeviceID deletes all sessions for a given user that share a device
+// fingerprint (used when revoking a single device across all its sessions).
+func (s *RedisStore) DeleteByDeviceID(ctx context.Context, userID, deviceID string) error {
+	pattern := s.prefix + "*"
+
+	iter := s.client.Scan(ctx, 0, pattern, 0).Iterator()
+	var keysToDelete []string
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+
+		data, err := s.client.Get(ctx, key).Result()
+		if err != nil {
+			continue
+		}
+
+		var session Session
+		if err := json.Unmarshal([]byte(data), &session); err != nil {
+			continue
+		}
+
+		if session.UserID == userID && session.DeviceID == deviceID {
+			keysToDelete = append(keysToDelete, key)
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return fmt.Errorf("failed to scan sessions by device: %w", err)
+	}
+
+	if len(keysToDelete) > 0 {
+		if err := s.client.Del(ctx, keysToDelete...).Err(); err != nil {
+			return fmt.Errorf("failed to delete device sessions: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // GetTTL returns the remaining TTL for a session
 func (s *RedisStore) GetTTL(ctx context.Context, sessionID string) (time.Duration, error) {
 	key := s.prefix + sessionID
@@ -210,4 +249,36 @@ func (s *RedisStore) GetActiveSessionCount(ctx context.Context, userID string) (
 	}
 
 	return count, nil
+}
+
+// ListActiveSessions returns active sessions for a given user.
+func (s *RedisStore) ListActiveSessions(ctx context.Context, userID string) ([]*Session, error) {
+	pattern := s.prefix + "*"
+
+	iter := s.client.Scan(ctx, 0, pattern, 0).Iterator()
+	var sessions []*Session
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+
+		data, err := s.client.Get(ctx, key).Result()
+		if err != nil {
+			continue
+		}
+
+		var session Session
+		if err := json.Unmarshal([]byte(data), &session); err != nil {
+			continue
+		}
+
+		if session.UserID == userID {
+			sessions = append(sessions, &session)
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return nil, fmt.Errorf("failed to list device sessions: %w", err)
+	}
+
+	return sessions, nil
 }

@@ -266,6 +266,25 @@ func (c *Controller) RefreshToken(ctx *gin.Context) {
 		return
 	}
 
+	// A refresh token must never resurrect a session that was revoked from
+	// another device. Redis session existence is the source of truth.
+	if _, err := sessionManager.Get(ctx.Request.Context(), tokenData.SessionID); err != nil {
+		logger.Logger.Warn("Refresh rejected for revoked session",
+			"user_id", tokenData.UserID,
+			"session_id", auth.GetKeyPreview(tokenData.SessionID),
+			"error", err.Error(),
+		)
+		_ = refreshTokenManager.DeleteRefreshToken(ctx.Request.Context(), refreshTokenCookie)
+		middleware.ClearAuthCookies(ctx)
+		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
+			Success: false,
+			Data:    nil,
+			Message: "Session has been revoked",
+			Error:   map[string]string{"session": "Please login again"},
+		})
+		return
+	}
+
 	// Get user details
 	user, err := c.repo.GetUserRepository().GetUserByID(tokenData.UserID)
 	if err != nil {

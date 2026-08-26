@@ -306,6 +306,29 @@ type CurrentSessionResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// ActiveSessionResponse is a single row in the "active devices / sessions" list.
+type ActiveSessionResponse struct {
+	SessionID string    `json:"session_id"`
+	IsCurrent bool      `json:"is_current"`
+	DeviceID  string    `json:"device_id,omitempty"`
+	IPAddress string    `json:"ip_address"`
+	UserAgent string    `json:"user_agent"`
+	CreatedAt time.Time `json:"created_at"`
+	LastSeen  time.Time `json:"last_seen"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// SessionsListResponse lists the signed-in user's active sessions.
+type SessionsListResponse struct {
+	Total    int                     `json:"total"`
+	Sessions []ActiveSessionResponse `json:"sessions"`
+}
+
+// SessionActionRequest specifies which session to act on.
+type SessionActionRequest struct {
+	SessionID string `json:"session_id" binding:"required"`
+}
+
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password" label:"Kata Sandi Saat Ini" binding:"required,min=8,max=50,pwdcomplex"`
 	NewPassword     string `json:"new_password" label:"Kata Sandi Baru" binding:"required,min=8,max=50,pwdcomplex,nefield=CurrentPassword"`
