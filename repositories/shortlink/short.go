@@ -14,10 +14,10 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/helpers"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	shortlink "github.com/adehusnim37/lihatin-go/models/shortlink"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -56,7 +56,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	}
 
 	shortLink := shortlink.ShortLink{
-		ID:          uuid.New().String(),
+		ID:          identifier.NewUUIDV7(),
 		UserID:      userIDPtr, // ✅ Use pointer for nullable field
 		ShortCode:   link.CustomCode,
 		OriginalURL: link.OriginalURL,
@@ -75,7 +75,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	}
 
 	shortLinkDetail := shortlink.ShortLinkDetail{
-		ID:          uuid.New().String(),
+		ID:          identifier.NewUUIDV7(),
 		ShortLinkID: shortLink.ID,
 		Passcode:    helpers.StringToInt(link.Passcode),
 		ClickLimit:  helpers.PtrToValue(link.Limit, 0),
@@ -160,7 +160,7 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 
 			// Create ShortLink
 			shortLink := shortlink.ShortLink{
-				ID:          uuid.New().String(),
+				ID:          identifier.NewUUIDV7(),
 				UserID:      userIDPtr,
 				ShortCode:   linkReq.CustomCode,
 				OriginalURL: linkReq.OriginalURL,
@@ -176,7 +176,7 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 
 			// Create ShortLinkDetail
 			shortLinkDetail := shortlink.ShortLinkDetail{
-				ID:          uuid.New().String(),
+				ID:          identifier.NewUUIDV7(),
 				ShortLinkID: shortLink.ID,
 				Passcode:    helpers.StringToInt(linkReq.Passcode),
 			}
@@ -431,7 +431,7 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		country, city := ip.GetLocation(ipAddress)
 
 		viewDetail := shortlink.ViewLinkDetail{
-			ID:          uuid.New().String(),
+			ID:          identifier.NewUUIDV7(),
 			ShortLinkID: link.ID,
 			IPAddress:   ipAddress,
 			UserAgent:   userAgent,

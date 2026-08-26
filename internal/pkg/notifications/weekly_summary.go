@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -104,7 +104,7 @@ func (s *WeeklySummaryService) sendRecipient(
 	}
 
 	delivery := user.WeeklySummaryDelivery{
-		ID:             uuid.NewString(),
+		ID:             identifier.NewUUIDV7(),
 		UserID:         recipient.UserID,
 		PeriodStart:    periodStart,
 		PeriodEnd:      periodEnd,

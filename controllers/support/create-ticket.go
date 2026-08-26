@@ -11,12 +11,12 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/disposable"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func (c *Controller) CreateTicket(ctx *gin.Context) {
@@ -78,7 +78,7 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 		return
 	}
 
-	ticketID := uuid.NewString()
+	ticketID := identifier.NewUUIDV7()
 	now := time.Now()
 	accessCode, err := auth.GenerateSecureToken(24)
 	if err != nil {
@@ -118,7 +118,7 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 	}
 
 	initialMessage := supportmodel.SupportMessage{
-		ID:          uuid.NewString(),
+		ID:          identifier.NewUUIDV7(),
 		TicketID:    ticket.ID,
 		SenderType:  string(supportmodel.SupportMessageSenderPublic),
 		SenderEmail: &senderEmail,

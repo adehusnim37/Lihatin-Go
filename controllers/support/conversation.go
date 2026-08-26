@@ -14,12 +14,12 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/repositories/supportrepo"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 const (
@@ -337,7 +337,7 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 		return
 	}
 
-	messageID := uuid.NewString()
+	messageID := identifier.NewUUIDV7()
 	attachments, err := c.collectSupportAttachments(ctx, ticket.ID, messageID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ATTACHMENT_INVALID", err.Error(), "attachments")
@@ -474,7 +474,7 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 		return
 	}
 
-	messageID := uuid.NewString()
+	messageID := identifier.NewUUIDV7()
 	attachments, err := c.collectSupportAttachments(ctx, ticket.ID, messageID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ATTACHMENT_INVALID", err.Error(), "attachments")
@@ -621,7 +621,7 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 		return
 	}
 
-	messageID := uuid.NewString()
+	messageID := identifier.NewUUIDV7()
 	attachments, err := c.collectSupportAttachments(ctx, ticket.ID, messageID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "SUPPORT_ATTACHMENT_INVALID", err.Error(), "attachments")
@@ -977,7 +977,7 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 		}
 
 		attachments = append(attachments, supportmodel.SupportAttachment{
-			ID:          uuid.NewString(),
+			ID:          identifier.NewUUIDV7(),
 			TicketID:    ticketID,
 			MessageID:   messageID,
 			FileName:    fileName,

@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/mail"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -150,7 +150,7 @@ func (s *CampaignService) deliverRecipient(
 	recipient campaignRecipient,
 ) error {
 	delivery := user.PromotionalEmailDelivery{
-		ID:         uuid.NewString(),
+		ID:         identifier.NewUUIDV7(),
 		CampaignID: campaign.ID,
 		UserID:     recipient.UserID,
 		Email:      recipient.Email,

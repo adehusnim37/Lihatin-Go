@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ func NewLoginAttemptRepository(db *gorm.DB) *LoginAttemptRepository {
 // RecordLoginAttempt records a login attempt
 func (r *LoginAttemptRepository) RecordLoginAttempt(ipAddress, userAgent string, success bool, failReason string, emailOrUsername string) error {
 	attempt := &user.LoginAttempt{
-		ID:              uuid.New().String(),
+		ID:              identifier.NewUUIDV7(),
 		EmailOrUsername: emailOrUsername,
 		IPAddress:       ipAddress,
 		UserAgent:       userAgent,

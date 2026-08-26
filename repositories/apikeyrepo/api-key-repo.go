@@ -10,10 +10,10 @@ import (
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -124,7 +124,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 		// 3. Create the new API key with explicit timestamp handling
 		now := time.Now()
 		apiKey = user.APIKey{
-			ID:          uuid.New().String(),
+			ID:          identifier.NewUUIDV7(),
 			UserID:      userID,
 			Name:        req.Name,
 			Key:         keyID,
@@ -736,7 +736,7 @@ func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix str
 	)
 
 	apiKey := &user.APIKey{
-		ID:          uuid.New().String(),
+		ID:          identifier.NewUUIDV7(),
 		UserID:      userID,
 		Name:        name,
 		Key:         keyID,

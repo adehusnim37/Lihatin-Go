@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -41,7 +41,7 @@ func (r *LoginEventRepository) RecordSuccessfulLogin(input SuccessfulLogin) (*us
 
 	now := time.Now()
 	event := &user.LoginEvent{
-		ID:              uuid.New().String(),
+		ID:              identifier.NewUUIDV7(),
 		UserID:          input.UserID,
 		SessionIDHash:   hashSessionID(input.SessionID),
 		Method:          input.Method,

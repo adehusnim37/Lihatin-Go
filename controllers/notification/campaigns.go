@@ -10,9 +10,9 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -43,7 +43,7 @@ func (c *Controller) CreateCampaign(ctx *gin.Context) {
 	}
 
 	campaign := user.PromotionalCampaign{
-		ID:        uuid.NewString(),
+		ID:        identifier.NewUUIDV7(),
 		Name:      request.Name,
 		Subject:   request.Subject,
 		Preheader: request.Preheader,
