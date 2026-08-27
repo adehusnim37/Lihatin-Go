@@ -12,6 +12,7 @@ type PremiumKey struct {
 	ValidUntil *time.Time        `json:"valid_until,omitempty" gorm:"index"`
 	LimitUsage *int64            `json:"limit_usage,omitempty" gorm:"default:null"`
 	UsageCount int64             `json:"usage_count" gorm:"default:0"`
+	IsLifetime bool              `json:"is_lifetime" gorm:"default:false;index"`
 	CreatedAt  time.Time         `json:"created_at" gorm:"autoCreateTime;index"`
 	UpdatedAt  time.Time         `json:"updated_at" gorm:"autoUpdateTime;index"`
 	DeletedAt  gorm.DeletedAt    `json:"deleted_at,omitempty" gorm:"index"`

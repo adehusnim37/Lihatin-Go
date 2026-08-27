@@ -3,10 +3,11 @@ package dto
 import "time"
 
 type GeneratePremiumCodeRequest struct {
-	ValidUntil time.Time `json:"valid_until" binding:"required" label:"Valid Until"`
+	ValidUntil time.Time `json:"valid_until" label:"Valid Until"`
 	LimitUsage int       `json:"limit_usage" binding:"required,gte=1" label:"Limit Usage"`
 	IsBulk     bool      `json:"is_bulk" label:"Is Bulk"`
 	Amount     int       `json:"amount,omitempty" binding:"omitempty,min=1,max=100" label:"Amount"`
+	IsLifetime bool      `json:"is_lifetime" label:"Is Lifetime"`
 }
 
 type RedeemPremiumCodeRequest struct {
@@ -19,6 +20,7 @@ type GeneratePremiumCodeResponse struct {
 	ValidUntil *time.Time                `json:"valid_until,omitempty"`
 	LimitUsage *int64                    `json:"limit_usage,omitempty"`
 	UsageCount int64                     `json:"usage_count"`
+	IsLifetime bool                      `json:"is_lifetime"`
 	CreatedAt  time.Time                 `json:"created_at"`
 	UpdatedAt  time.Time                 `json:"updated_at"`
 	KeyUsage   []PremiumKeyUsageResponse `json:"key_usage,omitempty"`

@@ -25,8 +25,24 @@ const (
 	tagSize           = 10 // 80-bit tag
 	totalRawSize      = payloadSize + tagSize
 
+	// lifetimeUnix is stored as the expiry field to mark a code that never
+	// expires. The value 0xFFFFFFFF far exceeds any realistic timestamp and
+	// can never be produced by a legit validUntil, so it is a safe sentinel.
+	lifetimeUnix uint32 = 0xFFFFFFFF
+
+	// lifetimeRedeemTTL keeps the one-time Redis reservation alive for lifetime
+	// codes. Chosen far beyond any product lifetime to preserve one-time
+	// semantics without relying on expiry.
+	lifetimeRedeemTTL = 100 * 365 * 24 * time.Hour
+
 	redeemedPrefix = "premium:redeemed:"
 )
+
+// IsLifetimeUnix reports whether the raw stored expiry field denotes a
+// lifetime (never-expiring) code.
+func IsLifetimeUnix(unix uint32) bool {
+	return unix == lifetimeUnix
+}
 
 var (
 	ErrSecretKeyMissing = errors.New("premium code secret key is missing")
@@ -77,6 +93,9 @@ func computeTag(secret, payload []byte) ([]byte, error) {
 	return sum[:tagSize], nil
 }
 
+// BuildSecretCode builds a secret code. If validUntil is the zero time, the
+// code is created as a lifetime code (never expires) by embedding the lifetime
+// sentinel into its payload.
 func BuildSecretCode(validUntil time.Time) (string, error) {
 	secret, err := loadSecretKey()
 	if err != nil {
@@ -85,11 +104,16 @@ func BuildSecretCode(validUntil time.Time) (string, error) {
 
 	payload := make([]byte, payloadSize)
 	payload[0] = codeVersion
-	unix := validUntil.Unix()
-	if unix < 0 || unix > 0xFFFFFFFF {
-		return "", fmt.Errorf("validUntil is out of range for 32-bit unsigned integer")
+	if validUntil.IsZero() {
+		// Lifetime code: mark with the sentinel expiry.
+		binary.BigEndian.PutUint32(payload[1:5], lifetimeUnix)
+	} else {
+		unix := validUntil.Unix()
+		if unix < 0 || unix > 0xFFFFFFFF {
+			return "", fmt.Errorf("validUntil is out of range for 32-bit unsigned integer")
+		}
+		binary.BigEndian.PutUint32(payload[1:5], uint32(unix))
 	}
-	binary.BigEndian.PutUint32(payload[1:5], uint32(unix))
 	if _, err := rand.Read(payload[5:]); err != nil {
 		return "", err
 	}
@@ -132,8 +156,15 @@ func VerifyCode(code string, now time.Time) (time.Time, string, error) {
 		return time.Time{}, "", ErrCodeSignature
 	}
 
-	unix := int64(binary.BigEndian.Uint32(payload[1:5]))
-	expiry := time.Unix(unix, 0).UTC()
+	rawUnix := binary.BigEndian.Uint32(payload[1:5])
+	if IsLifetimeUnix(rawUnix) {
+		// Lifetime code: never expires. Return zero expiry so callers know to
+		// treat the entitlement as permanent.
+		digest := sha256.Sum256([]byte(normalized))
+		return time.Time{}, hex.EncodeToString(digest[:]), nil
+	}
+
+	expiry := time.Unix(int64(rawUnix), 0).UTC()
 	if now.UTC().After(expiry) {
 		return time.Time{}, "", ErrCodeExpired
 	}
@@ -152,7 +183,15 @@ func RedeemOneTimeCode(ctx context.Context, redisClient *redis.Client, code, own
 		return "", time.Time{}, err
 	}
 
-	ttl := time.Until(expiry) + (30 * 24 * time.Hour)
+	// Lifetime codes carry a zero expiry. Keep the one-time Redis reservation
+	// alive effectively forever (a long fixed TTL) instead of collapsing to the
+	// minimum, so a lifetime code cannot be re-used after a short window.
+	var ttl time.Duration
+	if expiry.IsZero() {
+		ttl = lifetimeRedeemTTL
+	} else {
+		ttl = time.Until(expiry) + (30 * 24 * time.Hour)
+	}
 	if ttl < time.Hour {
 		ttl = time.Hour
 	}

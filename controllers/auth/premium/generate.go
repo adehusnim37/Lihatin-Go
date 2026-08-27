@@ -20,7 +20,7 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 		return
 	}
 
-	if req.ValidUntil.IsZero() || !req.ValidUntil.After(time.Now()) {
+	if !req.IsLifetime && (req.ValidUntil.IsZero() || !req.ValidUntil.After(time.Now())) {
 		httputil.SendErrorResponse(
 			ctx,
 			http.StatusBadRequest,
@@ -46,13 +46,18 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 		total = req.Amount
 	}
 
-	validUntil := req.ValidUntil.UTC()
+	// A zero time passed to BuildSecretCode produces a lifetime (never-expiring)
+	// code. For time-based codes we normalise to UTC.
+	codeValidUntil := time.Time{}
+	if !req.IsLifetime {
+		codeValidUntil = req.ValidUntil.UTC()
+	}
 	limitUsage := int64(req.LimitUsage)
 
 	// Pre-generate secret codes to avoid code duplication
 	secretCodes := make([]string, total)
 	for i := 0; i < total; i++ {
-		code, err := premiumpkg.BuildSecretCode(validUntil)
+		code, err := premiumpkg.BuildSecretCode(codeValidUntil)
 		if err != nil {
 			switch {
 			case errors.Is(err, premiumpkg.ErrSecretKeyMissing):
@@ -80,8 +85,12 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 	if !req.IsBulk {
 		premiumKey := user.PremiumKey{
 			Code:       secretCodes[0],
-			ValidUntil: &validUntil,
+			ValidUntil: nil,
 			LimitUsage: &limitUsage,
+			IsLifetime: req.IsLifetime,
+		}
+		if !req.IsLifetime {
+			premiumKey.ValidUntil = &codeValidUntil
 		}
 
 		if err := c.premiumRepo.CreateUserPremiumKey(&premiumKey); err != nil {
@@ -95,6 +104,7 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 			ValidUntil: premiumKey.ValidUntil,
 			LimitUsage: premiumKey.LimitUsage,
 			UsageCount: premiumKey.UsageCount,
+			IsLifetime: premiumKey.IsLifetime,
 			CreatedAt:  premiumKey.CreatedAt,
 			UpdatedAt:  premiumKey.UpdatedAt,
 		}, "Premium code generated successfully")
@@ -105,8 +115,12 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 	for i, code := range secretCodes {
 		premiumKeys[i] = user.PremiumKey{
 			Code:       code,
-			ValidUntil: &validUntil,
+			ValidUntil: nil,
 			LimitUsage: &limitUsage,
+			IsLifetime: req.IsLifetime,
+		}
+		if !req.IsLifetime {
+			premiumKeys[i].ValidUntil = &codeValidUntil
 		}
 	}
 
@@ -124,6 +138,7 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 			ValidUntil: createdKeys[i].ValidUntil,
 			LimitUsage: createdKeys[i].LimitUsage,
 			UsageCount: createdKeys[i].UsageCount,
+			IsLifetime: createdKeys[i].IsLifetime,
 			CreatedAt:  createdKeys[i].CreatedAt,
 			UpdatedAt:  createdKeys[i].UpdatedAt,
 		}
