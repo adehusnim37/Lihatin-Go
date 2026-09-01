@@ -6,9 +6,11 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/pemistahl/lingua-go"
 )
 
 // ValidationResponse contains the parsed validation error
@@ -29,45 +31,46 @@ type DetailError struct {
 // Indonesian error messages mapping.
 // #nosec G101 -- These are validation messages, not credentials.
 var indonesianMessages = map[string]string{
-	"required":       "%s wajib diisi",
-	"min":            "%s minimal %s",
-	"max":            "%s maksimal %s",
-	"len":            "%s harus %s",
-	"email":          "%s harus berupa email yang valid",
-	"url":            "%s harus berupa URL yang valid",
-	"alphanum":       "%s hanya boleh berisi huruf dan angka",
-	"alpha":          "%s hanya boleh berisi huruf",
-	"lowercase":      "%s harus berupa huruf kecil",
-	"uppercase":      "%s harus berupa huruf besar",
-	"numeric":        "%s harus berupa angka",
-	"oneof":          "%s harus salah satu dari: %s",
-	"matches":        "%s format tidak valid",
-	"unique":         "%s tidak boleh ada yang duplikat",
-	"no_space":       "%s tidak boleh mengandung spasi",
-	"no_special":     "%s tidak boleh mengandung karakter khusus",
-	"saveurlshort":   "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
-	"eqfield":        "%s harus sama dengan %s",
-	"nefield":        "%s tidak boleh sama dengan %s",
-	"pwdcomplex":     "%s harus mengandung minimal 8 karakter, huruf besar, huruf kecil, angka, dan simbol",
-	"username":       "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
-	"gte":            "%s minimal %s",
-	"lte":            "%s maksimal %s",
-	"gt":             "%s harus lebih dari %s",
-	"lt":             "%s harus kurang dari %s",
-	"dive":           "item dalam %s",
-	"six_digit":      "%s harus tepat 6 digit angka",
-	"datetime":       "%s harus berupa tanggal dan waktu yang valid dengan format %s",
-	"required_if":    "%s wajib diisi ketika %s adalah %s",
-	"excluded_if":    "%s tidak boleh diisi ketika %s adalah %s",
-	"excluded":       "%s tidak boleh diisi",
-	"omitempty":      "%s tidak valid",
-	"bool":           "%s harus berupa boolean",
-	"array":          "%s harus berupa array",
-	"slice":          "%s harus berupa array",
-	"map":            "%s harus berupa peta",
-	"set":            "%s harus berupa set",
-	"secret_code":    "%s harus berupa secret code yang valid",
-	"not_same_digit": "%s tidak boleh terdiri dari angka yang sama semua",
+	"required":        "%s wajib diisi",
+	"min":             "%s minimal %s",
+	"max":             "%s maksimal %s",
+	"len":             "%s harus %s",
+	"email":           "%s harus berupa email yang valid",
+	"url":             "%s harus berupa URL yang valid",
+	"alphanum":        "%s hanya boleh berisi huruf dan angka",
+	"alpha":           "%s hanya boleh berisi huruf",
+	"lowercase":       "%s harus berupa huruf kecil",
+	"uppercase":       "%s harus berupa huruf besar",
+	"numeric":         "%s harus berupa angka",
+	"oneof":           "%s harus salah satu dari: %s",
+	"matches":         "%s format tidak valid",
+	"unique":          "%s tidak boleh ada yang duplikat",
+	"no_space":        "%s tidak boleh mengandung spasi",
+	"no_special":      "%s tidak boleh mengandung karakter khusus",
+	"saveurlshort":    "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
+	"eqfield":         "%s harus sama dengan %s",
+	"nefield":         "%s tidak boleh sama dengan %s",
+	"pwdcomplex":      "%s harus mengandung minimal 8 karakter, huruf besar, huruf kecil, angka, dan simbol",
+	"username":        "%s hanya boleh berisi huruf, angka, underscore, dan hyphen",
+	"gte":             "%s minimal %s",
+	"lte":             "%s maksimal %s",
+	"gt":              "%s harus lebih dari %s",
+	"lt":              "%s harus kurang dari %s",
+	"dive":            "item dalam %s",
+	"six_digit":       "%s harus tepat 6 digit angka",
+	"datetime":        "%s harus berupa tanggal dan waktu yang valid dengan format %s",
+	"required_if":     "%s wajib diisi ketika %s adalah %s",
+	"excluded_if":     "%s tidak boleh diisi ketika %s adalah %s",
+	"excluded":        "%s tidak boleh diisi",
+	"omitempty":       "%s tidak valid",
+	"bool":            "%s harus berupa boolean",
+	"array":           "%s harus berupa array",
+	"slice":           "%s harus berupa array",
+	"map":             "%s harus berupa peta",
+	"set":             "%s harus berupa set",
+	"secret_code":     "%s harus berupa secret code yang valid",
+	"not_same_digit":  "%s tidak boleh terdiri dari angka yang sama semua",
+	"meaningful_text": "%s tidak boleh berupa teks acak/tidak bermakna",
 }
 
 // Type mapping for Indonesian error messages
@@ -360,6 +363,110 @@ func validateSecretCode(fl validator.FieldLevel) bool {
 	return regexp.MustCompile(`^[A-Za-z0-9\-\s]{20,80}$`).MatchString(secretCode)
 }
 
+var (
+	consonantRunRegex        = regexp.MustCompile(`(?i)[bcdfghjklmnpqrstvwxyz]{6,}`)
+	meaningfulTextTokenRegex = regexp.MustCompile(`[^\p{L}]+`)
+	keyboardMashTokenRegex   = regexp.MustCompile(`(?i)^(?:qwer|asdf|zxcv|qwe|rty|asd|sdf|dfg|fgh|ghj|hjk|jkl|zxc|xcv|cvb|vbn|bnm|qaz|wsx|edc|rfv|tgb|yhn|ujm)+$`)
+	technicalTokenRegex      = regexp.MustCompile(`(?i)(https?://|www\.|[/\\]|(?:err|error|exception|status|code|api|http|sql|json|jwt|uuid|otp|timeout|refused|failed)\b)`)
+
+	// Lingua is used as a language signal, not as the sole accept/reject rule.
+	// Support tickets commonly mix Indonesian and English, so the detector is
+	// intentionally restricted to those two languages.
+	meaningfulTextDetector = lingua.NewLanguageDetectorBuilder().
+				FromLanguages(lingua.Indonesian, lingua.English).
+				Build()
+)
+
+// validateMeaningfulText rejects obvious gibberish/random keyboard-mashing
+// while allowing normal Indonesian/English support text and technical terms.
+func validateMeaningfulText(fl validator.FieldLevel) bool {
+	return IsMeaningfulText(fl.Field().String())
+}
+
+// IsMeaningfulText exposes the same gibberish/keyboard-mashing detection used
+// by the "meaningful_text" struct tag so it can be reused outside of
+// struct-tag validation (e.g. multipart form fields like support message
+// bodies).
+func IsMeaningfulText(raw string) bool {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return true
+	}
+
+	words := meaningfulTextTokenRegex.Split(strings.ToLower(value), -1)
+	wordCount := 0
+	letterCount := 0
+	vowelCount := 0
+	for _, word := range words {
+		if word == "" {
+			continue
+		}
+		wordCount++
+		for _, r := range word {
+			if !unicode.In(r, unicode.Latin) {
+				continue
+			}
+			letterCount++
+			if strings.ContainsRune("aeiou", r) {
+				vowelCount++
+			}
+		}
+	}
+
+	if letterCount == 0 {
+		return true
+	}
+
+	// A long single token is usually random input, except for technical values
+	// such as ERR_CONNECTION_REFUSED, UUIDs, URLs, or file paths.
+	if letterCount >= 15 && wordCount == 1 && !technicalTokenRegex.MatchString(value) {
+		return false
+	}
+
+	// Long runs of consonants are a strong gibberish signal, e.g.
+	// "asfkajnfkashfjkaskhsafkjbjkdsf".
+	if consonantRunRegex.MatchString(value) {
+		return false
+	}
+
+	if wordCount >= 3 && looksLikeKeyboardMash(words) {
+		return false
+	}
+
+	// Overall vowel ratio is only a supporting signal. Lingua prevents valid
+	// short English/Indonesian phrases with abbreviations from being rejected.
+	if letterCount >= 12 && float64(vowelCount)/float64(letterCount) < 0.15 {
+		if !isConfidentEnglishOrIndonesian(value) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func looksLikeKeyboardMash(words []string) bool {
+	matched := 0
+	for _, word := range words {
+		if word == "" {
+			continue
+		}
+		if !keyboardMashTokenRegex.MatchString(word) {
+			return false
+		}
+		matched++
+	}
+	return matched >= 3
+}
+
+func isConfidentEnglishOrIndonesian(value string) bool {
+	language, detected := meaningfulTextDetector.DetectLanguageOf(value)
+	if !detected || (language != lingua.English && language != lingua.Indonesian) {
+		return false
+	}
+
+	return meaningfulTextDetector.ComputeLanguageConfidence(value, language) >= 0.65
+}
+
 // SetupCustomValidators registers custom validation rules
 func SetupCustomValidators(v *validator.Validate) error {
 	registrations := []struct {
@@ -375,6 +482,7 @@ func SetupCustomValidators(v *validator.Validate) error {
 		{tag: "six_digit", fn: validateSixDigit},
 		{tag: "secret_code", fn: validateSecretCode},
 		{tag: "not_same_digit", fn: validateNotSameDigit},
+		{tag: "meaningful_text", fn: validateMeaningfulText},
 	}
 
 	for _, registration := range registrations {

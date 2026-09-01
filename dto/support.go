@@ -5,8 +5,8 @@ import "time"
 type CreateSupportTicketRequest struct {
 	Email        string `json:"email" binding:"required,email,max=255"`
 	Category     string `json:"category" binding:"required,oneof=account_locked account_deactivated email_verification lost_2fa billing bug_report feature_request other"`
-	Subject      string `json:"subject" binding:"required,min=5,max=255"`
-	Description  string `json:"description" binding:"required,min=10,max=5000"`
+	Subject      string `json:"subject" binding:"required,min=5,max=255,meaningful_text"`
+	Description  string `json:"description" binding:"required,min=10,max=5000,meaningful_text"`
 	CaptchaToken string `json:"captcha_token" binding:"required,min=10,max=4096"`
 }
 

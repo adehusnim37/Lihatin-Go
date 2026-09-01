@@ -337,6 +337,16 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 		return
 	}
 
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+ticket.Status+", cant send message", http.StatusBadRequest, "ticket"), nil)
+		return
+	}
+
+	if body != "" && !validator.IsMeaningfulText(body) {
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_INVALID", "Message must not be random/meaningless text", http.StatusBadRequest, "body"), nil)
+		return
+	}
+
 	messageID := identifier.NewUUIDV7()
 	attachments, err := c.collectSupportAttachments(ctx, ticket.ID, messageID)
 	if err != nil {
@@ -474,6 +484,16 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 		return
 	}
 
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+ticket.Status+", cant send message", http.StatusBadRequest, "ticket"), nil)
+		return
+	}
+
+	if body != "" && !validator.IsMeaningfulText(body) {
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_INVALID", "Message must not be random/meaningless text", http.StatusBadRequest, "body"), nil)
+		return
+	}
+
 	messageID := identifier.NewUUIDV7()
 	attachments, err := c.collectSupportAttachments(ctx, ticket.ID, messageID)
 	if err != nil {
@@ -608,6 +628,10 @@ func (c *Controller) SendAdminMessage(ctx *gin.Context) {
 	body := strings.TrimSpace(ctx.PostForm("body"))
 	if len(body) > maxSupportMessageBodyLength {
 		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
+		return
+	}
+	if body != "" && !validator.IsMeaningfulText(body) {
+		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_INVALID", "Message must not be random/meaningless text", http.StatusBadRequest, "body"), nil)
 		return
 	}
 
