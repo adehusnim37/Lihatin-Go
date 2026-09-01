@@ -2,10 +2,12 @@ package auth
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // GenerateSecureToken generates a secure random token of specified byte length
@@ -121,9 +123,13 @@ func GenerateAPIKeyPair(prefix string) (keyID, secretKey, secretKeyHash, keyPrev
 	}
 	secretKey = base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(secretBytes)
 
-	// Hash the Secret Key for secure storage
-	hash := sha256.Sum256([]byte(secretKey))
-	secretKeyHash = fmt.Sprintf("%x", hash[:]) // Hex encode the hash
+	// Hash the Secret Key for secure storage using a computationally expensive KDF
+	salt := make([]byte, 16)
+	if _, err = rand.Read(salt); err != nil {
+		return "", "", "", "", fmt.Errorf("failed to generate secret key salt: %w", err)
+	}
+	derivedKey := pbkdf2.Key([]byte(secretKey), salt, 100000, 32, sha512.New)
+	secretKeyHash = hex.EncodeToString(salt) + ":" + hex.EncodeToString(derivedKey)
 
 	// Create user-friendly preview (first 8 + "..." + last 4)
 	if len(keyID) > 12 {
