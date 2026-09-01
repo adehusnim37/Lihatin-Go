@@ -31,6 +31,7 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 		return
 	}
 
+	const maxBulkAmount = 1000
 	total := 1
 	if req.IsBulk {
 		if req.Amount < 1 {
@@ -39,6 +40,16 @@ func (c *Controller) GeneratePremiumCode(ctx *gin.Context) {
 				http.StatusBadRequest,
 				"INVALID_BULK_AMOUNT",
 				"Amount must be at least 1 for bulk generation",
+				"amount",
+			)
+			return
+		}
+		if req.Amount > maxBulkAmount {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusBadRequest,
+				"INVALID_BULK_AMOUNT",
+				"Amount exceeds maximum allowed for bulk generation",
 				"amount",
 			)
 			return
