@@ -364,9 +364,7 @@ func validateSecretCode(fl validator.FieldLevel) bool {
 }
 
 var (
-	consonantRunRegex        = regexp.MustCompile(`(?i)[bcdfghjklmnpqrstvwxyz]{6,}`)
 	meaningfulTextTokenRegex = regexp.MustCompile(`[^\p{L}]+`)
-	keyboardMashTokenRegex   = regexp.MustCompile(`(?i)^(?:qwer|asdf|zxcv|qwe|rty|asd|sdf|dfg|fgh|ghj|hjk|jkl|zxc|xcv|cvb|vbn|bnm|qaz|wsx|edc|rfv|tgb|yhn|ujm)+$`)
 	technicalTokenRegex      = regexp.MustCompile(`(?i)(https?://|www\.|[/\\]|(?:err|error|exception|status|code|api|http|sql|json|jwt|uuid|otp|timeout|refused|failed)\b)`)
 
 	// Lingua is used as a language signal, not as the sole accept/reject rule.
@@ -393,69 +391,118 @@ func IsMeaningfulText(raw string) bool {
 		return true
 	}
 
-	words := meaningfulTextTokenRegex.Split(strings.ToLower(value), -1)
-	wordCount := 0
-	letterCount := 0
-	vowelCount := 0
-	for _, word := range words {
+	metrics := analyzeMeaningfulText(value)
+	if metrics.letterCount == 0 {
+		return true
+	}
+
+	score := meaningfulTextGibberishScore(metrics, value)
+	if score < 2 {
+		return true
+	}
+
+	// A low-vowel score can happen with valid abbreviation-heavy support text.
+	// Keep that one signal permissive when Lingua confidently recognizes the
+	// text as English or Indonesian; multiple independent signals still reject.
+	return score == 2 && metrics.lowVowelRatio && metrics.wordCount <= 3 && isConfidentEnglishOrIndonesian(value)
+}
+
+type meaningfulTextMetrics struct {
+	words          []string
+	wordCount      int
+	shortWordCount int
+	letterCount    int
+	vowelCount     int
+	uniqueLetters  int
+	maxConsonants  int
+	lowVowelRatio  bool
+	repeatedChunks bool
+}
+
+func analyzeMeaningfulText(value string) meaningfulTextMetrics {
+	metrics := meaningfulTextMetrics{
+		words: meaningfulTextTokenRegex.Split(strings.ToLower(value), -1),
+	}
+	uniqueLetters := make(map[rune]struct{})
+	for _, word := range metrics.words {
 		if word == "" {
 			continue
 		}
-		wordCount++
+		metrics.wordCount++
+		if len([]rune(word)) <= 3 {
+			metrics.shortWordCount++
+		}
+		metrics.repeatedChunks = metrics.repeatedChunks || hasRepeatedChunk(word)
+
+		consonants := 0
 		for _, r := range word {
 			if !unicode.In(r, unicode.Latin) {
 				continue
 			}
-			letterCount++
+			metrics.letterCount++
+			uniqueLetters[r] = struct{}{}
 			if strings.ContainsRune("aeiou", r) {
-				vowelCount++
+				metrics.vowelCount++
+				consonants = 0
+				continue
+			}
+			consonants++
+			if consonants > metrics.maxConsonants {
+				metrics.maxConsonants = consonants
 			}
 		}
 	}
-
-	if letterCount == 0 {
-		return true
-	}
-
-	// A long single token is usually random input, except for technical values
-	// such as ERR_CONNECTION_REFUSED, UUIDs, URLs, or file paths.
-	if letterCount >= 15 && wordCount == 1 && !technicalTokenRegex.MatchString(value) {
-		return false
-	}
-
-	// Long runs of consonants are a strong gibberish signal, e.g.
-	// "asfkajnfkashfjkaskhsafkjbjkdsf".
-	if consonantRunRegex.MatchString(value) {
-		return false
-	}
-
-	if wordCount >= 3 && looksLikeKeyboardMash(words) {
-		return false
-	}
-
-	// Overall vowel ratio is only a supporting signal. Lingua prevents valid
-	// short English/Indonesian phrases with abbreviations from being rejected.
-	if letterCount >= 12 && float64(vowelCount)/float64(letterCount) < 0.15 {
-		if !isConfidentEnglishOrIndonesian(value) {
-			return false
-		}
-	}
-
-	return true
+	metrics.uniqueLetters = len(uniqueLetters)
+	metrics.lowVowelRatio = metrics.letterCount >= 12 &&
+		float64(metrics.vowelCount)/float64(metrics.letterCount) < 0.20
+	return metrics
 }
 
-func looksLikeKeyboardMash(words []string) bool {
-	matched := 0
-	for _, word := range words {
-		if word == "" {
-			continue
-		}
-		if !keyboardMashTokenRegex.MatchString(word) {
-			return false
-		}
-		matched++
+func meaningfulTextGibberishScore(metrics meaningfulTextMetrics, value string) int {
+	score := 0
+	if metrics.letterCount >= 15 && metrics.wordCount == 1 && !technicalTokenRegex.MatchString(value) {
+		score += 2
 	}
-	return matched >= 3
+	if metrics.maxConsonants >= 6 {
+		score += 2
+	}
+	if metrics.lowVowelRatio && metrics.wordCount >= 3 {
+		score += 2
+	}
+	if metrics.lowVowelRatio && metrics.wordCount >= 4 && metrics.shortWordCount >= metrics.wordCount-1 {
+		score++
+	}
+	if metrics.repeatedChunks {
+		score += 2
+	}
+	if metrics.letterCount >= 16 && float64(metrics.uniqueLetters)/float64(metrics.letterCount) < 0.25 {
+		score++
+	}
+	return score
+}
+
+func hasRepeatedChunk(word string) bool {
+	runes := []rune(word)
+	if len(runes) < 8 {
+		return false
+	}
+
+	for chunkLength := 1; chunkLength <= 4; chunkLength++ {
+		for start := 0; start+chunkLength*3 <= len(runes); start++ {
+			chunk := string(runes[start : start+chunkLength])
+			repeats := 1
+			for next := start + chunkLength; next+chunkLength <= len(runes); next += chunkLength {
+				if string(runes[next:next+chunkLength]) != chunk {
+					break
+				}
+				repeats++
+			}
+			if repeats >= 3 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isConfidentEnglishOrIndonesian(value string) bool {

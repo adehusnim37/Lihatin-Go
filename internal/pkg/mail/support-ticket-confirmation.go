@@ -39,6 +39,7 @@ func (es *EmailService) SendSupportTicketConfirmationEmail(
 		Details: []emailDetail{
 			{Label: "Ticket Code", Value: ticketCode},
 			{Label: "Category", Value: categoryLabel},
+			{Label: "Access Code", Value: accessCode},
 			{Label: "Submitted At", Value: createdAt.Local().Format("2006-01-02 15:04:05")},
 			{Label: "Estimated Response", Value: "Within 24 hours (business day)"},
 		},
@@ -68,6 +69,7 @@ We received your support request.
 
 Ticket Code: %s
 Category: %s
+Access Code: %s
 Submitted At: %s
 Estimated Response: Within 24 hours (business day)
 

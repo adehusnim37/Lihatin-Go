@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adehusnim37/lihatin-go/internal/pkg/disposable"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 
 	"github.com/adehusnim37/lihatin-go/dto"
@@ -282,6 +283,27 @@ func (c *Controller) VerifyAccessCode(ctx *gin.Context) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	req.Code = strings.TrimSpace(req.Code)
 
+	if policy := disposable.Global(); policy != nil {
+		blocked, err := policy.ShouldBlockEmail(ctx.Request.Context(), req.Email)
+		if err != nil {
+			logger.Logger.Warn("Disposable email policy check failed for change email",
+				"ticket", req.Ticket,
+				"email", req.Email,
+				"error", err.Error(),
+			)
+		}
+		if blocked {
+			httputil.SendErrorResponse(
+				ctx,
+				http.StatusBadRequest,
+				"DISPOSABLE_EMAIL_BLOCKED",
+				"Disposable email addresses are not allowed. Please use a permanent email address.",
+				"new_email",
+			)
+			return
+		}
+	}
+
 	ticket, err := c.repo.GetTicketByCodeAndEmail(req.Ticket, req.Email)
 	if err != nil {
 		c.handleAppError(ctx, err)
@@ -289,6 +311,11 @@ func (c *Controller) VerifyAccessCode(ctx *gin.Context) {
 	}
 	if ticket == nil {
 		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_NOT_FOUND", "Ticket not found for provided email", http.StatusNotFound, "ticket"), nil)
+		return
+	}
+
+	if ticket.Status == "resolved" || ticket.Status == "closed" {
+		httputil.HandleError(ctx, apperrors.NewAppError("TICKET_CLOSED", "Ticket is already "+ticket.Status, http.StatusForbidden, "ticket"), nil)
 		return
 	}
 

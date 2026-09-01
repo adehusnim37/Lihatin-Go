@@ -47,6 +47,11 @@ func TestValidateMeaningfulText(t *testing.T) {
 			valid: false,
 		},
 		{
+			name:  "Repeated syllable spam",
+			value: "papapapaparaaam papapapa paparraarm",
+			valid: false,
+		},
+		{
 			name:  "Consonant spam",
 			value: "zzzzzzzzzzzzzzzz",
 			valid: false,
