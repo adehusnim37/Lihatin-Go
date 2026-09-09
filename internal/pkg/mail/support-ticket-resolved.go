@@ -8,14 +8,20 @@ import (
 )
 
 func (es *EmailService) SendSupportTicketResolvedEmail(toEmail, ticketCode, resolutionMessage string) error {
-	baseURL := strings.TrimRight(config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), "/")
+	baseURL, err := normalizeSupportFrontendURL(config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
+	if err != nil {
+		return err
+	}
 	message := strings.TrimSpace(resolutionMessage)
 	if message == "" {
 		message = "Your support request has been resolved. Please login again."
 	}
 
 	loginURL := fmt.Sprintf("%s/auth/login", baseURL)
-	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s", baseURL, ticketCode, toEmail)
+	trackURL, err := buildPublicSupportAccessURL(baseURL, ticketCode)
+	if err != nil {
+		return err
+	}
 
 	htmlBody := renderEmailTemplate(emailTemplate{
 		Badge:    "Support",

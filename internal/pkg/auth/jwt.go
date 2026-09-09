@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 )
@@ -89,7 +88,6 @@ func GenerateRefreshToken(ctx context.Context, redisClient *redis.Client, userID
 
 // ValidateJWT validates and parses a JWT token
 func ValidateJWT(tokenString string) (*JWTClaims, error) {
-	logger.Logger.Info("Validating JWT token", "token", tokenString)
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("invalid signing method")

@@ -28,6 +28,7 @@ const (
 	signupCompletionTokenPrefix = "signup_completion_token:"
 	signupCompletionEmailPrefix = "signup_completion_email:"
 	supportAccessTokenPrefix    = "support_access_token:"
+	supportAccessTicketPrefix   = "support_access_ticket:"
 )
 
 type EmailOTPPurpose string
@@ -69,6 +70,7 @@ type EmailOTPChallenge struct {
 	Purpose     EmailOTPPurpose `json:"purpose"`
 	Email       string          `json:"email"`
 	UserID      string          `json:"user_id,omitempty"`
+	IsDecoy     bool            `json:"is_decoy,omitempty"`
 	CodeHash    string          `json:"code_hash"`
 	ExpiresAt   int64           `json:"expires_at"`
 	LastSentAt  int64           `json:"last_sent_at"`
@@ -77,10 +79,11 @@ type EmailOTPChallenge struct {
 }
 
 type SupportAccessTokenPayload struct {
-	TicketID   string `json:"ticket_id"`
-	TicketCode string `json:"ticket_code"`
-	Email      string `json:"email"`
-	ExpiresAt  int64  `json:"expires_at"`
+	TicketID      string `json:"ticket_id"`
+	TicketCode    string `json:"ticket_code"`
+	Email         string `json:"email"`
+	AccessVersion string `json:"access_version"`
+	ExpiresAt     int64  `json:"expires_at"`
 }
 
 func emailOTPClient() (*redis.Client, error) {
@@ -108,6 +111,10 @@ func signupCompletionEmailKey(email string) string {
 
 func supportAccessTokenKey(token string) string {
 	return supportAccessTokenPrefix + token
+}
+
+func supportAccessTicketKey(ticketID string) string {
+	return supportAccessTicketPrefix + strings.TrimSpace(ticketID)
 }
 
 func HashEmailOTPCode(code string) string {
@@ -271,40 +278,82 @@ func ResendEmailOTPChallenge(ctx context.Context, token string) (challenge *Emai
 }
 
 func VerifyEmailOTPChallenge(ctx context.Context, token string, otpCode string, purpose EmailOTPPurpose) (*EmailOTPChallenge, error) {
-	challenge, err := GetEmailOTPChallenge(ctx, token)
+	client, err := emailOTPClient()
 	if err != nil {
 		return nil, err
 	}
 
-	if challenge.Purpose != purpose {
-		return nil, ErrEmailOTPPurposeMismatch
-	}
+	key := emailOTPChallengeKey(strings.TrimSpace(token))
+	providedHash := HashEmailOTPCode(otpCode)
+	var verified *EmailOTPChallenge
 
-	hash := HashEmailOTPCode(otpCode)
-	if subtle.ConstantTimeCompare([]byte(challenge.CodeHash), []byte(hash)) != 1 {
-		challenge.Attempts++
-		if challenge.Attempts >= EmailOTPMaxAttempts {
-			_ = DeleteEmailOTPChallenge(ctx, token)
-			return nil, ErrEmailOTPAttemptsExceeded
+	// WATCH makes verification and challenge consumption atomic. Concurrent
+	// requests cannot both redeem the same OTP or lose failed-attempt updates.
+	for attempt := 0; attempt < 8; attempt++ {
+		err = client.Watch(ctx, func(tx *redis.Tx) error {
+			raw, getErr := tx.Get(ctx, key).Result()
+			if getErr != nil {
+				if errors.Is(getErr, redis.Nil) {
+					return ErrEmailOTPChallengeNotFound
+				}
+				return getErr
+			}
+
+			var challenge EmailOTPChallenge
+			if unmarshalErr := json.Unmarshal([]byte(raw), &challenge); unmarshalErr != nil {
+				return unmarshalErr
+			}
+			if time.Now().After(time.Unix(challenge.ExpiresAt, 0)) {
+				pipe := tx.TxPipeline()
+				pipe.Del(ctx, key)
+				if _, execErr := pipe.Exec(ctx); execErr != nil {
+					return execErr
+				}
+				return ErrEmailOTPChallengeExpired
+			}
+			if challenge.Purpose != purpose {
+				return ErrEmailOTPPurposeMismatch
+			}
+
+			pipe := tx.TxPipeline()
+			if subtle.ConstantTimeCompare([]byte(challenge.CodeHash), []byte(providedHash)) != 1 {
+				challenge.Attempts++
+				if challenge.Attempts >= EmailOTPMaxAttempts {
+					pipe.Del(ctx, key)
+					if _, execErr := pipe.Exec(ctx); execErr != nil {
+						return execErr
+					}
+					return ErrEmailOTPAttemptsExceeded
+				}
+
+				payload, marshalErr := json.Marshal(&challenge)
+				if marshalErr != nil {
+					return marshalErr
+				}
+				ttl := time.Until(time.Unix(challenge.ExpiresAt, 0))
+				if ttl <= 0 {
+					ttl = time.Second
+				}
+				pipe.Set(ctx, key, payload, ttl)
+				if _, execErr := pipe.Exec(ctx); execErr != nil {
+					return execErr
+				}
+				return &EmailOTPInvalidCodeError{RemainingAttempts: EmailOTPMaxAttempts - challenge.Attempts}
+			}
+
+			pipe.Del(ctx, key)
+			if _, execErr := pipe.Exec(ctx); execErr != nil {
+				return execErr
+			}
+			verified = &challenge
+			return nil
+		}, key)
+		if !errors.Is(err, redis.TxFailedErr) {
+			return verified, err
 		}
-
-		if err := SaveEmailOTPChallenge(ctx, token, challenge); err != nil {
-			logger.Logger.Warn("Failed to persist failed email OTP attempt",
-				"error", err.Error(),
-			)
-		}
-
-		remainingAttempts := EmailOTPMaxAttempts - challenge.Attempts
-		return nil, &EmailOTPInvalidCodeError{RemainingAttempts: remainingAttempts}
 	}
 
-	if err := DeleteEmailOTPChallenge(ctx, token); err != nil {
-		logger.Logger.Warn("Failed to consume email OTP challenge",
-			"error", err.Error(),
-		)
-	}
-
-	return challenge, nil
+	return nil, redis.TxFailedErr
 }
 
 func CreateSignupCompletionToken(ctx context.Context, email string) (string, error) {
@@ -425,7 +474,7 @@ func ConsumeSignupCompletionToken(ctx context.Context, token string) (string, er
 	return email, nil
 }
 
-func CreateSupportAccessToken(ctx context.Context, ticketID, ticketCode, email string) (string, *SupportAccessTokenPayload, error) {
+func CreateSupportAccessToken(ctx context.Context, ticketID, ticketCode, email, accessVersion string) (string, *SupportAccessTokenPayload, error) {
 	client, err := emailOTPClient()
 	if err != nil {
 		return "", nil, err
@@ -437,10 +486,11 @@ func CreateSupportAccessToken(ctx context.Context, ticketID, ticketCode, email s
 	}
 
 	payload := &SupportAccessTokenPayload{
-		TicketID:   strings.TrimSpace(ticketID),
-		TicketCode: strings.TrimSpace(ticketCode),
-		Email:      normalizeEmailForKey(email),
-		ExpiresAt:  time.Now().Add(SupportAccessTokenTTL).Unix(),
+		TicketID:      strings.TrimSpace(ticketID),
+		TicketCode:    strings.TrimSpace(ticketCode),
+		Email:         normalizeEmailForKey(email),
+		AccessVersion: strings.TrimSpace(accessVersion),
+		ExpiresAt:     time.Now().Add(SupportAccessTokenTTL).Unix(),
 	}
 
 	raw, err := json.Marshal(payload)
@@ -448,7 +498,11 @@ func CreateSupportAccessToken(ctx context.Context, ticketID, ticketCode, email s
 		return "", nil, err
 	}
 
-	if err := client.Set(ctx, supportAccessTokenKey(token), raw, SupportAccessTokenTTL).Err(); err != nil {
+	pipe := client.TxPipeline()
+	pipe.Set(ctx, supportAccessTokenKey(token), raw, SupportAccessTokenTTL)
+	pipe.SAdd(ctx, supportAccessTicketKey(payload.TicketID), token)
+	pipe.Expire(ctx, supportAccessTicketKey(payload.TicketID), SupportAccessTokenTTL)
+	if _, err := pipe.Exec(ctx); err != nil {
 		return "", nil, err
 	}
 
@@ -480,6 +534,52 @@ func GetSupportAccessToken(ctx context.Context, token string) (*SupportAccessTok
 	}
 
 	return &payload, nil
+}
+
+// DeleteSupportAccessToken removes one browser/API session and its ticket index entry.
+func DeleteSupportAccessToken(ctx context.Context, token string) error {
+	client, err := emailOTPClient()
+	if err != nil {
+		return err
+	}
+
+	normalizedToken := strings.TrimSpace(token)
+	if normalizedToken == "" {
+		return nil
+	}
+
+	payload, payloadErr := GetSupportAccessToken(ctx, normalizedToken)
+	pipe := client.TxPipeline()
+	pipe.Del(ctx, supportAccessTokenKey(normalizedToken))
+	if payloadErr == nil && payload != nil && strings.TrimSpace(payload.TicketID) != "" {
+		pipe.SRem(ctx, supportAccessTicketKey(payload.TicketID), normalizedToken)
+	}
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// RevokeSupportAccessTokensForTicket invalidates every outstanding public
+// support session when a ticket crosses the closed/resolved boundary.
+func RevokeSupportAccessTokensForTicket(ctx context.Context, ticketID string) error {
+	client, err := emailOTPClient()
+	if err != nil {
+		return err
+	}
+
+	indexKey := supportAccessTicketKey(ticketID)
+	tokens, err := client.SMembers(ctx, indexKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return err
+	}
+
+	keys := make([]string, 0, len(tokens)+1)
+	for _, token := range tokens {
+		if normalized := strings.TrimSpace(token); normalized != "" {
+			keys = append(keys, supportAccessTokenKey(normalized))
+		}
+	}
+	keys = append(keys, indexKey)
+	return client.Del(ctx, keys...).Err()
 }
 
 func CooldownSecondsForNextResend(challenge *EmailOTPChallenge) int {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
@@ -31,10 +32,14 @@ const (
 	ticketPrefix                  = "LHTK-"
 	ticketCodeLength              = 6
 	ticketCodeCharset             = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	supportAccessCookieName       = "support_session"
+	supportAccessCookiePathPrefix = "/v1/support/tickets/"
 	supportAccessOTPRequestLimit  = 5
 	supportAccessOTPRequestWindow = 30 * time.Minute
 	supportAccessOTPResendLimit   = 3
 	supportAccessOTPResendWindow  = time.Hour
+	supportAccessCodeVerifyLimit  = 3
+	supportAccessCodeVerifyWindow = 5 * time.Minute
 )
 
 type Controller struct {
@@ -266,6 +271,65 @@ func hashSupportAccessCode(raw string) string {
 	return fmt.Sprintf("%x", sum[:])
 }
 
+func isPublicTicketClosed(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case string(supportmodel.TicketStatusResolved), string(supportmodel.TicketStatusClosed):
+		return true
+	default:
+		return false
+	}
+}
+
+func supportAccessCookiePath(ticketCode string) string {
+	return supportAccessCookiePathPrefix + strings.ToUpper(strings.TrimSpace(ticketCode))
+}
+
+func setSupportAccessCookie(ctx *gin.Context, token, ticketCode string) error {
+	settings := auth.ResolveAuthCookieSettings(ctx)
+	if settings.RejectInsecureRequest {
+		return errors.New("cannot issue support session over insecure production request")
+	}
+
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     supportAccessCookieName,
+		Value:    strings.TrimSpace(token),
+		Path:     supportAccessCookiePath(ticketCode),
+		Domain:   settings.Domain,
+		MaxAge:   int(auth.SupportAccessTokenTTL.Seconds()),
+		Expires:  time.Now().Add(auth.SupportAccessTokenTTL),
+		Secure:   settings.Secure,
+		HttpOnly: true,
+		SameSite: settings.SameSite,
+	})
+	return nil
+}
+
+func clearSupportAccessCookie(ctx *gin.Context, ticketCode string) {
+	settings := auth.ResolveAuthCookieSettings(ctx)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name:     supportAccessCookieName,
+		Value:    "",
+		Path:     supportAccessCookiePath(ticketCode),
+		Domain:   settings.Domain,
+		MaxAge:   -1,
+		Expires:  time.Unix(1, 0),
+		Secure:   settings.Secure,
+		HttpOnly: true,
+		SameSite: settings.SameSite,
+	})
+}
+
+func supportAccessTokenFromRequest(ctx *gin.Context) string {
+	if token := strings.TrimSpace(ctx.GetHeader(supportAccessTokenHeader)); token != "" {
+		return token
+	}
+	token, err := ctx.Cookie(supportAccessCookieName)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(token)
+}
+
 func hashSupportRateLimitSubject(action, ticket, email string) string {
 	normalized := strings.Join([]string{
 		strings.ToLower(strings.TrimSpace(action)),
@@ -286,7 +350,7 @@ func (c *Controller) enforceSupportAccessRateLimit(
 ) (blocked bool, err error) {
 	manager := middleware.GetSessionManager()
 	if manager == nil || manager.GetRedisClient() == nil {
-		return false, nil
+		return false, errors.New("support access rate limiter is unavailable")
 	}
 
 	key := fmt.Sprintf(
@@ -295,15 +359,22 @@ func (c *Controller) enforceSupportAccessRateLimit(
 		hashSupportRateLimitSubject(action, ticket, email),
 	)
 
-	redisClient := manager.GetRedisClient()
-	count, err := redisClient.Incr(ctx, key).Result()
-	if err != nil {
-		logger.Logger.Warn("Support access rate limit Redis error", "error", err.Error(), "action", action)
-		return false, nil
+	const incrementWithTTLScript = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+return count`
+	windowMillis := window.Milliseconds()
+	if windowMillis < 1 {
+		windowMillis = 1
 	}
 
-	if count == 1 {
-		redisClient.Expire(ctx, key, window)
+	redisClient := manager.GetRedisClient()
+	count, err := redisClient.Eval(ctx, incrementWithTTLScript, []string{key}, windowMillis).Int64()
+	if err != nil {
+		logger.Logger.Warn("Support access rate limit Redis error", "error", err.Error(), "action", action)
+		return false, err
 	}
 
 	return count > int64(limit), nil

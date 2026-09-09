@@ -15,7 +15,6 @@ func RegisterSupportRoutes(rg *gin.RouterGroup, userRepo userrepo.UserRepository
 	supportPublic := rg.Group("/support")
 	{
 		supportPublic.POST("/tickets", middleware.RateLimitMiddleware(10, 24, 0), supportController.CreateTicket)
-		supportPublic.GET("/track", middleware.RateLimitMiddleware(20, 0, 1), supportController.TrackTicket)
 		supportPublic.POST("/access/request-otp", middleware.RateLimitMiddleware(15, 0, 10), supportController.RequestAccessOTP)
 		supportPublic.POST("/access/resend-otp", middleware.RateLimitMiddleware(20, 0, 10), supportController.ResendAccessOTP)
 		supportPublic.POST("/access/verify-otp", middleware.RateLimitMiddleware(20, 0, 10), supportController.VerifyAccessOTP)
@@ -23,6 +22,7 @@ func RegisterSupportRoutes(rg *gin.RouterGroup, userRepo userrepo.UserRepository
 		supportPublic.GET("/tickets/:ticketCode/messages", middleware.RateLimitMiddleware(40, 0, 1), supportController.ListPublicConversation)
 		supportPublic.POST("/tickets/:ticketCode/messages", middleware.RateLimitMiddleware(25, 0, 10), supportController.SendPublicMessage)
 		supportPublic.GET("/tickets/:ticketCode/attachments/:attachmentID", middleware.RateLimitMiddleware(60, 0, 1), supportController.DownloadPublicAttachment)
+		supportPublic.POST("/tickets/:ticketCode/access/logout", middleware.RateLimitMiddleware(30, 0, 10), supportController.RevokePublicAccess)
 	}
 
 	supportUser := rg.Group("/auth/support")

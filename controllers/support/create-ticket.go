@@ -35,8 +35,10 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 	if policy := disposable.Global(); policy != nil {
 		blocked, err := policy.ShouldBlockEmail(ctx.Request.Context(), senderEmail)
 		if err != nil {
+			// Disposable-domain reputation is an anti-abuse signal, not an
+			// authentication boundary. Keep ticket creation available when the
+			// reputation source is unavailable; ownership is verified separately.
 			logger.Logger.Warn("Disposable email policy check failed for support ticket",
-				"email", senderEmail,
 				"error", err.Error(),
 			)
 		}
@@ -62,7 +64,7 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 
 	captchaOK, err := c.verifyCaptcha(strings.TrimSpace(req.CaptchaToken), ctx.ClientIP())
 	if err != nil {
-		logger.Logger.Warn("Captcha validation error", "error", err.Error(), "ip", ctx.ClientIP(), "email", req.Email)
+		logger.Logger.Warn("Captcha validation error", "error", err.Error(), "ip", ctx.ClientIP())
 		httputil.HandleError(ctx, apperrors.NewAppError("CAPTCHA_VERIFICATION_FAILED", "Captcha verification failed", http.StatusBadRequest, "captcha_token"), nil)
 		return
 	}
@@ -112,7 +114,7 @@ func (c *Controller) CreateTicket(ctx *gin.Context) {
 	}
 
 	if err := c.repo.CreateTicket(&ticket); err != nil {
-		logger.Logger.Error("Failed creating support ticket", "error", err.Error(), "email", req.Email)
+		logger.Logger.Error("Failed creating support ticket", "error", err.Error())
 		c.handleAppError(ctx, err)
 		return
 	}

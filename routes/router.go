@@ -44,7 +44,6 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 
 		// Public support access & conversation.
 		{Method: http.MethodPost, Path: "/v1/support/tickets"},
-		{Method: http.MethodGet, Path: "/v1/support/track"},
 		{Method: http.MethodPost, Path: "/v1/support/access/request-otp"},
 		{Method: http.MethodPost, Path: "/v1/support/access/resend-otp"},
 		{Method: http.MethodPost, Path: "/v1/support/access/verify-otp"},
@@ -52,6 +51,7 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/messages"},
 		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/messages"},
 		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/attachments/:attachmentID"},
+		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/access/logout"},
 
 		// API-key clients do not use browser cookies and are not CSRF targets.
 		// Their route middleware still validates the API key after this bypass.
