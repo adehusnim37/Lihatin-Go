@@ -261,6 +261,8 @@ func buildCategoryLabel(category string) string {
 		return "Bug Report"
 	case string(supportmodel.TicketCategoryFeatureRequest):
 		return "Feature Request"
+	case string(supportmodel.TicketCategorySuspiciousLink):
+		return "Suspicious Link"
 	default:
 		return "Other"
 	}
