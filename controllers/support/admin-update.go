@@ -52,15 +52,29 @@ func (c *Controller) UpdateTicket(ctx *gin.Context) {
 	}
 
 	var resolvedBy *string
+	revokedAccessCodeHash := ""
 	if req.Status == string(supportmodel.TicketStatusResolved) || req.Status == string(supportmodel.TicketStatusClosed) {
 		if adminID != "" {
 			resolvedBy = &adminID
 		}
+		revocationSecret, generateErr := auth.GenerateSecureToken(24)
+		if generateErr != nil {
+			httputil.HandleError(ctx, apperrors.NewAppError("TICKET_UPDATE_FAILED", "Failed to secure closed ticket", http.StatusInternalServerError, "status"), nil)
+			return
+		}
+		revokedAccessCodeHash = hashSupportAccessCode(revocationSecret)
 	}
 
-	if err := c.repo.UpdateTicketStatus(id, req.Status, req.Priority, req.AdminNotes, resolvedBy); err != nil {
+	if err := c.repo.UpdateTicketStatus(id, req.Status, req.Priority, req.AdminNotes, resolvedBy, revokedAccessCodeHash); err != nil {
 		c.handleAppErrorAs(ctx, err, "status")
 		return
+	}
+	if isPublicTicketClosed(req.Status) {
+		if revokeErr := auth.RevokeSupportAccessTokensForTicket(ctx.Request.Context(), ticket.ID); revokeErr != nil {
+			// Authorization also checks current ticket status on every request, so
+			// a Redis revocation failure cannot reopen a closed ticket.
+			logger.Logger.Error("Failed revoking support sessions for closed ticket", "ticket_code", ticket.TicketCode, "error", revokeErr.Error())
+		}
 	}
 
 	updatedTicket, err := c.repo.GetTicketByID(id)
@@ -204,17 +218,6 @@ func (c *Controller) sendTicketUpdatedEmail(ticket *supportmodel.SupportTicket, 
 		return
 	}
 
-	accessCode, err := auth.GenerateSecureToken(24)
-	if err != nil {
-		logger.Logger.Error("Failed generating support access code for update email", "ticket_code", ticket.TicketCode, "error", err.Error())
-		return
-	}
-
-	if err := c.repo.UpdatePublicAccessCodeHash(ticket.ID, hashSupportAccessCode(accessCode)); err != nil {
-		logger.Logger.Error("Failed updating support access code hash", "ticket_code", ticket.TicketCode, "error", err.Error())
-		return
-	}
-
 	adminSummary := ""
 	if ticket.AdminNotes != nil && strings.TrimSpace(*ticket.AdminNotes) != "" {
 		adminSummary = strings.TrimSpace(*ticket.AdminNotes)
@@ -233,7 +236,6 @@ func (c *Controller) sendTicketUpdatedEmail(ticket *supportmodel.SupportTicket, 
 		ticket.TicketCode,
 		ticket.Status,
 		adminSummary,
-		accessCode,
 		c.frontendURL(),
 	); err != nil {
 		logger.Logger.Error("Failed sending support updated email", "ticket_code", ticket.TicketCode, "error", err.Error())

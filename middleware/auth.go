@@ -472,7 +472,7 @@ func APIKeyMiddleware(apiKeyRepo *apikeyrepo.APIKeyRepository) gin.HandlerFunc {
 			"user_agent", c.GetHeader("User-Agent"),
 			"path", c.Request.URL.Path,
 			"method", c.Request.Method,
-			"query", c.Request.URL.RawQuery,
+			"query", captureQueryParams(c),
 		)
 
 		ip := c.ClientIP()

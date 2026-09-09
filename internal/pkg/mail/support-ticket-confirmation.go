@@ -21,14 +21,20 @@ func (es *EmailService) SendSupportTicketConfirmationEmail(
 	if baseURL == "" {
 		baseURL = config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
 	}
-	baseURL = strings.TrimRight(baseURL, "/")
+	baseURL, err := normalizeSupportFrontendURL(baseURL)
+	if err != nil {
+		return err
+	}
 
 	recipientName := strings.TrimSpace(toName)
 	if recipientName == "" {
 		recipientName = "there"
 	}
 
-	trackURL := fmt.Sprintf("%s/support?ticket=%s&email=%s&code=%s", baseURL, ticketCode, toEmail, accessCode)
+	trackURL, err := buildPublicSupportAccessURL(baseURL, ticketCode)
+	if err != nil {
+		return err
+	}
 
 	htmlBody := renderEmailTemplate(emailTemplate{
 		Badge:    "Support",
@@ -60,7 +66,20 @@ func (es *EmailService) SendSupportTicketConfirmationEmail(
 		FooterBaseURL: baseURL,
 	})
 
-	textBody := fmt.Sprintf(`
+	textBody := renderSupportConfirmationText(
+		recipientName,
+		ticketCode,
+		categoryLabel,
+		accessCode,
+		createdAt,
+		trackURL,
+	)
+
+	return es.sendEmail(toEmail, fmt.Sprintf("Support Ticket %s Received - Lihatin", ticketCode), textBody, htmlBody)
+}
+
+func renderSupportConfirmationText(recipientName, ticketCode, categoryLabel, accessCode string, createdAt time.Time, trackURL string) string {
+	return fmt.Sprintf(`
 LIHATIN - SUPPORT TICKET RECEIVED
 
 Hi %s,
@@ -78,9 +97,7 @@ Track ticket:
 
 Thanks,
 Lihatin Support Team
-`, recipientName, ticketCode, categoryLabel, createdAt.Local().Format("2006-01-02 15:04:05"), trackURL)
-
-	return es.sendEmail(toEmail, fmt.Sprintf("Support Ticket %s Received - Lihatin", ticketCode), textBody, htmlBody)
+`, recipientName, ticketCode, categoryLabel, accessCode, createdAt.Local().Format("2006-01-02 15:04:05"), trackURL)
 }
 
 func (es *EmailService) SendSupportTicketAdminAlertEmail(ticketCode, fromEmail, subject, category, frontendURL string) error {
@@ -93,7 +110,10 @@ func (es *EmailService) SendSupportTicketAdminAlertEmail(ticketCode, fromEmail, 
 	if baseURL == "" {
 		baseURL = config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000")
 	}
-	baseURL = strings.TrimRight(baseURL, "/")
+	baseURL, err := normalizeSupportFrontendURL(baseURL)
+	if err != nil {
+		return err
+	}
 
 	adminRecipients := strings.Split(recipientsRaw, ",")
 	cleanRecipients := make([]string, 0, len(adminRecipients))

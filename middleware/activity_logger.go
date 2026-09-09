@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,16 +21,33 @@ import (
 
 type bodyLogWriter struct {
 	gin.ResponseWriter
-	body *bytes.Buffer
+	body     *bytes.Buffer
+	bodySize int64
+	omitBody bool
 }
 
-func (w bodyLogWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)                  // copy to buffer
+const maxLoggedResponseBodyBytes = 64 * 1024
+
+func (w *bodyLogWriter) capture(b []byte) {
+	w.bodySize += int64(len(b))
+	if w.omitBody {
+		return
+	}
+	if w.body.Len()+len(b) > maxLoggedResponseBodyBytes {
+		w.body.Reset()
+		w.omitBody = true
+		return
+	}
+	w.body.Write(b)
+}
+
+func (w *bodyLogWriter) Write(b []byte) (int, error) {
+	w.capture(b)
 	return w.ResponseWriter.Write(b) // write out normally
 }
 
-func (w bodyLogWriter) WriteString(s string) (int, error) {
-	w.body.WriteString(s)
+func (w *bodyLogWriter) WriteString(s string) (int, error) {
+	w.capture([]byte(s))
 	return w.ResponseWriter.WriteString(s)
 }
 
@@ -124,7 +142,12 @@ func ActivityLogger(loggerRepo *loggerrepo.LoggerRepository) gin.HandlerFunc {
 		message := fmt.Sprintf("%s %s - %d (%dms)", method, path, statusCode, responseTime)
 
 		// Create response body - ensure valid JSON for database constraint
-		responseBody := blw.body.String()
+		responseBody := ""
+		if blw.omitBody {
+			responseBody = summarizeOmittedRequestBody(c.Writer.Header().Get("Content-Type"), blw.bodySize)
+		} else {
+			responseBody = sanitizeResponseBody(blw.body.Bytes(), c.Writer.Header())
+		}
 		if responseBody == "" {
 			responseBody = "{}" // Empty JSON object to satisfy database constraint
 		}
@@ -201,34 +224,66 @@ func sanitizeRequestBody(body []byte, contentType string) string {
 		return summarizeOmittedRequestBody(contentType, int64(len(body)))
 	}
 
-	bodyText := string(body)
-
-	// Limit body size to prevent huge logs
-	const maxBodySize = 1000
-	if len(bodyText) > maxBodySize {
-		bodyText = bodyText[:maxBodySize] + "... [truncated]"
+	var jsonData interface{}
+	if err := json.Unmarshal(body, &jsonData); err == nil {
+		if sanitizedBytes, marshalErr := json.Marshal(sanitizeLogValue(jsonData)); marshalErr == nil {
+			return truncateLoggedBody(string(sanitizedBytes))
+		}
 	}
 
-	// Try to parse as JSON and remove sensitive fields
-	var jsonData map[string]interface{}
-	if err := json.Unmarshal([]byte(bodyText), &jsonData); err == nil {
-		// Remove sensitive fields
-		sensitiveFields := []string{"password", "token", "secret", "key", "auth", "authorization"}
-		for _, field := range sensitiveFields {
-			for key := range jsonData {
-				if strings.Contains(strings.ToLower(key), field) {
-					jsonData[key] = "[REDACTED]"
-				}
+	return truncateLoggedBody(string(body))
+}
+
+func sanitizeResponseBody(body []byte, headers http.Header) string {
+	contentType := strings.ToLower(strings.TrimSpace(headers.Get("Content-Type")))
+	if headers.Get("Content-Disposition") != "" || shouldOmitRequestBody(normalizeRequestContentType(contentType)) {
+		return summarizeOmittedRequestBody(contentType, int64(len(body)))
+	}
+	return sanitizeRequestBody(body, contentType)
+}
+
+func sanitizeLogValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		for key, child := range typed {
+			if isSensitiveLogField(key) {
+				typed[key] = "[REDACTED]"
+				continue
 			}
+			typed[key] = sanitizeLogValue(child)
 		}
+		return typed
+	case []interface{}:
+		for index := range typed {
+			typed[index] = sanitizeLogValue(typed[index])
+		}
+		return typed
+	default:
+		return value
+	}
+}
 
-		// Convert back to JSON string
-		if sanitizedBytes, err := json.Marshal(jsonData); err == nil {
-			return string(sanitizedBytes)
+func isSensitiveLogField(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	for _, fragment := range []string{"password", "token", "secret", "authorization", "email"} {
+		if strings.Contains(normalized, fragment) {
+			return true
 		}
 	}
+	switch normalized {
+	case "key", "auth", "code", "access_code", "otp", "otp_code":
+		return true
+	default:
+		return false
+	}
+}
 
-	return bodyText
+func truncateLoggedBody(body string) string {
+	const maxBodySize = 1000
+	if len(body) > maxBodySize {
+		return body[:maxBodySize] + "... [truncated]"
+	}
+	return body
 }
 
 func shouldOmitRequestBody(contentType string) bool {
@@ -290,6 +345,10 @@ func captureQueryParams(c *gin.Context) string {
 
 	queryMap := make(map[string]interface{})
 	for key, values := range c.Request.URL.Query() {
+		if isSensitiveQueryParameter(key) {
+			queryMap[key] = "[REDACTED]"
+			continue
+		}
 		if len(values) == 1 {
 			queryMap[key] = values[0]
 		} else {
@@ -302,6 +361,15 @@ func captureQueryParams(c *gin.Context) string {
 	}
 
 	return "{}" // Return empty JSON object on error
+}
+
+func isSensitiveQueryParameter(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "access_token", "refresh_token", "session_id", "token", "code", "access_code", "otp", "otp_code", "challenge_token", "email":
+		return true
+	default:
+		return false
+	}
 }
 
 // captureRouteParams captures all route parameters as JSON string
@@ -328,7 +396,7 @@ func captureContextLocals(c *gin.Context) string {
 	locals := make(map[string]interface{})
 
 	// Get common context keys that might be interesting to log
-	contextKeys := []string{"user_id", "session_id", "request_id", "tenant_id", "role", "permissions"}
+	contextKeys := []string{"user_id", "request_id", "tenant_id", "role", "permissions"}
 
 	for _, key := range contextKeys {
 		if value, exists := c.Get(key); exists {
@@ -414,6 +482,10 @@ func extractHeadersInfo(c *gin.Context) string {
 
 	for key, values := range c.Request.Header {
 		if len(values) > 0 {
+			if isSensitiveHeader(key) {
+				headersMap[key] = "[REDACTED]"
+				continue
+			}
 			headersMap[key] = values[0] // ambil value pertama
 		}
 	}
@@ -426,6 +498,19 @@ func extractHeadersInfo(c *gin.Context) string {
 	}
 
 	return string(headersJSON)
+}
+
+func isSensitiveHeader(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	if strings.Contains(normalized, "token") || strings.Contains(normalized, "secret") {
+		return true
+	}
+	switch normalized {
+	case "authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "x-session-id":
+		return true
+	default:
+		return false
+	}
 }
 
 // extract X-API-Key from headers if present

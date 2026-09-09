@@ -2,13 +2,15 @@ package mail
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/config"
 )
 
 func (es *EmailService) SendSupportAccessOTPEmail(toEmail, ticketCode, otpCode string) error {
-	baseURL := strings.TrimRight(config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"), "/")
+	baseURL, err := normalizeSupportFrontendURL(config.GetEnvOrDefault(config.EnvFrontendURL, "http://localhost:3000"))
+	if err != nil {
+		return err
+	}
 	subject := fmt.Sprintf("Support Access Code for %s - Lihatin", ticketCode)
 
 	htmlBody := renderEmailTemplate(emailTemplate{

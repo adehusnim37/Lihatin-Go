@@ -8,7 +8,10 @@ import (
 	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+var ErrSupportTicketClosed = errors.New("support ticket is closed")
 
 type TicketListFilters struct {
 	Status   string
@@ -75,6 +78,37 @@ func (r *SupportTicketRepository) CreateMessageWithAttachments(message *supportm
 			}
 		}
 
+		return nil
+	})
+}
+
+// CreateMessageWithAttachmentsIfActive locks the ticket row and enforces the
+// active-status boundary in the same transaction as message creation. This
+// closes the race where an admin can close a ticket after a controller check
+// but before the message insert.
+func (r *SupportTicketRepository) CreateMessageWithAttachmentsIfActive(message *supportmodel.SupportMessage, attachments []supportmodel.SupportAttachment) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var ticket supportmodel.SupportTicket
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id", "status").
+			Where("id = ?", strings.TrimSpace(message.TicketID)).
+			First(&ticket).Error; err != nil {
+			return supportTicketNotFound(err)
+		}
+
+		switch strings.ToLower(strings.TrimSpace(ticket.Status)) {
+		case string(supportmodel.TicketStatusResolved), string(supportmodel.TicketStatusClosed):
+			return ErrSupportTicketClosed
+		}
+
+		if err := tx.Create(message).Error; err != nil {
+			return apperrors.ErrSupportMessageCreateFailed.WithError(err)
+		}
+		if len(attachments) > 0 {
+			if err := tx.Create(&attachments).Error; err != nil {
+				return apperrors.ErrSupportAttachmentCreateFailed.WithError(err)
+			}
+		}
 		return nil
 	})
 }
@@ -238,7 +272,7 @@ func (r *SupportTicketRepository) GetAttachmentByID(id string) (*supportmodel.Su
 	return &item, nil
 }
 
-func (r *SupportTicketRepository) UpdateTicketStatus(id, status, priority string, adminNotes *string, resolvedBy *string) error {
+func (r *SupportTicketRepository) UpdateTicketStatus(id, status, priority string, adminNotes *string, resolvedBy *string, revokedAccessCodeHash string) error {
 	updates := map[string]any{
 		"status":      strings.TrimSpace(status),
 		"admin_notes": adminNotes,
@@ -248,11 +282,14 @@ func (r *SupportTicketRepository) UpdateTicketStatus(id, status, priority string
 		updates["priority"] = p
 	}
 
-	normalized := strings.TrimSpace(status)
+	normalized := strings.ToLower(strings.TrimSpace(status))
 	if normalized == string(supportmodel.TicketStatusResolved) || normalized == string(supportmodel.TicketStatusClosed) {
 		now := time.Now()
 		updates["resolved_at"] = &now
 		updates["resolved_by"] = resolvedBy
+		if hash := strings.TrimSpace(revokedAccessCodeHash); hash != "" {
+			updates["public_access_code_hash"] = hash
+		}
 	} else {
 		updates["resolved_at"] = nil
 		updates["resolved_by"] = nil
@@ -296,33 +333,14 @@ func (r *SupportTicketRepository) MarkTicketAsActiveByReply(ticketID string) err
 		return supportTicketNotFound(err)
 	}
 
-	if ticket.Status == string(supportmodel.TicketStatusResolved) || ticket.Status == string(supportmodel.TicketStatusClosed) {
+	normalizedStatus := strings.ToLower(strings.TrimSpace(ticket.Status))
+	if normalizedStatus == string(supportmodel.TicketStatusResolved) || normalizedStatus == string(supportmodel.TicketStatusClosed) {
 		updates["status"] = string(supportmodel.TicketStatusInProgress)
 		updates["resolved_at"] = nil
 		updates["resolved_by"] = nil
 	}
 
 	if err := r.db.Model(&supportmodel.SupportTicket{}).Where("id = ?", normalizedID).Updates(updates).Error; err != nil {
-		return apperrors.ErrSupportTicketUpdateFailed.WithError(err)
-	}
-
-	return nil
-}
-
-func (r *SupportTicketRepository) UpdatePublicAccessCodeHash(id, accessCodeHash string) error {
-	normalizedID := strings.TrimSpace(id)
-	normalizedHash := strings.TrimSpace(accessCodeHash)
-
-	if normalizedID == "" || normalizedHash == "" {
-		return apperrors.ErrSupportTicketUpdateFailed.WithError(errors.New("ticket id and access code hash are required"))
-	}
-
-	if err := r.db.Model(&supportmodel.SupportTicket{}).
-		Where("id = ?", normalizedID).
-		Updates(map[string]any{
-			"public_access_code_hash": normalizedHash,
-			"updated_at":              time.Now(),
-		}).Error; err != nil {
 		return apperrors.ErrSupportTicketUpdateFailed.WithError(err)
 	}
 

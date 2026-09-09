@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"mime"
 	"path/filepath"
 	"strings"
@@ -35,12 +36,12 @@ func (s *S3SupportAttachmentStorage) UploadAttachment(
 	fileName string,
 	contentType string,
 	data []byte,
-) (objectURL string, objectKey string, err error) {
+) (objectKey string, err error) {
 	if s == nil || s.base == nil || s.base.client == nil {
-		return "", "", fmt.Errorf("support attachment storage not configured")
+		return "", fmt.Errorf("support attachment storage not configured")
 	}
 	if len(data) == 0 {
-		return "", "", fmt.Errorf("empty attachment payload")
+		return "", fmt.Errorf("empty attachment payload")
 	}
 
 	objectKey = s.buildObjectKey(ticketID, messageID, fileName, contentType)
@@ -55,10 +56,10 @@ func (s *S3SupportAttachmentStorage) UploadAttachment(
 		CacheControl:  awsv2.String("private, max-age=0, no-cache"),
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("failed to upload support attachment: %w", err)
+		return "", fmt.Errorf("failed to upload support attachment: %w", err)
 	}
 
-	return s.base.buildObjectURL(objectKey), objectKey, nil
+	return objectKey, nil
 }
 
 func (s *S3SupportAttachmentStorage) DeleteAttachment(ctx context.Context, objectKey string) error {
@@ -80,6 +81,26 @@ func (s *S3SupportAttachmentStorage) DeleteAttachment(ctx context.Context, objec
 	}
 
 	return nil
+}
+
+func (s *S3SupportAttachmentStorage) OpenAttachment(ctx context.Context, objectKey string) (io.ReadCloser, string, int64, error) {
+	if s == nil || s.base == nil || s.base.client == nil {
+		return nil, "", 0, fmt.Errorf("support attachment storage not configured")
+	}
+	normalizedKey := strings.TrimSpace(objectKey)
+	if normalizedKey == "" {
+		return nil, "", 0, fmt.Errorf("support attachment object key is empty")
+	}
+
+	output, err := s.base.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: awsv2.String(s.base.bucket),
+		Key:    awsv2.String(normalizedKey),
+	})
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("failed to download support attachment: %w", err)
+	}
+
+	return output.Body, awsv2.ToString(output.ContentType), awsv2.ToInt64(output.ContentLength), nil
 }
 
 func (s *S3SupportAttachmentStorage) buildObjectKey(ticketID, messageID, fileName, contentType string) string {

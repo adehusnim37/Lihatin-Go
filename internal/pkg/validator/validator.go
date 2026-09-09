@@ -366,6 +366,7 @@ func validateSecretCode(fl validator.FieldLevel) bool {
 var (
 	meaningfulTextTokenRegex = regexp.MustCompile(`[^\p{L}]+`)
 	technicalTokenRegex      = regexp.MustCompile(`(?i)(https?://|www\.|[/\\]|(?:err|error|exception|status|code|api|http|sql|json|jwt|uuid|otp|timeout|refused|failed)\b)`)
+	keyboardMashRegex        = regexp.MustCompile(`(?i)(qwert|asdf|zxcv|hjkl|123qwe)`)
 
 	// Lingua is used as a language signal, not as the sole accept/reject rule.
 	// Support tickets commonly mix Indonesian and English, so the detector is
@@ -393,6 +394,13 @@ func IsMeaningfulText(raw string) bool {
 
 	metrics := analyzeMeaningfulText(value)
 	if metrics.letterCount == 0 {
+		// Preserve useful short status/error codes (for example "404") while
+		// rejecting punctuation, emoji, and long numeric-only payloads.
+		return metrics.digitCount == 3 && metrics.symbolCount == 0
+	}
+	if metrics.latinLetterCount == 0 {
+		// Do not hard-code language support to Latin scripts. Other validation
+		// layers still enforce the field's minimum and maximum lengths.
 		return true
 	}
 
@@ -408,15 +416,18 @@ func IsMeaningfulText(raw string) bool {
 }
 
 type meaningfulTextMetrics struct {
-	words          []string
-	wordCount      int
-	shortWordCount int
-	letterCount    int
-	vowelCount     int
-	uniqueLetters  int
-	maxConsonants  int
-	lowVowelRatio  bool
-	repeatedChunks bool
+	words            []string
+	wordCount        int
+	shortWordCount   int
+	letterCount      int
+	latinLetterCount int
+	digitCount       int
+	symbolCount      int
+	vowelCount       int
+	uniqueLetters    int
+	maxConsonants    int
+	lowVowelRatio    bool
+	repeatedChunks   bool
 }
 
 func analyzeMeaningfulText(value string) meaningfulTextMetrics {
@@ -436,12 +447,22 @@ func analyzeMeaningfulText(value string) meaningfulTextMetrics {
 
 		consonants := 0
 		for _, r := range word {
-			if !unicode.In(r, unicode.Latin) {
+			if unicode.IsDigit(r) {
+				metrics.digitCount++
+				continue
+			}
+			if !unicode.IsLetter(r) {
+				metrics.symbolCount++
 				continue
 			}
 			metrics.letterCount++
+			if !unicode.In(r, unicode.Latin) {
+				consonants = 0
+				continue
+			}
+			metrics.latinLetterCount++
 			uniqueLetters[r] = struct{}{}
-			if strings.ContainsRune("aeiou", r) {
+			if isLatinVowel(r) {
 				metrics.vowelCount++
 				consonants = 0
 				continue
@@ -453,15 +474,33 @@ func analyzeMeaningfulText(value string) meaningfulTextMetrics {
 		}
 	}
 	metrics.uniqueLetters = len(uniqueLetters)
-	metrics.lowVowelRatio = metrics.letterCount >= 12 &&
-		float64(metrics.vowelCount)/float64(metrics.letterCount) < 0.20
+	for _, r := range value {
+		if unicode.IsDigit(r) {
+			metrics.digitCount++
+		} else if !unicode.IsLetter(r) && !unicode.IsSpace(r) {
+			metrics.symbolCount++
+		}
+	}
+	metrics.lowVowelRatio = metrics.latinLetterCount >= 12 &&
+		float64(metrics.vowelCount)/float64(metrics.latinLetterCount) < 0.20
 	return metrics
+}
+
+func isLatinVowel(r rune) bool {
+	switch unicode.ToLower(r) {
+	case 'a', 'e', 'i', 'o', 'u', 'á', 'à', 'â', 'ä', 'ã', 'å', 'é', 'è', 'ê', 'ë', 'í', 'ì', 'î', 'ï', 'ó', 'ò', 'ô', 'ö', 'õ', 'ú', 'ù', 'û', 'ü':
+		return true
+	default:
+		return false
+	}
 }
 
 func meaningfulTextGibberishScore(metrics meaningfulTextMetrics, value string) int {
 	score := 0
-	if metrics.letterCount >= 15 && metrics.wordCount == 1 && !technicalTokenRegex.MatchString(value) {
-		score += 2
+	if metrics.latinLetterCount >= 15 && metrics.wordCount == 1 && !technicalTokenRegex.MatchString(value) {
+		// A long single word is common in Indonesian and technical vocabulary;
+		// treat it as supporting evidence, never a decisive signal by itself.
+		score++
 	}
 	if metrics.maxConsonants >= 6 {
 		score += 2
@@ -475,7 +514,10 @@ func meaningfulTextGibberishScore(metrics meaningfulTextMetrics, value string) i
 	if metrics.repeatedChunks {
 		score += 2
 	}
-	if metrics.letterCount >= 16 && float64(metrics.uniqueLetters)/float64(metrics.letterCount) < 0.25 {
+	if keyboardMashRegex.MatchString(value) {
+		score += 2
+	}
+	if metrics.latinLetterCount >= 16 && float64(metrics.uniqueLetters)/float64(metrics.latinLetterCount) < 0.25 {
 		score++
 	}
 	return score
@@ -487,7 +529,7 @@ func hasRepeatedChunk(word string) bool {
 		return false
 	}
 
-	for chunkLength := 1; chunkLength <= 4; chunkLength++ {
+	for chunkLength := 1; chunkLength <= 8; chunkLength++ {
 		for start := 0; start+chunkLength*3 <= len(runes); start++ {
 			chunk := string(runes[start : start+chunkLength])
 			repeats := 1

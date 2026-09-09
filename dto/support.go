@@ -4,19 +4,14 @@ import "time"
 
 type CreateSupportTicketRequest struct {
 	Email        string `json:"email" binding:"required,email,max=255"`
-	Category     string `json:"category" binding:"required,oneof=account_locked account_deactivated email_verification lost_2fa billing bug_report feature_request other"`
-	Subject      string `json:"subject" binding:"required,min=5,max=255,meaningful_text"`
-	Description  string `json:"description" binding:"required,min=10,max=5000,meaningful_text"`
+	Category     string `json:"category" binding:"required,oneof=account_locked account_deactivated email_verification lost_2fa billing bug_report feature_request suspicious_link other"`
+	Subject      string `json:"subject" binding:"required,min=5,max=255"`
+	Description  string `json:"description" binding:"required,min=10,max=5000"`
 	CaptchaToken string `json:"captcha_token" binding:"required,min=10,max=4096"`
 }
 
 type CreateSupportTicketResponse struct {
 	TicketCode string `json:"ticket_code"`
-}
-
-type TrackSupportTicketQuery struct {
-	Ticket string `form:"ticket" binding:"required,min=6,max=20"`
-	Email  string `form:"email" binding:"required,email,max=255"`
 }
 
 type TrackSupportTicketResponse struct {
@@ -110,7 +105,6 @@ type SupportOTPChallengeResponse struct {
 }
 
 type SupportAccessResponse struct {
-	AccessToken      string                     `json:"access_token"`
 	ExpiresInSeconds int                        `json:"expires_in_seconds"`
 	Ticket           TrackSupportTicketResponse `json:"ticket"`
 }

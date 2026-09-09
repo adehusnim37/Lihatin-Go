@@ -21,6 +21,7 @@ const (
 	TicketCategoryBilling            TicketCategory = "billing"
 	TicketCategoryBugReport          TicketCategory = "bug_report"
 	TicketCategoryFeatureRequest     TicketCategory = "feature_request"
+	TicketCategorySuspiciousLink     TicketCategory = "suspicious_link"
 	TicketCategoryOther              TicketCategory = "other"
 )
 
