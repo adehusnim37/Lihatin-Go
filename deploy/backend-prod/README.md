@@ -23,6 +23,7 @@ For same-host deployment with split compose projects:
 - DB name in `DATABASE_URL` must match `MARIADB_DATABASE` from db stack exactly (default: `lihatin_go`, lowercase)
 - DB user/password in `DATABASE_URL` must match `MARIADB_USER`/`MARIADB_PASSWORD` from db stack
 - `REDIS_ADDR` should target `lihatin-valkey:6379`
+- `SHORT_CODE_PERMUTATION_SECRET` must contain at least 32 characters and remain unchanged after codes have been allocated
 
 ### Using Doppler on the VPS
 

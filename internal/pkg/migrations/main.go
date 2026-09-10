@@ -9,6 +9,7 @@ import (
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // runMigrations handles all model migrations
@@ -67,6 +68,16 @@ func RunMigrations(db *gorm.DB) error {
 	if err := db.AutoMigrate(&shortlink.ShortLink{}); err != nil {
 		return fmt.Errorf("failed to migrate ShortLink model: %w", err)
 	}
+	if err := normalizeShortCodeCollation(db); err != nil {
+		return err
+	}
+
+	if err := db.AutoMigrate(&shortlink.ShortCodeAllocator{}); err != nil {
+		return fmt.Errorf("failed to migrate ShortCodeAllocator model: %w", err)
+	}
+	if err := seedShortCodeAllocators(db); err != nil {
+		return err
+	}
 
 	if err := db.AutoMigrate(&shortlink.ShortLinkDetail{}); err != nil {
 		return fmt.Errorf("failed to migrate ShortLinkDetail model: %w", err)
@@ -118,6 +129,57 @@ func RunMigrations(db *gorm.DB) error {
 	}
 
 	log.Println("✅ All models migrated successfully!")
+	return nil
+}
+
+func normalizeShortCodeCollation(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("gorm DB is required")
+	}
+	if db.Dialector.Name() != "mysql" || !db.Migrator().HasTable(&shortlink.ShortLink{}) {
+		return nil
+	}
+
+	var currentCollation string
+	if err := db.Raw(`
+		SELECT COLLATION_NAME
+		FROM INFORMATION_SCHEMA.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE()
+		  AND TABLE_NAME = 'short_links'
+		  AND COLUMN_NAME = 'short_code'
+	`).Scan(&currentCollation).Error; err != nil {
+		return fmt.Errorf("failed to inspect short_links.short_code collation: %w", err)
+	}
+	if currentCollation == "ascii_bin" {
+		return nil
+	}
+
+	log.Printf("ℹ️ Changing short_links.short_code collation from %q to ascii_bin", currentCollation)
+	if err := db.Exec(`
+		ALTER TABLE short_links
+		MODIFY COLUMN short_code VARCHAR(100)
+		CHARACTER SET ascii COLLATE ascii_bin NOT NULL
+	`).Error; err != nil {
+		return fmt.Errorf("failed to apply ascii_bin collation to short_links.short_code: %w", err)
+	}
+	return nil
+}
+
+func seedShortCodeAllocators(db *gorm.DB) error {
+	allocators := make([]shortlink.ShortCodeAllocator, 0, shortlink.MaxShortCodeLength-shortlink.MinShortCodeLength+1)
+	for length := shortlink.MinShortCodeLength; length <= shortlink.MaxShortCodeLength; length++ {
+		allocators = append(allocators, shortlink.ShortCodeAllocator{
+			CodeLength: uint8(length),
+			Capacity:   shortlink.ShortCodeCapacity(length),
+		})
+	}
+
+	if err := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "code_length"}},
+		DoUpdates: clause.AssignmentColumns([]string{"capacity"}),
+	}).Create(&allocators).Error; err != nil {
+		return fmt.Errorf("failed to seed short code allocators: %w", err)
+	}
 	return nil
 }
 

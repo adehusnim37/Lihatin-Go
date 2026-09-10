@@ -84,6 +84,7 @@ cp .env.example .env
 - `JWT_SECRET`
 - `SESSION_SECRET`
 - `CSRF_SECRET` (required in production; use at least 32 random bytes)
+- `SHORT_CODE_PERMUTATION_SECRET` (at least 32 characters and must remain stable; changing it changes future code allocation order)
 - `PREMIUM_CODE_SECRET`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
 - `APP_PORT` (default `:8080`)

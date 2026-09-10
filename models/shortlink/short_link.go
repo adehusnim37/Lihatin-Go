@@ -10,7 +10,7 @@ import (
 type ShortLink struct {
 	ID          string         `json:"id" gorm:"primaryKey"`                                                                     // Changed to string for consistency
 	UserID      *string        `json:"user_id,omitempty" gorm:"size:191;index;index:idx_short_links_user_created_at,priority:1"` // Foreign key to users table (nullable for optional auth)
-	ShortCode   string         `json:"short_code" gorm:"uniqueIndex;size:100;not null"`
+	ShortCode   string         `json:"short_code" gorm:"type:varchar(100) CHARACTER SET ascii COLLATE ascii_bin;not null;uniqueIndex"`
 	OriginalURL string         `json:"original_url" gorm:"type:text;not null"`
 	Title       string         `json:"title,omitempty" gorm:"size:255"`
 	Description string         `json:"description,omitempty" gorm:"type:text"`

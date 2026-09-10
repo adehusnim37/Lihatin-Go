@@ -40,6 +40,7 @@ BCRYPT_COST=12
 ALLOWED_ORIGINS=http://localhost:3000,https://yourapp.com
 AUTH_COOKIE_SAME_SITE=lax
 CSRF_SECRET=generate-at-least-32-random-bytes
+SHORT_CODE_PERMUTATION_SECRET=generate-at-least-32-random-bytes-and-keep-it-stable
 ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
 ALLOWED_HEADERS=Content-Type,Authorization
 ```

@@ -1,10 +1,8 @@
 package shortlink
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/url"
 	"sort"
 	"strings"
@@ -44,12 +42,14 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 		}
 	}
 
-	if link.CustomCode == "" {
-		generatedCode, err := r.generateCustomCode()
+	isGeneratedCode := link.CustomCode == ""
+	var permutationKey []byte
+	if isGeneratedCode {
+		var err error
+		permutationKey, err = loadShortCodePermutationKey()
 		if err != nil {
 			return nil, nil, apperrors.ErrShortCreatedFailed.WithError(err)
 		}
-		link.CustomCode = generatedCode
 	}
 
 	// Handle nullable UserID - convert string to *string for database
@@ -98,9 +98,33 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 		UTMContent:  utmContent,
 	}
 
-	// Use transaction to ensure both shortLink and shortLinkDetail are created atomically
+	// The allocator reservation, short link, and detail are committed atomically. If
+	// any write fails, the counter is rolled back together with the link.
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&shortLink).Error; err != nil {
+		if isGeneratedCode {
+			allocator := newShortCodeAllocatorSession(tx, permutationKey)
+			for {
+				code, err := allocator.nextCode()
+				if err != nil {
+					return apperrors.ErrShortCreatedFailed.WithError(err)
+				}
+				shortLink.ShortCode = code
+
+				if err := tx.Create(&shortLink).Error; err != nil {
+					if isDuplicateKeyError(err) {
+						// Existing custom/legacy codes can occupy an ordinal. Consume
+						// it and deterministically try the next one.
+						continue
+					}
+					logger.Logger.Error("Failed to create short link", "error", err.Error())
+					return apperrors.ErrShortCreatedFailed.WithError(err)
+				}
+				if err := allocator.flush(); err != nil {
+					return apperrors.ErrShortCreatedFailed.WithError(err)
+				}
+				break
+			}
+		} else if err := tx.Create(&shortLink).Error; err != nil {
 			logger.Logger.Error("Failed to create short link", "error", err.Error())
 			if isDuplicateKeyError(err) {
 				return apperrors.ErrDuplicateShortCode
@@ -119,6 +143,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	if err != nil {
 		return nil, nil, err
 	}
+	link.CustomCode = shortLink.ShortCode
 
 	logger.Logger.Info("Short link created successfully",
 		"id", shortLink.ID,
@@ -139,42 +164,61 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 		return nil, nil, apperrors.ErrBulkCreateLimitExceeded
 	}
 
-	preparedLinks, err := r.prepareBulkShortLinkRequests(links)
-	if err != nil {
-		logger.Logger.Error("Failed to prepare bulk short links", "error", err.Error())
-		return nil, nil, apperrors.ErrShortBulkCreateFailed.WithError(err)
+	hasGeneratedCode := false
+	for i := range links {
+		if links[i].CustomCode == "" {
+			hasGeneratedCode = true
+			break
+		}
+	}
+	var permutationKey []byte
+	if hasGeneratedCode {
+		var err error
+		permutationKey, err = loadShortCodePermutationKey()
+		if err != nil {
+			return nil, nil, apperrors.ErrShortBulkCreateFailed.WithError(err)
+		}
 	}
 
-	createdLinks := make([]shortlink.ShortLink, 0, len(preparedLinks))
-	createdDetails := make([]shortlink.ShortLinkDetail, 0, len(preparedLinks))
-	for _, linkReq := range preparedLinks {
-		var userIDPtr *string
-		if linkReq.UserID != "" {
-			userID := linkReq.UserID
-			userIDPtr = &userID
+	var createdLinks []shortlink.ShortLink
+	var createdDetails []shortlink.ShortLinkDetail
+
+	// Allocation and both batch inserts share one transaction. Bulk allocation
+	// locks one allocator row and advances it once, rather than once per link.
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		preparedLinks, err := r.prepareBulkShortLinkRequests(tx, links, permutationKey)
+		if err != nil {
+			return err
 		}
 
-		createdLinks = append(createdLinks, shortlink.ShortLink{
-			ID:          identifier.NewUUIDV7(),
-			UserID:      userIDPtr,
-			ShortCode:   linkReq.CustomCode,
-			OriginalURL: linkReq.OriginalURL,
-			Title:       linkReq.Title,
-			Description: linkReq.Description,
-			ExpiresAt:   linkReq.ExpiresAt,
-		})
-	}
+		createdLinks = make([]shortlink.ShortLink, 0, len(preparedLinks))
+		createdDetails = make([]shortlink.ShortLinkDetail, 0, len(preparedLinks))
+		for _, linkReq := range preparedLinks {
+			var userIDPtr *string
+			if linkReq.UserID != "" {
+				userID := linkReq.UserID
+				userIDPtr = &userID
+			}
 
-	for i, linkReq := range preparedLinks {
-		createdDetails = append(createdDetails, shortlink.ShortLinkDetail{
-			ID:          identifier.NewUUIDV7(),
-			ShortLinkID: createdLinks[i].ID,
-			Passcode:    helpers.StringToInt(linkReq.Passcode),
-		})
-	}
+			createdLinks = append(createdLinks, shortlink.ShortLink{
+				ID:          identifier.NewUUIDV7(),
+				UserID:      userIDPtr,
+				ShortCode:   linkReq.CustomCode,
+				OriginalURL: linkReq.OriginalURL,
+				Title:       linkReq.Title,
+				Description: linkReq.Description,
+				ExpiresAt:   linkReq.ExpiresAt,
+			})
+		}
 
-	// Single transaction for all operations
-	err = r.db.Transaction(func(tx *gorm.DB) error {
+		for i, linkReq := range preparedLinks {
+			createdDetails = append(createdDetails, shortlink.ShortLinkDetail{
+				ID:          identifier.NewUUIDV7(),
+				ShortLinkID: createdLinks[i].ID,
+				Passcode:    helpers.StringToInt(linkReq.Passcode),
+			})
+		}
+
 		if err := tx.Create(&createdLinks).Error; err != nil {
 			if isDuplicateKeyError(err) {
 				return apperrors.ErrDuplicateShortCode
@@ -202,130 +246,43 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 	return createdLinks, createdDetails, nil
 }
 
-// shortCodeCharset is the alphabet used to build random short codes.
-const shortCodeCharset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-
-const (
-	minShortCodeLength        = 2
-	maxShortCodeLength        = 8
-	maxCodeAttemptsPerLength  = 5
-	shortCodeSaturationFactor = 0.9
-)
-
-// generateCustomCode generates a unique short code with a dynamically growing length.
-// It starts at minShortCodeLength characters. If the space for that length is getting full
-// (based on how many short links already exist in the DB) or a collision keeps happening,
-// it automatically escalates to the next length (2 -> 3 -> 4 -> ...) up to maxShortCodeLength.
-func (r *ShortLinkRepository) generateCustomCode() (string, error) {
-	length, err := r.availableShortCodeLength()
-	if err != nil {
-		return "", err
-	}
-
-	for length <= maxShortCodeLength {
-		for range maxCodeAttemptsPerLength {
-			code, err := randomCode(length)
-			if err != nil {
-				return "", err
-			}
-
-			var count int64
-			if err := r.db.Unscoped().Model(&shortlink.ShortLink{}).
-				Where("short_code = ?", code).
-				Count(&count).Error; err != nil {
-				return "", err
-			}
-			if count == 0 {
-				return code, nil
-			}
-		}
-		length++
-	}
-
-	return "", fmt.Errorf("unable to allocate a unique short code up to %d characters", maxShortCodeLength)
-}
-
-// availableShortCodeLength reads the usage of all dynamic lengths in one query.
-// A length is considered full at 90% so collision retries do not dominate creation.
-func (r *ShortLinkRepository) availableShortCodeLength() (int, error) {
-	type lengthUsage struct {
-		CodeLength int
-		Count      int64
-	}
-
-	var usages []lengthUsage
-	if err := r.db.Unscoped().Model(&shortlink.ShortLink{}).
-		Select("CHAR_LENGTH(short_code) AS code_length, COUNT(*) AS count").
-		Where("CHAR_LENGTH(short_code) BETWEEN ? AND ?", minShortCodeLength, maxShortCodeLength-1).
-		Group("CHAR_LENGTH(short_code)").
-		Scan(&usages).Error; err != nil {
-		return 0, err
-	}
-
-	counts := make(map[int]int64, len(usages))
-	for _, usage := range usages {
-		counts[usage.CodeLength] = usage.Count
-	}
-	for length := minShortCodeLength; length < maxShortCodeLength; length++ {
-		if float64(counts[length]) < float64(shortCodeCapacity(length))*shortCodeSaturationFactor {
-			return length, nil
-		}
-	}
-	return maxShortCodeLength, nil
-}
-
-func shortCodeCapacity(length int) int64 {
-	capacity := int64(1)
-	base := int64(len(shortCodeCharset))
-	for range length {
-		capacity *= base
-	}
-	return capacity
-}
-
-func (r *ShortLinkRepository) prepareBulkShortLinkRequests(links []dto.CreateShortLinkRequest) ([]dto.CreateShortLinkRequest, error) {
+func (r *ShortLinkRepository) prepareBulkShortLinkRequests(tx *gorm.DB, links []dto.CreateShortLinkRequest, permutationKey []byte) ([]dto.CreateShortLinkRequest, error) {
 	prepared := append([]dto.CreateShortLinkRequest(nil), links...)
 	generated := make([]bool, len(prepared))
-	lengths := make([]int, len(prepared))
-	attempts := make([]int, len(prepared))
 	reserved := make(map[string]struct{}, len(prepared))
 
-	hasGeneratedCode := false
+	customCodes := make([]string, 0, len(prepared))
 	for i := range prepared {
 		if prepared[i].CustomCode == "" {
 			generated[i] = true
-			hasGeneratedCode = true
 			continue
 		}
 		if _, exists := reserved[prepared[i].CustomCode]; exists {
 			return nil, apperrors.ErrDuplicateShortCodeInBatch
 		}
 		reserved[prepared[i].CustomCode] = struct{}{}
+		customCodes = append(customCodes, prepared[i].CustomCode)
 	}
 
-	startLength := minShortCodeLength
-	if hasGeneratedCode {
-		var err error
-		startLength, err = r.availableShortCodeLength()
-		if err != nil {
+	if len(customCodes) > 0 {
+		var existingCustomCodes []string
+		if err := tx.Unscoped().Model(&shortlink.ShortLink{}).
+			Where("short_code IN ?", customCodes).
+			Pluck("short_code", &existingCustomCodes).Error; err != nil {
 			return nil, apperrors.ErrShortGetFailed.WithError(err)
+		}
+		if len(existingCustomCodes) > 0 {
+			return nil, apperrors.ErrDuplicateShortCode
 		}
 	}
 
+	allocator := newShortCodeAllocatorSession(tx, permutationKey)
 	generateAt := func(i int) error {
 		for {
-			if attempts[i] >= maxCodeAttemptsPerLength {
-				lengths[i]++
-				attempts[i] = 0
-			}
-			if lengths[i] > maxShortCodeLength {
-				return fmt.Errorf("unable to allocate a unique bulk short code up to %d characters", maxShortCodeLength)
-			}
-			code, err := randomCode(lengths[i])
+			code, err := allocator.nextCode()
 			if err != nil {
 				return err
 			}
-			attempts[i]++
 			if _, exists := reserved[code]; exists {
 				continue
 			}
@@ -337,7 +294,6 @@ func (r *ShortLinkRepository) prepareBulkShortLinkRequests(links []dto.CreateSho
 
 	for i := range prepared {
 		if generated[i] {
-			lengths[i] = startLength
 			if err := generateAt(i); err != nil {
 				return nil, apperrors.ErrShortCreatedFailed.WithError(err)
 			}
@@ -351,12 +307,15 @@ func (r *ShortLinkRepository) prepareBulkShortLinkRequests(links []dto.CreateSho
 		}
 
 		var existingCodes []string
-		if err := r.db.Unscoped().Model(&shortlink.ShortLink{}).
+		if err := tx.Unscoped().Model(&shortlink.ShortLink{}).
 			Where("short_code IN ?", codes).
 			Pluck("short_code", &existingCodes).Error; err != nil {
 			return nil, apperrors.ErrShortGetFailed.WithError(err)
 		}
 		if len(existingCodes) == 0 {
+			if err := allocator.flush(); err != nil {
+				return nil, apperrors.ErrShortCreatedFailed.WithError(err)
+			}
 			return prepared, nil
 		}
 
@@ -391,20 +350,6 @@ func isDuplicateKeyError(err error) bool {
 	}
 	var mysqlErr *mysqldriver.MySQLError
 	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
-}
-
-// randomCode generates a random string of the given length using shortCodeCharset.
-func randomCode(length int) (string, error) {
-	code := make([]byte, length)
-	max := big.NewInt(int64(len(shortCodeCharset)))
-	for i := range code {
-		idx, err := rand.Int(rand.Reader, max)
-		if err != nil {
-			return "", err
-		}
-		code[i] = shortCodeCharset[idx.Int64()]
-	}
-	return string(code), nil
 }
 
 // GetShortsByUserIDWithPagination gets short links with pagination and sorting

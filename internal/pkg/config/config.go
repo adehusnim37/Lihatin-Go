@@ -114,6 +114,7 @@ const (
 	EnvAuthCookieSameSite             = "AUTH_COOKIE_SAME_SITE"
 	EnvRateLimit                      = "RATE_LIMIT"
 	EnvPremiumCodeSecret              = "PREMIUM_CODE_SECRET"
+	EnvShortCodePermutationSecret     = "SHORT_CODE_PERMUTATION_SECRET"
 	EnvAuthEnforceTOTPForPrivileged   = "AUTH_ENFORCE_TOTP_FOR_PRIVILEGED"
 	EnvAuthSecondFactorLimitPerUserIP = "AUTH_SECOND_FACTOR_LIMIT_PER_USER_IP"
 	EnvAuthSecondFactorLimitPerIP     = "AUTH_SECOND_FACTOR_LIMIT_PER_IP"
