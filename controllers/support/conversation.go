@@ -1010,9 +1010,12 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 			return failAfterPartialUpload(fmt.Errorf("attachment file cannot be empty"))
 		}
 
-		contentType := strings.TrimSpace(header.Header.Get("Content-Type"))
-		if contentType == "" {
-			contentType = http.DetectContentType(fileData)
+		contentType := http.DetectContentType(fileData)
+		switch contentType {
+		case "application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif":
+			// Supported support-ticket attachment.
+		default:
+			return failAfterPartialUpload(fmt.Errorf("only PDF and image files (JPG, PNG, WebP, GIF) are allowed"))
 		}
 		if len(contentType) > 100 {
 			contentType = contentType[:100]
@@ -1112,6 +1115,11 @@ func (c *Controller) sendAttachment(ctx *gin.Context, attachment *supportmodel.S
 		contentType = "application/octet-stream"
 	}
 	ctx.Header("Cache-Control", "private, no-store")
-	ctx.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.FileName}))
+	disposition := "attachment"
+	if ctx.Query("disposition") == "inline" &&
+		(contentType == "application/pdf" || contentType == "image/jpeg") {
+		disposition = "inline"
+	}
+	ctx.Header("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.FileName}))
 	ctx.DataFromReader(http.StatusOK, contentLength, contentType, body, nil)
 }
