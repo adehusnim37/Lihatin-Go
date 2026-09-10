@@ -30,10 +30,17 @@ func NewShortLinkRepository(db *gorm.DB) *ShortLinkRepository {
 }
 
 func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) (*shortlink.ShortLink, *shortlink.ShortLinkDetail, error) {
-	// Check for duplicate short code first
+	// Fast-path UX check: if the user supplied a custom code, look it up first so we can
+	// return a clear error quickly instead of waiting for the DB unique constraint to fire.
+	// NOTE: this is purely a UX optimization - the unique index on short_code is still the
+	// real safety net against race conditions (two requests could pass this check at the
+	// same time), so we still handle gorm.ErrDuplicatedKey below.
 	if link.CustomCode != "" {
 		if err := r.db.Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
 			return nil, nil, apperrors.ErrDuplicateShortCode
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Logger.Error("Database error while checking duplicate short code", "error", err.Error())
+			return nil, nil, apperrors.ErrShortGetFailed.WithError(err)
 		}
 	}
 
@@ -146,7 +153,7 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 				}
 			}
 
-			// Check existing codes in database
+			// Check existing codes in database. This already checks in generateCustomCode.
 			var existingLink shortlink.ShortLink
 			if err := tx.Where("short_code = ?", linkReq.CustomCode).First(&existingLink).Error; err == nil {
 				return apperrors.ErrDuplicateShortCode
@@ -203,25 +210,93 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 	return createdLinks, createdDetails, nil
 }
 
+// shortCodeCharset is the alphabet used to build random short codes.
+const shortCodeCharset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+// generateCustomCode generates a unique short code with a dynamically growing length.
+// It starts at minCodeLength characters. If the space for that length is getting full
+// (based on how many short links already exist in the DB) or a collision keeps happening,
+// it automatically escalates to the next length (2 -> 3 -> 4 -> ...) up to maxCodeLength.
 func (r *ShortLinkRepository) generateCustomCode(url string) string {
-	// Encode the URL to base64 and take 4 random characters from the encoded string
-	encodedString := base64.RawURLEncoding.EncodeToString([]byte(url))
-	if encodedString == "" {
-		encodedString = "shortlink"
+	const (
+		minCodeLength     = 2
+		maxCodeLength     = 8
+		maxAttemptsPerLen = 5 // how many random tries before growing the length
+	)
+
+	length := minCodeLength
+
+	// Skip lengths whose keyspace is already saturated (e.g. > 90% used),
+	// so we don't waste attempts colliding against a nearly-full space.
+	for length < maxCodeLength && r.isCodeSpaceSaturated(length) {
+		length++
 	}
 
-	code := make([]byte, 4)
-	max := big.NewInt(int64(len(encodedString))) // Use the length of the encoded string for random index generation
-	for i := range code {                        // Generate 4 random characters
-		idx, err := rand.Int(rand.Reader, max)
-		if err != nil { // Fallback to deterministic character if random generation fails
-			logger.Logger.Error("Failed to generate random index for short code", "error", err)
-			code[i] = encodedString[i%len(encodedString)]
-			continue
+	for length <= maxCodeLength {
+		for range maxAttemptsPerLen {
+			code, err := randomCode(length)
+			if err != nil {
+				logger.Logger.Error("Failed to generate random short code", "error", err, "length", length)
+				continue
+			}
+
+			var existing shortlink.ShortLink
+			err = r.db.Where("short_code = ?", code).First(&existing).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return code // Unique code found
+			}
+			if err != nil {
+				logger.Logger.Error("Database error while checking short code uniqueness", "error", err, "code", code)
+			}
+			// Collision (or DB error) - try again, escalate length after enough attempts
 		}
-		code[i] = encodedString[idx.Int64()]
+		length++ // Ran out of attempts at this length, grow it
 	}
-	return string(code)
+
+	// Extremely unlikely fallback: derive a code from the URL + timestamp to avoid a hard failure
+	fallback := base64.RawURLEncoding.EncodeToString([]byte(url + time.Now().String()))
+	if len(fallback) > maxCodeLength {
+		fallback = fallback[:maxCodeLength]
+	}
+	logger.Logger.Warn("Exhausted random short code attempts, using fallback code", "fallback", fallback)
+	return fallback
+}
+
+// isCodeSpaceSaturated reports whether the keyspace for a given code length is
+// getting full enough (>90% of possible combinations already used) that we
+// should move on to the next length instead of wasting random attempts.
+func (r *ShortLinkRepository) isCodeSpaceSaturated(length int) bool {
+	var count int64
+	// Cheap approximation: count how many existing short codes have this exact length.
+	if err := r.db.Model(&shortlink.ShortLink{}).
+		Where("LENGTH(short_code) = ?", length).
+		Count(&count).Error; err != nil {
+		logger.Logger.Error("Failed to count short codes for saturation check", "error", err, "length", length)
+		return false
+	}
+
+	capacity := int64(1)
+	base := int64(len(shortCodeCharset))
+	for range length {
+		capacity *= base
+	}
+
+	// Consider saturated once 90% of the space is used.
+	return float64(count) >= float64(capacity)*0.9
+}
+
+// randomCode generates a random string of the given length using shortCodeCharset.
+func randomCode(length int) (string, error) {
+	code := make([]byte, length)
+	max := big.NewInt(int64(len(shortCodeCharset)))
+	for i := range code {
+		idx, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", err
+		}
+		code[i] = shortCodeCharset[idx.Int64()]
+	}
+	return string(code), nil
 }
 
 // GetShortsByUserIDWithPagination gets short links with pagination and sorting
