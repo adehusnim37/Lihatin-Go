@@ -8,24 +8,24 @@ import (
 
 // ShortLinkDetail stores additional metadata and settings for short links
 type ShortLinkDetail struct {
-	ID                     string         `json:"id" gorm:"primaryKey"`                         // Changed to string for consistency
-	ShortLinkID            string         `json:"short_link_id" gorm:"size:191;not null;index"` // Foreign key, changed to string
-	Passcode               int            `json:"passcode,omitempty" validate:"max=6,numeric"`  // Removed gorm:"size:6"
-	ClickLimit             int            `json:"click_limit" gorm:"default:0"`                 // 0 means unlimited
-	CurrentClicks          int            `json:"current_clicks" gorm:"default:0"`
-	EnableStats            bool           `json:"enable_stats" gorm:"default:true"`
-	IsBanned               bool           `json:"is_banned" gorm:"default:false"`
-	BannedReason           string         `json:"banned_reason,omitempty" gorm:"size:255"`
-	BannedBy               *string        `json:"banned_by,omitempty" gorm:"size:191"` // Admin user ID who banned the link
-	CustomDomain           string         `json:"custom_domain,omitempty" gorm:"size:255"`
-	UTMSource              string         `json:"utm_source,omitempty" gorm:"size:100"`
-	UTMMedium              string         `json:"utm_medium,omitempty" gorm:"size:100"`
-	UTMCampaign            string         `json:"utm_campaign,omitempty" gorm:"size:100"`
-	UTMTerm                string         `json:"utm_term,omitempty" gorm:"size:100"`
-	UTMContent             string         `json:"utm_content,omitempty" gorm:"size:100"`
-	CreatedAt              time.Time      `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt              time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt              gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	ID            string         `json:"id" gorm:"primaryKey"`                                                                     // Changed to string for consistency
+	ShortLinkID   string         `json:"short_link_id" gorm:"size:191;not null;uniqueIndex:uidx_short_link_details_short_link_id"` // One detail row per short link
+	Passcode      int            `json:"passcode,omitempty" validate:"max=6,numeric"`                                              // Removed gorm:"size:6"
+	ClickLimit    int            `json:"click_limit" gorm:"default:0"`                                                             // 0 means unlimited
+	CurrentClicks int            `json:"current_clicks" gorm:"default:0"`
+	EnableStats   bool           `json:"enable_stats" gorm:"default:true"`
+	IsBanned      bool           `json:"is_banned" gorm:"default:false"`
+	BannedReason  string         `json:"banned_reason,omitempty" gorm:"size:255"`
+	BannedBy      *string        `json:"banned_by,omitempty" gorm:"size:191"` // Admin user ID who banned the link
+	CustomDomain  string         `json:"custom_domain,omitempty" gorm:"size:255"`
+	UTMSource     string         `json:"utm_source,omitempty" gorm:"size:100"`
+	UTMMedium     string         `json:"utm_medium,omitempty" gorm:"size:100"`
+	UTMCampaign   string         `json:"utm_campaign,omitempty" gorm:"size:100"`
+	UTMTerm       string         `json:"utm_term,omitempty" gorm:"size:100"`
+	UTMContent    string         `json:"utm_content,omitempty" gorm:"size:100"`
+	CreatedAt     time.Time      `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt     gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 
 	// Relationships
 	ShortLink ShortLink `json:"short_link,omitempty" gorm:"foreignKey:ShortLinkID;references:ID"`

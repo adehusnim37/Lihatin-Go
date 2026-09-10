@@ -2,7 +2,6 @@ package shortlink
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/big"
@@ -18,6 +17,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/ip"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	shortlink "github.com/adehusnim37/lihatin-go/models/shortlink"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -36,7 +36,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	// real safety net against race conditions (two requests could pass this check at the
 	// same time), so we still handle gorm.ErrDuplicatedKey below.
 	if link.CustomCode != "" {
-		if err := r.db.Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
+		if err := r.db.Unscoped().Select("id").Where("short_code = ?", link.CustomCode).First(&shortlink.ShortLink{}).Error; err == nil {
 			return nil, nil, apperrors.ErrDuplicateShortCode
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Logger.Error("Database error while checking duplicate short code", "error", err.Error())
@@ -45,7 +45,11 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	}
 
 	if link.CustomCode == "" {
-		link.CustomCode = r.generateCustomCode(link.OriginalURL)
+		generatedCode, err := r.generateCustomCode()
+		if err != nil {
+			return nil, nil, apperrors.ErrShortCreatedFailed.WithError(err)
+		}
+		link.CustomCode = generatedCode
 	}
 
 	// Handle nullable UserID - convert string to *string for database
@@ -98,7 +102,7 @@ func (r *ShortLinkRepository) CreateShortLink(link *dto.CreateShortLinkRequest) 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&shortLink).Error; err != nil {
 			logger.Logger.Error("Failed to create short link", "error", err.Error())
-			if errors.Is(err, gorm.ErrDuplicatedKey) {
+			if isDuplicateKeyError(err) {
 				return apperrors.ErrDuplicateShortCode
 			}
 			return apperrors.ErrShortCreatedFailed.WithError(err)
@@ -135,63 +139,51 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 		return nil, nil, apperrors.ErrBulkCreateLimitExceeded
 	}
 
-	var createdLinks []shortlink.ShortLink
-	var createdDetails []shortlink.ShortLinkDetail
+	preparedLinks, err := r.prepareBulkShortLinkRequests(links)
+	if err != nil {
+		logger.Logger.Error("Failed to prepare bulk short links", "error", err.Error())
+		return nil, nil, apperrors.ErrShortBulkCreateFailed.WithError(err)
+	}
+
+	createdLinks := make([]shortlink.ShortLink, 0, len(preparedLinks))
+	createdDetails := make([]shortlink.ShortLinkDetail, 0, len(preparedLinks))
+	for _, linkReq := range preparedLinks {
+		var userIDPtr *string
+		if linkReq.UserID != "" {
+			userID := linkReq.UserID
+			userIDPtr = &userID
+		}
+
+		createdLinks = append(createdLinks, shortlink.ShortLink{
+			ID:          identifier.NewUUIDV7(),
+			UserID:      userIDPtr,
+			ShortCode:   linkReq.CustomCode,
+			OriginalURL: linkReq.OriginalURL,
+			Title:       linkReq.Title,
+			Description: linkReq.Description,
+			ExpiresAt:   linkReq.ExpiresAt,
+		})
+	}
+
+	for i, linkReq := range preparedLinks {
+		createdDetails = append(createdDetails, shortlink.ShortLinkDetail{
+			ID:          identifier.NewUUIDV7(),
+			ShortLinkID: createdLinks[i].ID,
+			Passcode:    helpers.StringToInt(linkReq.Passcode),
+		})
+	}
 
 	// Single transaction for all operations
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		for i, linkReq := range links {
-			// Generate short code if not provided
-			if linkReq.CustomCode == "" {
-				linkReq.CustomCode = r.generateCustomCode(linkReq.OriginalURL)
-			}
-
-			// Check for duplicate codes within batch
-			for j := range i {
-				if links[j].CustomCode == linkReq.CustomCode {
-					return apperrors.ErrDuplicateShortCodeInBatch
-				}
-			}
-
-			// Check existing codes in database. This already checks in generateCustomCode.
-			var existingLink shortlink.ShortLink
-			if err := tx.Where("short_code = ?", linkReq.CustomCode).First(&existingLink).Error; err == nil {
+	err = r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&createdLinks).Error; err != nil {
+			if isDuplicateKeyError(err) {
 				return apperrors.ErrDuplicateShortCode
 			}
+			return apperrors.ErrShortCreatedFailed.WithError(err)
+		}
 
-			// Handle nullable UserID
-			var userIDPtr *string
-			if linkReq.UserID != "" {
-				userIDPtr = &linkReq.UserID
-			}
-
-			// Create ShortLink
-			shortLink := shortlink.ShortLink{
-				ID:          identifier.NewUUIDV7(),
-				UserID:      userIDPtr,
-				ShortCode:   linkReq.CustomCode,
-				OriginalURL: linkReq.OriginalURL,
-				Title:       linkReq.Title,
-				Description: linkReq.Description,
-				ExpiresAt:   linkReq.ExpiresAt,
-			}
-
-			if err := tx.Create(&shortLink).Error; err != nil {
-				return apperrors.ErrShortCreatedFailed
-			}
-			createdLinks = append(createdLinks, shortLink)
-
-			// Create ShortLinkDetail
-			shortLinkDetail := shortlink.ShortLinkDetail{
-				ID:          identifier.NewUUIDV7(),
-				ShortLinkID: shortLink.ID,
-				Passcode:    helpers.StringToInt(linkReq.Passcode),
-			}
-
-			if err := tx.Create(&shortLinkDetail).Error; err != nil {
-				return apperrors.ErrShortDetailCreatedFailed
-			}
-			createdDetails = append(createdDetails, shortLinkDetail)
+		if err := tx.Create(&createdDetails).Error; err != nil {
+			return apperrors.ErrShortDetailCreatedFailed.WithError(err)
 		}
 
 		return nil
@@ -213,76 +205,192 @@ func (r *ShortLinkRepository) CreateBulkShortLinks(links []dto.CreateShortLinkRe
 // shortCodeCharset is the alphabet used to build random short codes.
 const shortCodeCharset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
+const (
+	minShortCodeLength        = 2
+	maxShortCodeLength        = 8
+	maxCodeAttemptsPerLength  = 5
+	shortCodeSaturationFactor = 0.9
+)
+
 // generateCustomCode generates a unique short code with a dynamically growing length.
-// It starts at minCodeLength characters. If the space for that length is getting full
+// It starts at minShortCodeLength characters. If the space for that length is getting full
 // (based on how many short links already exist in the DB) or a collision keeps happening,
-// it automatically escalates to the next length (2 -> 3 -> 4 -> ...) up to maxCodeLength.
-func (r *ShortLinkRepository) generateCustomCode(url string) string {
-	const (
-		minCodeLength     = 2
-		maxCodeLength     = 8
-		maxAttemptsPerLen = 5 // how many random tries before growing the length
-	)
+// it automatically escalates to the next length (2 -> 3 -> 4 -> ...) up to maxShortCodeLength.
+func (r *ShortLinkRepository) generateCustomCode() (string, error) {
+	length, err := r.availableShortCodeLength()
+	if err != nil {
+		return "", err
+	}
 
-	length := minCodeLength
+	for length <= maxShortCodeLength {
+		for range maxCodeAttemptsPerLength {
+			code, err := randomCode(length)
+			if err != nil {
+				return "", err
+			}
 
-	// Skip lengths whose keyspace is already saturated (e.g. > 90% used),
-	// so we don't waste attempts colliding against a nearly-full space.
-	for length < maxCodeLength && r.isCodeSpaceSaturated(length) {
+			var count int64
+			if err := r.db.Unscoped().Model(&shortlink.ShortLink{}).
+				Where("short_code = ?", code).
+				Count(&count).Error; err != nil {
+				return "", err
+			}
+			if count == 0 {
+				return code, nil
+			}
+		}
 		length++
 	}
 
-	for length <= maxCodeLength {
-		for range maxAttemptsPerLen {
-			code, err := randomCode(length)
-			if err != nil {
-				logger.Logger.Error("Failed to generate random short code", "error", err, "length", length)
-				continue
-			}
-
-			var existing shortlink.ShortLink
-			err = r.db.Where("short_code = ?", code).First(&existing).Error
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return code // Unique code found
-			}
-			if err != nil {
-				logger.Logger.Error("Database error while checking short code uniqueness", "error", err, "code", code)
-			}
-			// Collision (or DB error) - try again, escalate length after enough attempts
-		}
-		length++ // Ran out of attempts at this length, grow it
-	}
-
-	// Extremely unlikely fallback: derive a code from the URL + timestamp to avoid a hard failure
-	fallback := base64.RawURLEncoding.EncodeToString([]byte(url + time.Now().String()))
-	if len(fallback) > maxCodeLength {
-		fallback = fallback[:maxCodeLength]
-	}
-	logger.Logger.Warn("Exhausted random short code attempts, using fallback code", "fallback", fallback)
-	return fallback
+	return "", fmt.Errorf("unable to allocate a unique short code up to %d characters", maxShortCodeLength)
 }
 
-// isCodeSpaceSaturated reports whether the keyspace for a given code length is
-// getting full enough (>90% of possible combinations already used) that we
-// should move on to the next length instead of wasting random attempts.
-func (r *ShortLinkRepository) isCodeSpaceSaturated(length int) bool {
-	var count int64
-	// Cheap approximation: count how many existing short codes have this exact length.
-	if err := r.db.Model(&shortlink.ShortLink{}).
-		Where("LENGTH(short_code) = ?", length).
-		Count(&count).Error; err != nil {
-		logger.Logger.Error("Failed to count short codes for saturation check", "error", err, "length", length)
-		return false
+// availableShortCodeLength reads the usage of all dynamic lengths in one query.
+// A length is considered full at 90% so collision retries do not dominate creation.
+func (r *ShortLinkRepository) availableShortCodeLength() (int, error) {
+	type lengthUsage struct {
+		CodeLength int
+		Count      int64
 	}
 
+	var usages []lengthUsage
+	if err := r.db.Unscoped().Model(&shortlink.ShortLink{}).
+		Select("CHAR_LENGTH(short_code) AS code_length, COUNT(*) AS count").
+		Where("CHAR_LENGTH(short_code) BETWEEN ? AND ?", minShortCodeLength, maxShortCodeLength-1).
+		Group("CHAR_LENGTH(short_code)").
+		Scan(&usages).Error; err != nil {
+		return 0, err
+	}
+
+	counts := make(map[int]int64, len(usages))
+	for _, usage := range usages {
+		counts[usage.CodeLength] = usage.Count
+	}
+	for length := minShortCodeLength; length < maxShortCodeLength; length++ {
+		if float64(counts[length]) < float64(shortCodeCapacity(length))*shortCodeSaturationFactor {
+			return length, nil
+		}
+	}
+	return maxShortCodeLength, nil
+}
+
+func shortCodeCapacity(length int) int64 {
 	capacity := int64(1)
 	base := int64(len(shortCodeCharset))
 	for range length {
 		capacity *= base
 	}
+	return capacity
+}
 
-	// Consider saturated once 90% of the space is used.
-	return float64(count) >= float64(capacity)*0.9
+func (r *ShortLinkRepository) prepareBulkShortLinkRequests(links []dto.CreateShortLinkRequest) ([]dto.CreateShortLinkRequest, error) {
+	prepared := append([]dto.CreateShortLinkRequest(nil), links...)
+	generated := make([]bool, len(prepared))
+	lengths := make([]int, len(prepared))
+	attempts := make([]int, len(prepared))
+	reserved := make(map[string]struct{}, len(prepared))
+
+	hasGeneratedCode := false
+	for i := range prepared {
+		if prepared[i].CustomCode == "" {
+			generated[i] = true
+			hasGeneratedCode = true
+			continue
+		}
+		if _, exists := reserved[prepared[i].CustomCode]; exists {
+			return nil, apperrors.ErrDuplicateShortCodeInBatch
+		}
+		reserved[prepared[i].CustomCode] = struct{}{}
+	}
+
+	startLength := minShortCodeLength
+	if hasGeneratedCode {
+		var err error
+		startLength, err = r.availableShortCodeLength()
+		if err != nil {
+			return nil, apperrors.ErrShortGetFailed.WithError(err)
+		}
+	}
+
+	generateAt := func(i int) error {
+		for {
+			if attempts[i] >= maxCodeAttemptsPerLength {
+				lengths[i]++
+				attempts[i] = 0
+			}
+			if lengths[i] > maxShortCodeLength {
+				return fmt.Errorf("unable to allocate a unique bulk short code up to %d characters", maxShortCodeLength)
+			}
+			code, err := randomCode(lengths[i])
+			if err != nil {
+				return err
+			}
+			attempts[i]++
+			if _, exists := reserved[code]; exists {
+				continue
+			}
+			prepared[i].CustomCode = code
+			reserved[code] = struct{}{}
+			return nil
+		}
+	}
+
+	for i := range prepared {
+		if generated[i] {
+			lengths[i] = startLength
+			if err := generateAt(i); err != nil {
+				return nil, apperrors.ErrShortCreatedFailed.WithError(err)
+			}
+		}
+	}
+
+	for {
+		codes := make([]string, len(prepared))
+		for i := range prepared {
+			codes[i] = prepared[i].CustomCode
+		}
+
+		var existingCodes []string
+		if err := r.db.Unscoped().Model(&shortlink.ShortLink{}).
+			Where("short_code IN ?", codes).
+			Pluck("short_code", &existingCodes).Error; err != nil {
+			return nil, apperrors.ErrShortGetFailed.WithError(err)
+		}
+		if len(existingCodes) == 0 {
+			return prepared, nil
+		}
+
+		existing := make(map[string]struct{}, len(existingCodes))
+		for _, code := range existingCodes {
+			existing[code] = struct{}{}
+			reserved[code] = struct{}{}
+		}
+
+		regenerated := false
+		for i := range prepared {
+			if _, collides := existing[prepared[i].CustomCode]; !collides {
+				continue
+			}
+			if !generated[i] {
+				return nil, apperrors.ErrDuplicateShortCode
+			}
+			if err := generateAt(i); err != nil {
+				return nil, apperrors.ErrShortCreatedFailed.WithError(err)
+			}
+			regenerated = true
+		}
+		if !regenerated {
+			return nil, apperrors.ErrDuplicateShortCode
+		}
+	}
+}
+
+func isDuplicateKeyError(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	var mysqlErr *mysqldriver.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
 }
 
 // randomCode generates a random string of the given length using shortCodeCharset.
@@ -353,13 +461,32 @@ func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, pag
 		}
 	}
 
+	clickCounts := make(map[string]int64, len(links))
+	if len(links) > 0 {
+		linkIDs := make([]string, len(links))
+		for i := range links {
+			linkIDs[i] = links[i].ID
+		}
+
+		var counts []struct {
+			ShortLinkID string
+			Count       int64
+		}
+		if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+			Select("short_link_id, COUNT(*) AS count").
+			Where("short_link_id IN ?", linkIDs).
+			Group("short_link_id").
+			Scan(&counts).Error; err != nil {
+			return nil, apperrors.ErrShortGetFailed.WithError(err)
+		}
+		for _, count := range counts {
+			clickCounts[count.ShortLinkID] = count.Count
+		}
+	}
+
 	// Convert ShortLink to ShortsLinkResponse with pre-allocated capacity
 	shortLinkResponses := make([]dto.ShortsLinkResponse, 0, len(links))
 	for _, link := range links {
-		// Calculate click count from views using a separate query (more efficient for large datasets)
-		var clickCount int64
-		r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Count(&clickCount)
-
 		shortLinkResponses = append(shortLinkResponses, dto.ShortsLinkResponse{
 			ID:          link.ID, // Now both are strings - consistent!
 			UserID:      link.UserID,
@@ -371,7 +498,7 @@ func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, pag
 			ExpiresAt:   link.ExpiresAt,
 			CreatedAt:   link.CreatedAt,
 			UpdatedAt:   link.UpdatedAt,
-			ClickCount:  int(clickCount), // Real click count from Views
+			ClickCount:  int(clickCounts[link.ID]),
 		})
 	}
 
@@ -393,8 +520,9 @@ func (r *ShortLinkRepository) GetShortsByUserIDWithPagination(userID string, pag
 
 func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAgent, referer, device, browser, os string, passcode int) (*shortlink.ShortLink, error) {
 	var link shortlink.ShortLink
-	// Find the short link by code with proper validation
-	err := r.db.Where("short_code = ?", code).First(&link).Error
+	// Detail is required for every redirect, so load the one-to-one association in
+	// the same round trip as the short link.
+	err := r.db.Joins("Detail").Where("short_links.short_code = ?", code).First(&link).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Logger.Warn("Short link not found",
@@ -438,15 +566,13 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		return nil, apperrors.ErrShortLinkExpired
 	}
 
-	// Check passcode if provided
-	var detail shortlink.ShortLinkDetail
-	if err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error; err != nil {
+	if link.Detail == nil {
 		logger.Logger.Error("Failed to fetch short link detail",
 			"short_code", code,
-			"error", err.Error(),
 		)
 		return nil, apperrors.ErrShortDetailNotFound
 	}
+	detail := *link.Detail
 
 	// Passcode checks
 	if detail.Passcode != 0 && passcode == 0 {
@@ -483,22 +609,31 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 		return nil, apperrors.ErrClickLimitReached
 	}
 
-	// Atomic increment for click count using GORM expression
-	if err := r.db.Model(&shortlink.ShortLinkDetail{}).
-		Where("id = ?", detail.ID).
+	// The limit predicate and increment happen atomically. The earlier check is only
+	// a fast path; RowsAffected protects the limit under concurrent redirects.
+	updateQuery := r.db.Model(&shortlink.ShortLinkDetail{}).Where("id = ?", detail.ID)
+	if detail.ClickLimit > 0 {
+		updateQuery = updateQuery.Where("current_clicks < ?", detail.ClickLimit)
+	}
+	result := updateQuery.
 		Updates(map[string]interface{}{
 			"current_clicks": gorm.Expr("current_clicks + ?", 1),
 			"updated_at":     time.Now(),
-		}).Error; err != nil {
+		})
+	if result.Error != nil {
 		logger.Logger.Error("Failed to update short link detail",
 			"short_code", code,
 			"ip_address", ipAddress,
-			"error", err.Error(),
+			"error", result.Error.Error(),
 		)
-		return nil, apperrors.ErrShortDetailUpdateFailed.WithError(err)
+		return nil, apperrors.ErrShortDetailUpdateFailed.WithError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, apperrors.ErrClickLimitReached
 	}
 
-	link.Detail = &detail // Attach detail to link so it's fresh if needed
+	detail.CurrentClicks++
+	link.Detail = &detail
 
 	// Track the click with basic info in background
 	go func() {
@@ -539,7 +674,6 @@ func (r *ShortLinkRepository) RedirectByShortCode(code string, ipAddress, userAg
 func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole string) (*dto.ShortLinkResponse, error) {
 	var link shortlink.ShortLink
 	var detail shortlink.ShortLinkDetail
-	var recentViews []shortlink.ViewLinkDetail
 
 	// Fetch short link based on role
 	var err error
@@ -595,22 +729,6 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 		return nil, apperrors.ErrShortDetailFindFailed.WithError(err)
 	}
 
-	// Fetch recent views if stats enabled
-	if detail.EnableStats {
-		err = r.db.Where("short_link_id = ?", link.ID).
-			Order("clicked_at DESC").
-			Limit(10).
-			Find(&recentViews).Error
-		if err != nil {
-			logger.Logger.Error("Database error while fetching recent views",
-				"short_code", code,
-				"error", err.Error(),
-			)
-			// Ensure we return an AppError here too, maybe ShortGetFailed is broad enough
-			return nil, apperrors.ErrShortGetFailed.WithError(err)
-		}
-	}
-
 	// Build detail response
 	detailResponse := &dto.ShortLinkDetailsResponse{
 		ID:            detail.ID,
@@ -649,14 +767,9 @@ func (r *ShortLinkRepository) GetShortLink(code string, userID string, userRole 
 
 func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, userRole string) (*dto.ShortLinkWithStatsResponse, error) {
 	var link shortlink.ShortLink
-	var totalCount int64
-	var uniqueVisitors int64
 	var countries []dto.Country
 	var devices []dto.TopDevice
 	var referrers []dto.TopReferrer
-	var last24hCount int64
-	var last7dCount int64
-	var last30dCount int64
 
 	if userRole != "admin" {
 		err := r.db.Where("short_code = ? AND user_id = ?", code, userId).First(&link).Error
@@ -684,31 +797,43 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		}
 	}
 
-	// Get total views
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Count(&totalCount).Error; err != nil {
+	now := time.Now()
+	var counters struct {
+		TotalClicks    int64
+		UniqueVisitors int64
+		Last24h        int64
+		Last7d         int64
+		Last30d        int64
+		Last60d        int64
+		Last90d        int64
+	}
+	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
+		Select(`COUNT(*) AS total_clicks,
+			COUNT(DISTINCT ip_address) AS unique_visitors,
+			COALESCE(SUM(CASE WHEN clicked_at >= ? THEN 1 ELSE 0 END), 0) AS last24h,
+			COALESCE(SUM(CASE WHEN clicked_at >= ? THEN 1 ELSE 0 END), 0) AS last7d,
+			COALESCE(SUM(CASE WHEN clicked_at >= ? THEN 1 ELSE 0 END), 0) AS last30d,
+			COALESCE(SUM(CASE WHEN clicked_at >= ? THEN 1 ELSE 0 END), 0) AS last60d,
+			COALESCE(SUM(CASE WHEN clicked_at >= ? THEN 1 ELSE 0 END), 0) AS last90d`,
+			now.Add(-24*time.Hour),
+			now.Add(-7*24*time.Hour),
+			now.Add(-30*24*time.Hour),
+			now.Add(-60*24*time.Hour),
+			now.Add(-90*24*time.Hour)).
+		Where("short_link_id = ?", link.ID).
+		Scan(&counters).Error; err != nil {
 		return nil, apperrors.ErrShortViewTrackFailed.WithError(err)
 	}
 
-	// Get unique visitors based on distinct IP addresses
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Distinct("ip_address").Count(&uniqueVisitors).Error; err != nil {
-		return nil, apperrors.ErrShortViewTrackFailed.WithError(err)
-	}
-
-	// Get top Countries by views
-	// This is a simplified example; in a real scenario, you might want to limit the number of results
-	// This is a simplified example; in a real scenario, you might want to limit the number of results
+	// Get top countries by views.
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
 		Select("country, COUNT(*) as count").
 		Where("short_link_id = ?", link.ID).
 		Group("country").
+		Order("count DESC").
 		Scan(&countries).Error; err != nil {
 		return nil, apperrors.ErrShortStatsFailed.WithError(err)
 	}
-
-	// Sort countries DESC
-	sort.Slice(countries, func(i, j int) bool {
-		return countries[i].Count > countries[j].Count
-	})
 
 	// Add "Other" if > 5
 	if len(countries) > 5 {
@@ -766,47 +891,16 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		}
 	}
 
-	// Parse and Aggregate Devices (UserAgent-based)
-	var rawDevices []struct {
-		UserAgent string
-		Count     int
-	}
+	// Device is normalized when the view is written, so aggregate that low-cardinality
+	// column directly instead of grouping and transferring every distinct user-agent.
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Select("user_agent, COUNT(*) as count").
+		Select("COALESCE(NULLIF(device, ''), 'Unknown') AS device, COUNT(*) AS count").
 		Where("short_link_id = ?", link.ID).
-		Group("user_agent").
-		Scan(&rawDevices).Error; err != nil {
+		Group("device").
+		Order("count DESC").
+		Scan(&devices).Error; err != nil {
 		return nil, apperrors.ErrShortStatsFailed.WithError(err)
 	}
-
-	deviceMap := make(map[string]int)
-	for _, raw := range rawDevices {
-		device := "Unknown"
-		uaLower := strings.ToLower(raw.UserAgent)
-
-		// Simple parsing logic (replicating basic middleware logic)
-		if strings.Contains(uaLower, "mobile") || strings.Contains(uaLower, "android") || strings.Contains(uaLower, "iphone") {
-			device = "Mobile"
-		} else if strings.Contains(uaLower, "tablet") || strings.Contains(uaLower, "ipad") {
-			device = "Tablet"
-		} else if strings.Contains(uaLower, "bot") || strings.Contains(uaLower, "crawler") {
-			device = "Bot"
-		} else if strings.Contains(uaLower, "postman") || strings.Contains(uaLower, "axios") || strings.Contains(uaLower, "curl") {
-			device = "API"
-		} else {
-			device = "Desktop"
-		}
-
-		deviceMap[device] += raw.Count
-	}
-
-	for dev, count := range deviceMap {
-		devices = append(devices, dto.TopDevice{Device: dev, Count: count})
-	}
-	// Sort devices DESC
-	sort.Slice(devices, func(i, j int) bool {
-		return devices[i].Count > devices[j].Count
-	})
 	if len(devices) > 5 {
 		var otherCount int
 		for i := 5; i < len(devices); i++ {
@@ -818,43 +912,11 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 		}
 	}
 
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-24*time.Hour)).
-		Count(&last24hCount).Error; err != nil {
-		return nil, apperrors.ErrShortStatsFailed.WithError(err)
-	}
-
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-7*24*time.Hour)).
-		Count(&last7dCount).Error; err != nil {
-		return nil, apperrors.ErrShortStatsFailed.WithError(err)
-	}
-
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-30*24*time.Hour)).
-		Count(&last30dCount).Error; err != nil {
-		return nil, apperrors.ErrShortStatsFailed.WithError(err)
-	}
-
-	var last60dCount int64
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-60*24*time.Hour)).
-		Count(&last60dCount).Error; err != nil {
-		return nil, apperrors.ErrShortStatsFailed.WithError(err)
-	}
-
-	var last90dCount int64
-	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-90*24*time.Hour)).
-		Count(&last90dCount).Error; err != nil {
-		return nil, apperrors.ErrShortStatsFailed.WithError(err)
-	}
-
 	// Get Click History (Daily for last 90 days)
 	var history []dto.ClickHistoryItem
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
 		Select("DATE_FORMAT(clicked_at, '%Y-%m-%d') as date, COUNT(*) as count").
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-90*24*time.Hour)).
+		Where("short_link_id = ? AND clicked_at >= ?", link.ID, now.Add(-90*24*time.Hour)).
 		Group("DATE_FORMAT(clicked_at, '%Y-%m-%d')").
 		Order("date ASC").
 		Scan(&history).Error; err != nil {
@@ -865,7 +927,7 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 	var historyHourly []dto.ClickHistoryItem
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).
 		Select("DATE_FORMAT(clicked_at, '%Y-%m-%d %H:00') as date, COUNT(*) as count").
-		Where("short_link_id = ? AND clicked_at >= ?", link.ID, time.Now().Add(-24*time.Hour)).
+		Where("short_link_id = ? AND clicked_at >= ?", link.ID, now.Add(-24*time.Hour)).
 		Group("DATE_FORMAT(clicked_at, '%Y-%m-%d %H:00')").
 		Order("date ASC").
 		Scan(&historyHourly).Error; err != nil {
@@ -874,13 +936,13 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 
 	return &dto.ShortLinkWithStatsResponse{
 		ShortCode:          link.ShortCode,
-		TotalClicks:        int(totalCount),
-		UniqueVisitors:     int(uniqueVisitors),
-		Last24h:            int(last24hCount),
-		Last7d:             int(last7dCount),
-		Last30d:            int(last30dCount),
-		Last60d:            int(last60dCount),
-		Last90d:            int(last90dCount),
+		TotalClicks:        int(counters.TotalClicks),
+		UniqueVisitors:     int(counters.UniqueVisitors),
+		Last24h:            int(counters.Last24h),
+		Last7d:             int(counters.Last7d),
+		Last30d:            int(counters.Last30d),
+		Last60d:            int(counters.Last60d),
+		Last90d:            int(counters.Last90d),
 		TopReferrers:       referrers,
 		TopDevices:         devices,
 		TopCountries:       countries,
@@ -890,163 +952,158 @@ func (r *ShortLinkRepository) GetStatsShortLink(code string, userId string, user
 }
 
 func (r *ShortLinkRepository) GetDashboardStats(userId string, userRole string, startDate, endDate string) (*dto.DashboardStatsResponse, error) {
-	// Build base query condition
-	var userCondition string
-	var userArgs []interface{}
-	if userRole != "admin" {
-		userCondition = "user_id = ?"
-		userArgs = append(userArgs, userId)
-	}
-
-	// Get all link IDs for this user (for aggregate stats)
-	var allLinkIDs []string
-	linkQuery := r.db.Model(&shortlink.ShortLink{}).Select("id")
-	if userCondition != "" {
-		linkQuery = linkQuery.Where(userCondition, userArgs...)
-	}
-	linkQuery.Pluck("id", &allLinkIDs)
-
-	// ============ AGGREGATE SUMMARY STATS ============
 	var summary dto.DashboardSummary
-
-	// Total links count
-	var totalLinks int64
-	var activeLinks int64
-	countQuery := r.db.Model(&shortlink.ShortLink{})
-	if userCondition != "" {
-		countQuery = countQuery.Where(userCondition, userArgs...)
-	}
-	countQuery.Count(&totalLinks)
-
-	activeQuery := r.db.Model(&shortlink.ShortLink{}).Where("is_active = ?", true)
-	if userCondition != "" {
-		activeQuery = activeQuery.Where(userCondition, userArgs...)
-	}
-	activeQuery.Count(&activeLinks)
-
-	summary.TotalLinks = totalLinks
-	summary.ActiveLinks = activeLinks
-	summary.InactiveLinks = totalLinks - activeLinks
-
-	// Check if dates are provided
 	useDateFilter := startDate != "" && endDate != ""
+	periodStart := startDate + " 00:00:00"
+	periodEnd := endDate + " 23:59:59"
+	now := time.Now()
 
-	// Aggregate clicks across all user's links
-	if len(allLinkIDs) > 0 {
-		// Filtered base query for stats
-		statsQuery := r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id IN ?", allLinkIDs)
-		if useDateFilter {
-			// Filtering by provided date range
-			statsQuery = statsQuery.Where("clicked_at >= ? AND clicked_at <= ?", startDate+" 00:00:00", endDate+" 23:59:59")
-		}
-
-		statsQuery.Count(&summary.TotalClicks)
-		statsQuery.Distinct("ip_address").Count(&summary.TotalUniqueVisitors)
-
-		// Clicks by date ranges
-		r.db.Model(&shortlink.ViewLinkDetail{}).
-			Where("short_link_id IN ? AND clicked_at >= ?", allLinkIDs, time.Now().Add(-24*time.Hour)).
-			Count(&summary.ClicksLast24h)
-
-		r.db.Model(&shortlink.ViewLinkDetail{}).
-			Where("short_link_id IN ? AND clicked_at >= ?", allLinkIDs, time.Now().Add(-7*24*time.Hour)).
-			Count(&summary.ClicksLast7d)
-
-		r.db.Model(&shortlink.ViewLinkDetail{}).
-			Where("short_link_id IN ? AND clicked_at >= ?", allLinkIDs, time.Now().Add(-30*24*time.Hour)).
-			Count(&summary.ClicksLast30d)
-
-		r.db.Model(&shortlink.ViewLinkDetail{}).
-			Where("short_link_id IN ? AND clicked_at >= ?", allLinkIDs, time.Now().Add(-60*24*time.Hour)).
-			Count(&summary.ClicksLast60d)
-
-		r.db.Model(&shortlink.ViewLinkDetail{}).
-			Where("short_link_id IN ? AND clicked_at >= ?", allLinkIDs, time.Now().Add(-90*24*time.Hour)).
-			Count(&summary.ClicksLast90d)
-
-		// Aggregate top countries
-		var aggCountries []dto.Country
-		countryQuery := r.db.Model(&shortlink.ViewLinkDetail{}).
-			Select("COALESCE(NULLIF(country, ''), 'Unknown') as country, COUNT(*) as count").
-			Where("short_link_id IN ?", allLinkIDs)
-		if useDateFilter {
-			countryQuery = countryQuery.Where("clicked_at >= ? AND clicked_at <= ?", startDate+" 00:00:00", endDate+" 23:59:59")
-		}
-		countryQuery.Group("country").
-			Order("count DESC").
-			Limit(5).
-			Scan(&aggCountries)
-		summary.TopCountries = aggCountries
-
-		// Aggregate top devices (handle empty)
-		var aggDevices []dto.TopDevice
-		deviceQuery := r.db.Model(&shortlink.ViewLinkDetail{}).
-			Select("COALESCE(NULLIF(device, ''), 'Unknown') as device, COUNT(*) as count").
-			Where("short_link_id IN ?", allLinkIDs)
-		if useDateFilter {
-			deviceQuery = deviceQuery.Where("clicked_at >= ? AND clicked_at <= ?", startDate+" 00:00:00", endDate+" 23:59:59")
-		}
-		deviceQuery.Group("device").
-			Order("count DESC").
-			Limit(5).
-			Scan(&aggDevices)
-		summary.TopDevices = aggDevices
-
-		// Aggregate top referrers (parse host)
-		var rawRefs []struct {
-			Referer string
-			Count   int
-		}
-		refQuery := r.db.Model(&shortlink.ViewLinkDetail{}).
-			Select("referer, COUNT(*) as count").
-			Where("short_link_id IN ?", allLinkIDs)
-		if useDateFilter {
-			refQuery = refQuery.Where("clicked_at >= ? AND clicked_at <= ?", startDate+" 00:00:00", endDate+" 23:59:59")
-		}
-		refQuery.Group("referer").
-			Scan(&rawRefs)
-
-		refMap := make(map[string]int)
-		for _, ref := range rawRefs {
-			host := "Direct / None"
-			if ref.Referer != "" {
-				if u, err := url.Parse(ref.Referer); err == nil && u.Host != "" {
-					host = u.Host
-				} else {
-					host = ref.Referer
-				}
-			}
-			refMap[host] += ref.Count
-		}
-		aggReferrers := make([]dto.TopReferrer, 0, len(refMap))
-		for host, count := range refMap {
-			aggReferrers = append(aggReferrers, dto.TopReferrer{Host: host, Count: count})
-		}
-		sort.Slice(aggReferrers, func(i, j int) bool {
-			return aggReferrers[i].Count > aggReferrers[j].Count
-		})
-		if len(aggReferrers) > 5 {
-			aggReferrers = aggReferrers[:5]
-		}
-		summary.TopReferrers = aggReferrers
-
-		// Aggregate click history (Filtered or Default 90d)
-		var clickHistory []dto.ClickHistoryItem
-		historyQuery := r.db.Model(&shortlink.ViewLinkDetail{}).
-			Select("DATE_FORMAT(clicked_at, '%Y-%m-%d') as date, COUNT(*) as count").
-			Where("short_link_id IN ?", allLinkIDs)
-
-		if useDateFilter {
-			historyQuery = historyQuery.Where("clicked_at >= ? AND clicked_at <= ?", startDate+" 00:00:00", endDate+" 23:59:59")
-		} else {
-			historyQuery = historyQuery.Where("clicked_at >= ?", time.Now().Add(-90*24*time.Hour))
-		}
-
-		historyQuery.Group("DATE_FORMAT(clicked_at, '%Y-%m-%d')").
-			Order("date ASC").
-			Scan(&clickHistory)
-		summary.ClickHistory = clickHistory
+	linkQuery := r.db.Model(&shortlink.ShortLink{})
+	if userRole != "admin" {
+		linkQuery = linkQuery.Where("user_id = ?", userId)
 	}
+	var linkCounts struct {
+		TotalLinks  int64
+		ActiveLinks int64
+	}
+	if err := linkQuery.
+		Select("COUNT(*) AS total_links, COALESCE(SUM(CASE WHEN is_active = ? THEN 1 ELSE 0 END), 0) AS active_links", true).
+		Scan(&linkCounts).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+	summary.TotalLinks = linkCounts.TotalLinks
+	summary.ActiveLinks = linkCounts.ActiveLinks
+	summary.InactiveLinks = linkCounts.TotalLinks - linkCounts.ActiveLinks
+
+	newViewQuery := func() *gorm.DB {
+		query := r.db.Model(&shortlink.ViewLinkDetail{}).
+			Joins("JOIN short_links ON short_links.id = view_link_details.short_link_id").
+			Where("short_links.deleted_at IS NULL")
+		if userRole != "admin" {
+			query = query.Where("short_links.user_id = ?", userId)
+		}
+		return query
+	}
+	applyDateFilter := func(query *gorm.DB) *gorm.DB {
+		if useDateFilter {
+			return query.Where("view_link_details.clicked_at >= ? AND view_link_details.clicked_at <= ?", periodStart, periodEnd)
+		}
+		return query
+	}
+
+	totalExpression := "COUNT(*)"
+	uniqueExpression := "COUNT(DISTINCT view_link_details.ip_address)"
+	selectArgs := make([]any, 0, 9)
+	if useDateFilter {
+		totalExpression = "COUNT(CASE WHEN view_link_details.clicked_at >= ? AND view_link_details.clicked_at <= ? THEN 1 END)"
+		uniqueExpression = "COUNT(DISTINCT CASE WHEN view_link_details.clicked_at >= ? AND view_link_details.clicked_at <= ? THEN view_link_details.ip_address END)"
+		selectArgs = append(selectArgs, periodStart, periodEnd, periodStart, periodEnd)
+	}
+	selectArgs = append(selectArgs,
+		now.Add(-24*time.Hour),
+		now.Add(-7*24*time.Hour),
+		now.Add(-30*24*time.Hour),
+		now.Add(-60*24*time.Hour),
+		now.Add(-90*24*time.Hour),
+	)
+	statsSelect := fmt.Sprintf(`%s AS total_clicks,
+		%s AS total_unique_visitors,
+		COALESCE(SUM(CASE WHEN view_link_details.clicked_at >= ? THEN 1 ELSE 0 END), 0) AS clicks_last24h,
+		COALESCE(SUM(CASE WHEN view_link_details.clicked_at >= ? THEN 1 ELSE 0 END), 0) AS clicks_last7d,
+		COALESCE(SUM(CASE WHEN view_link_details.clicked_at >= ? THEN 1 ELSE 0 END), 0) AS clicks_last30d,
+		COALESCE(SUM(CASE WHEN view_link_details.clicked_at >= ? THEN 1 ELSE 0 END), 0) AS clicks_last60d,
+		COALESCE(SUM(CASE WHEN view_link_details.clicked_at >= ? THEN 1 ELSE 0 END), 0) AS clicks_last90d`, totalExpression, uniqueExpression)
+	var viewCounters struct {
+		TotalClicks         int64
+		TotalUniqueVisitors int64
+		ClicksLast24h       int64
+		ClicksLast7d        int64
+		ClicksLast30d       int64
+		ClicksLast60d       int64
+		ClicksLast90d       int64
+	}
+	if err := newViewQuery().Select(statsSelect, selectArgs...).Scan(&viewCounters).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+	summary.TotalClicks = viewCounters.TotalClicks
+	summary.TotalUniqueVisitors = viewCounters.TotalUniqueVisitors
+	summary.ClicksLast24h = viewCounters.ClicksLast24h
+	summary.ClicksLast7d = viewCounters.ClicksLast7d
+	summary.ClicksLast30d = viewCounters.ClicksLast30d
+	summary.ClicksLast60d = viewCounters.ClicksLast60d
+	summary.ClicksLast90d = viewCounters.ClicksLast90d
+
+	var aggCountries []dto.Country
+	if err := applyDateFilter(newViewQuery()).
+		Select("COALESCE(NULLIF(view_link_details.country, ''), 'Unknown') AS country, COUNT(*) AS count").
+		Group("view_link_details.country").
+		Order("count DESC").
+		Limit(5).
+		Scan(&aggCountries).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+	summary.TopCountries = aggCountries
+
+	var aggDevices []dto.TopDevice
+	if err := applyDateFilter(newViewQuery()).
+		Select("COALESCE(NULLIF(view_link_details.device, ''), 'Unknown') AS device, COUNT(*) AS count").
+		Group("view_link_details.device").
+		Order("count DESC").
+		Limit(5).
+		Scan(&aggDevices).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+	summary.TopDevices = aggDevices
+
+	var rawRefs []struct {
+		Referer string
+		Count   int
+	}
+	if err := applyDateFilter(newViewQuery()).
+		Select("view_link_details.referer, COUNT(*) AS count").
+		Group("view_link_details.referer").
+		Scan(&rawRefs).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+	refMap := make(map[string]int)
+	for _, ref := range rawRefs {
+		host := "Direct / None"
+		if ref.Referer != "" {
+			if parsed, err := url.Parse(ref.Referer); err == nil && parsed.Host != "" {
+				host = parsed.Host
+			} else {
+				host = ref.Referer
+			}
+		}
+		refMap[host] += ref.Count
+	}
+	aggReferrers := make([]dto.TopReferrer, 0, len(refMap))
+	for host, count := range refMap {
+		aggReferrers = append(aggReferrers, dto.TopReferrer{Host: host, Count: count})
+	}
+	sort.Slice(aggReferrers, func(i, j int) bool {
+		return aggReferrers[i].Count > aggReferrers[j].Count
+	})
+	if len(aggReferrers) > 5 {
+		aggReferrers = aggReferrers[:5]
+	}
+	summary.TopReferrers = aggReferrers
+
+	var clickHistory []dto.ClickHistoryItem
+	historyQuery := newViewQuery().
+		Select("DATE_FORMAT(view_link_details.clicked_at, '%Y-%m-%d') AS date, COUNT(*) AS count")
+	if useDateFilter {
+		historyQuery = applyDateFilter(historyQuery)
+	} else {
+		historyQuery = historyQuery.Where("view_link_details.clicked_at >= ?", now.Add(-90*24*time.Hour))
+	}
+	if err := historyQuery.
+		Group("DATE_FORMAT(view_link_details.clicked_at, '%Y-%m-%d')").
+		Order("date ASC").
+		Scan(&clickHistory).Error; err != nil {
+		return nil, apperrors.ErrShortStatsFailed.WithError(err)
+	}
+	summary.ClickHistory = clickHistory
 
 	return &dto.DashboardStatsResponse{
 		Summary: &summary,
@@ -1056,7 +1113,6 @@ func (r *ShortLinkRepository) GetDashboardStats(userId string, userRole string, 
 // GetShortLinkViewsPaginated gets paginated views for a specific short link
 func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID string, page, limit int, sort, orderBy string, userRole string) (*dto.PaginatedShortLinkDetailWithStatsResponse, error) {
 	var link shortlink.ShortLink
-	var detail shortlink.ShortLinkDetail
 	var viewDetails []shortlink.ViewLinkDetail
 	var totalCount int64
 
@@ -1087,23 +1143,6 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 		}
 	}
 
-	// Get the short link detail
-	err := r.db.Where("short_link_id = ?", link.ID).First(&detail).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Logger.Error("Short link detail not found",
-				"short_code", code,
-				"short_link_id", link.ID,
-			)
-			return nil, apperrors.ErrShortDetailNotFound
-		}
-		logger.Logger.Error("Database error while fetching short link detail",
-			"short_code", code,
-			"error", err.Error(),
-		)
-		return nil, apperrors.ErrShortDetailFindFailed.WithError(err)
-	}
-
 	// Get total count of views
 	if err := r.db.Model(&shortlink.ViewLinkDetail{}).Where("short_link_id = ?", link.ID).Count(&totalCount).Error; err != nil {
 		return nil, apperrors.ErrShortGetFailed.WithError(err)
@@ -1122,7 +1161,7 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 	orderClause := fmt.Sprintf("%s %s", sort, orderBy)
 
 	// Get paginated views
-	err = r.db.Where("short_link_id = ?", link.ID).
+	err := r.db.Where("short_link_id = ?", link.ID).
 		Order(orderClause).
 		Offset(offset).
 		Limit(limit).
@@ -1173,27 +1212,24 @@ func (r *ShortLinkRepository) GetShortLinkViewsPaginated(code string, userID str
 }
 
 func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (*dto.ShortLinkPreviewResponse, error) {
-	var link shortlink.ShortLink
-	var detail shortlink.ShortLinkDetail
-
-	err := r.db.Where("short_code = ?", code.Code).First(&link).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil // Code does not exist
-		}
-		logger.Logger.Error("Database error while checking short code",
-			"short_code", code.Code,
-			"error", err.Error(),
-		)
-		return nil, apperrors.ErrShortCheckFailed.WithError(err)
+	type previewRecord struct {
+		ShortCode   string
+		OriginalURL string
+		Title       string
+		Description string
+		Passcode    int
 	}
 
-	q := r.db.Where("short_link_id = ?", link.ID)
+	var preview previewRecord
+	q := r.db.Table("short_links").
+		Select("short_links.short_code, short_links.original_url, short_links.title, short_links.description, short_link_details.passcode").
+		Joins("JOIN short_link_details ON short_link_details.short_link_id = short_links.id AND short_link_details.deleted_at IS NULL").
+		Where("short_links.short_code = ? AND short_links.deleted_at IS NULL", code.Code)
 	if code.Passcode != "" {
 		passcodeInt := helpers.StringToInt(code.Passcode)
-		q = q.Where("passcode = ?", passcodeInt)
+		q = q.Where("short_link_details.passcode = ?", passcodeInt)
 	}
-	err = q.First(&detail).Error
+	err := q.Take(&preview).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil // Code or supplied passcode does not exist
@@ -1205,7 +1241,7 @@ func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (*dto.ShortL
 		return nil, apperrors.ErrShortCheckFailed.WithError(err)
 	}
 
-	destination, err := url.Parse(link.OriginalURL)
+	destination, err := url.Parse(preview.OriginalURL)
 	if err != nil {
 		logger.Logger.Warn("Unable to parse destination URL for public preview",
 			"short_code", code.Code,
@@ -1220,12 +1256,12 @@ func (r *ShortLinkRepository) CheckShortCode(code *dto.CodeRequest) (*dto.ShortL
 	}
 
 	return &dto.ShortLinkPreviewResponse{
-		ShortCode:         link.ShortCode,
+		ShortCode:         preview.ShortCode,
 		DestinationHost:   destinationHost,
 		DestinationScheme: destinationScheme,
-		Title:             link.Title,
-		Description:       link.Description,
-		RequiresPasscode:  detail.Passcode != 0,
+		Title:             preview.Title,
+		Description:       preview.Description,
+		RequiresPasscode:  preview.Passcode != 0,
 	}, nil
 }
 
@@ -1475,10 +1511,10 @@ func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, 
 	offset := (page - 1) * limit
 	orderClause := sort + " " + orderBy
 
-	// Query with LEFT JOINs to get all data including details and view counts
+	// Detail is the only association used by the admin response. Avoid loading all
+	// views: it can grow without bound and this response does not expose them.
 	queryFind := r.db.
-		Preload("Detail"). // Load detail relationship
-		Preload("Views").  // Load views relationship for click counts
+		Preload("Detail").
 		Order(orderClause).
 		Limit(limit).
 		Offset(offset)
@@ -1502,12 +1538,6 @@ func (r *ShortLinkRepository) ListAllShortLinks(userID string, page, limit int, 
 	// Convert to response format with detailed information
 	shortLinkResponses := make([]dto.ShortLinkResponse, 0, len(shortLinks))
 	for _, link := range shortLinks {
-		// Count total clicks for this short link
-		var clickCount int64
-		r.db.Model(&shortlink.ViewLinkDetail{}).
-			Where("short_link_id = ?", link.ID).
-			Count(&clickCount)
-
 		// Build detail response
 		var detailResponse *dto.ShortLinkDetailsResponse
 		if link.Detail != nil {
