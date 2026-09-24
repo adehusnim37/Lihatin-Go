@@ -11,6 +11,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
 	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/adehusnim37/lihatin-go/repositories/apikeyrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
@@ -335,13 +336,50 @@ func RateLimitMiddleware(limit int, duration ...int) gin.HandlerFunc {
 		}
 	}
 
+	return rateLimitMiddleware(limit, windowDuration, "", ipRateLimitKey)
+}
+
+// PremiumRateLimitMiddleware applies the standard API quota to non-premium
+// users and the higher quota to users with active premium access.
+func PremiumRateLimitMiddleware(standardLimit, premiumLimit int) gin.HandlerFunc {
+	standardHandler := rateLimitMiddleware(standardLimit, time.Hour, "standard", accountRateLimitKey)
+	premiumHandler := rateLimitMiddleware(premiumLimit, 10*time.Minute, "premium", accountRateLimitKey)
+
 	return func(c *gin.Context) {
-		clientIP := c.ClientIP()
-		route := c.FullPath()
-		if route == "" {
-			route = c.Request.URL.Path
+		if premium, ok := c.Get("premium_access_active"); ok {
+			if isPremium, ok := premium.(bool); ok && isPremium {
+				premiumHandler(c)
+				return
+			}
 		}
-		key := fmt.Sprintf("rate_limit:%s:%s:%s", clientIP, c.Request.Method, route)
+
+		standardHandler(c)
+	}
+}
+
+func ipRateLimitKey(c *gin.Context, tier string) (string, bool) {
+	route := c.FullPath()
+	if route == "" {
+		route = c.Request.URL.Path
+	}
+	return fmt.Sprintf("rate_limit:%s:%s:%s:%s", tier, c.ClientIP(), c.Request.Method, route), true
+}
+
+func accountRateLimitKey(c *gin.Context, tier string) (string, bool) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		return "", false
+	}
+	return fmt.Sprintf("rate_limit:api_account:%s:%s", tier, userID), true
+}
+
+func rateLimitMiddleware(limit int, windowDuration time.Duration, tier string, keyForRequest func(*gin.Context, string) (string, bool)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key, ok := keyForRequest(c, tier)
+		if !ok {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
 
 		// Get Redis via SessionManager
 		redisClient := GetSessionManager().GetRedisClient()
@@ -366,7 +404,7 @@ func RateLimitMiddleware(limit int, duration ...int) gin.HandlerFunc {
 
 		// 3. Check limit
 		if count > int64(limit) {
-			logger.Logger.Warn("Rate limit exceeded", "ip", clientIP, "count", count)
+			logger.Logger.Warn("Rate limit exceeded", "rate_limit_key", key, "count", count)
 			c.JSON(http.StatusTooManyRequests, common.APIResponse{
 				Success: false,
 				Data:    nil,
@@ -394,38 +432,10 @@ func SecurityHeaders() gin.HandlerFunc {
 	}
 }
 
-// CORSMiddleware handles CORS headers
+// CORSMiddleware delegates to the same allowlist and header rules as the
+// router's active middleware, including X-API-Key on trusted origins.
 func CORSMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		origin := c.Request.Header.Get("Origin")
-
-		// In production, maintain a whitelist of allowed origins
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://localhost:3001",
-			"http://localhost:8080",
-			"https://yourdomain.com",
-		}
-
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
-				c.Header("Access-Control-Allow-Origin", origin)
-				break
-			}
-		}
-
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With")
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Max-Age", "86400")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
-	}
+	return auth.CORSMiddleware()
 }
 
 // IPWhitelistMiddleware restricts access to whitelisted IPs
@@ -591,7 +601,8 @@ func CheckPermissionAPIKey(authRepo *authrepo.AuthRepository, requiredPermission
 	}
 }
 
-// AuthRepositoryAPIKeyMiddleware validates API keys using AuthRepository
+// AuthRepositoryAPIKeyMiddleware authenticates without spending a use; the
+// route reserves usage after permission and rate-limit checks.
 func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
@@ -610,7 +621,7 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.Handl
 		ip := c.ClientIP()
 
 		// Validate API key using the auth repository
-		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().ValidateAPIKey(apiKey, ip)
+		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().AuthenticateAPIKey(apiKey, ip)
 		if err != nil {
 			logger.Logger.Warn("API key validation failed",
 				"key_preview", auth.GetKeyPreview(apiKey),
@@ -640,6 +651,25 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.Handl
 			"api_key_name", apiKeyRecord.Name,
 		)
 
+		c.Next()
+	}
+}
+
+// APIKeyUsageMiddleware reserves one use only for an authorized request that
+// passed its account rate limit.
+func APIKeyUsageMiddleware(authRepo *authrepo.AuthRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		value, exists := c.Get("api_key")
+		apiKeyRecord, ok := value.(*user.APIKey)
+		if !exists || !ok || apiKeyRecord == nil {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		if err := authRepo.GetAPIKeyRepository().ReserveAPIKeyUsage(apiKeyRecord, c.ClientIP()); err != nil {
+			httputil.HandleError(c, err, nil)
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }

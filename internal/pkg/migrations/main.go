@@ -51,6 +51,9 @@ func RunMigrations(db *gorm.DB) error {
 	if err := db.AutoMigrate(&user.NotificationPreference{}); err != nil {
 		return fmt.Errorf("failed to migrate NotificationPreference model: %w", err)
 	}
+	if err := db.AutoMigrate(&user.InAppAnnouncementRead{}); err != nil {
+		return fmt.Errorf("failed to migrate InAppAnnouncementRead model: %w", err)
+	}
 
 	if err := db.AutoMigrate(&user.WeeklySummaryDelivery{}); err != nil {
 		return fmt.Errorf("failed to migrate WeeklySummaryDelivery model: %w", err)

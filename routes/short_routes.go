@@ -23,16 +23,18 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 	apiShort := rg.Group("api/short")
 	{
 		apiShort.Use(middleware.AuthRepositoryAPIKeyMiddleware(authRepo))
-		apiShort.Use(middleware.RateLimitMiddleware(1000))
-		// Higher rate limit for API access
-		apiShort.POST("", middleware.CheckPermissionAPIKey(authRepo, []string{"create"}, false), shortController.Create)
-		apiShort.GET("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetShortLink)
-		apiShort.PUT("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"update"}, false), shortController.UpdateShortLink)
-		apiShort.GET("", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.ListShortLinks)
-		apiShort.GET("/:code/stats", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetShortLinkStats)
-		apiShort.GET("/:code/views", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetShortLinkViewsPaginated)
-		apiShort.DELETE("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"delete"}, false), shortController.DeleteShortLink)
-		apiShort.GET("/stats", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), shortController.GetAllStatsShorts)
+		// All API keys on an account share its tier limit. Check permissions first,
+		// then reserve the key's total-use quota only after the rate check passes.
+		apiRateLimit := middleware.PremiumRateLimitMiddleware(50, 100)
+		apiUsage := middleware.APIKeyUsageMiddleware(authRepo)
+		apiShort.POST("", middleware.CheckPermissionAPIKey(authRepo, []string{"write"}, false), apiRateLimit, apiUsage, shortController.Create)
+		apiShort.GET("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), apiRateLimit, apiUsage, shortController.GetShortLink)
+		apiShort.PUT("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"update"}, false), apiRateLimit, apiUsage, shortController.UpdateShortLink)
+		apiShort.GET("", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), apiRateLimit, apiUsage, shortController.ListShortLinks)
+		apiShort.GET("/:code/stats", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), apiRateLimit, apiUsage, shortController.GetShortLinkStats)
+		apiShort.GET("/:code/views", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), apiRateLimit, apiUsage, shortController.GetShortLinkViewsPaginated)
+		apiShort.DELETE("/:code", middleware.CheckPermissionAPIKey(authRepo, []string{"delete"}, false), apiRateLimit, apiUsage, shortController.DeleteShortLink)
+		apiShort.GET("/stats", middleware.CheckPermissionAPIKey(authRepo, []string{"read"}, false), apiRateLimit, apiUsage, shortController.GetAllStatsShorts)
 	}
 
 	// ✅ PROTECTED ROUTES: Accessible by authenticated users (user or admin)
@@ -60,7 +62,7 @@ func RegisterShortRoutes(rg *gin.RouterGroup, shortController *shortlink.Control
 		protectedAdminShort.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
 		protectedAdminShort.Use(middleware.RequireRole("admin")) // Ensures only admin access
 		// ✅ UNIVERSAL ENDPOINT: Same endpoint, but admin gets all data
-		protectedAdminShort.GET("", shortController.ListShortLinks) // Will return all short links for admin
+		protectedAdminShort.GET("", shortController.ListShortLinks)              // Will return all short links for admin
 		protectedAdminShort.GET("users/:userID", shortController.ListShortLinks) // Get list of short links for specific user
 		protectedAdminShort.GET("/:code/views", shortController.GetShortLinkViewsPaginated)
 		protectedAdminShort.DELETE("/:code", shortController.DeleteShortLink)

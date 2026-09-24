@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -98,7 +100,7 @@ The secret key is hashed for secure storage.
 Returns:
 - keyID: The generated API key ID (e.g., "sk_lh_AbCdEf123...")
 - secretKey: The generated secret key (to be shown only once)
-- secretKeyHash: The SHA-256 hash of the secret key (for storage)
+- secretKeyHash: Salted PBKDF2-SHA512 hash of the secret key (for storage)
 - keyPreview: A preview of the key ID (first 8 chars + "..." + last 4 chars)
 - error: Any error encountered during generation
 */
@@ -142,11 +144,29 @@ func GenerateAPIKeyPair(prefix string) (keyID, secretKey, secretKeyHash, keyPrev
 	return keyID, secretKey, secretKeyHash, keyPreview, nil
 }
 
-// ValidateAPISecretKey compares a provided plaintext secret key against a stored hash.
+// ValidateAPISecretKey compares a secret with the salted PBKDF2-SHA512 hash
+// written by GenerateAPIKeyPair. Older SHA-256 hashes remain readable so
+// existing keys do not have to be rotated during deployment.
 func ValidateAPISecretKey(providedSecretKey, storedSecretKeyHash string) bool {
+	if saltHex, keyHex, found := strings.Cut(storedSecretKeyHash, ":"); found {
+		salt, saltErr := hex.DecodeString(saltHex)
+		stored, keyErr := hex.DecodeString(keyHex)
+		if saltErr != nil || keyErr != nil || len(salt) != 16 || len(stored) != 32 {
+			return false
+		}
+		derived := pbkdf2.Key([]byte(providedSecretKey), salt, 100000, 32, sha512.New)
+		return subtle.ConstantTimeCompare(derived, stored) == 1
+	}
+	// Legacy keys were stored as a 64-character SHA-256 hex digest.
+	if len(storedSecretKeyHash) != sha256.Size*2 {
+		return false
+	}
+	stored, err := hex.DecodeString(storedSecretKeyHash)
+	if err != nil {
+		return false
+	}
 	hash := sha256.Sum256([]byte(providedSecretKey))
-	providedSecretKeyHash := fmt.Sprintf("%x", hash[:])
-	return providedSecretKeyHash == storedSecretKeyHash
+	return subtle.ConstantTimeCompare(hash[:], stored) == 1
 }
 
 func ValidateAPIKeyFormat(key string) bool {

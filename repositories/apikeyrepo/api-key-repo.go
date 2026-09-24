@@ -2,7 +2,6 @@ package apikeyrepo
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -15,12 +14,16 @@ import (
 	"github.com/adehusnim37/lihatin-go/models/logging"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // APIKeyRepository handles API key database operations
 type APIKeyRepository struct {
 	db *gorm.DB
 }
+
+// Used only to equalize the KDF work for an unknown, well-formed key ID.
+var dummyAPIKeyHash = fmt.Sprintf("%032x:%064x", 0, 0)
 
 // NewAPIKeyRepository creates a new API key repository
 func NewAPIKeyRepository(db *gorm.DB) *APIKeyRepository {
@@ -47,13 +50,17 @@ func mapAPIKeyToResponse(apiKey *user.APIKey) dto.APIKeyResponse {
 
 // CreateAPIKey creates a new API key using improved atomic operations
 func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyRequest) (*dto.CreateAPIKeyResponse, error) {
+	return r.createAPIKeyWithPrefix(userID, req, "")
+}
+
+func (r *APIKeyRepository) createAPIKeyWithPrefix(userID string, req dto.CreateAPIKeyRequest, prefix string) (*dto.CreateAPIKeyResponse, error) {
 	// Set default permissions if none provided
 	if len(req.Permissions) == 0 {
 		req.Permissions = []string{"read", "write", "delete", "update"}
 	}
 
 	// Generate API key pair first (fail fast if generation fails)
-	keyID, secretKey, secretKeyHash, keyPreview, err := auth.GenerateAPIKeyPair("")
+	keyID, secretKey, secretKeyHash, keyPreview, err := auth.GenerateAPIKeyPair(prefix)
 	if err != nil {
 		logger.Logger.Error("Failed to generate API key pair", "error", err.Error())
 		return nil, apperrors.ErrAPIKeyCreateFailed
@@ -71,7 +78,9 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 	err = r.db.Transaction(func(tx *gorm.DB) error {
 		// 1. Validate user exists, is active, and verified (single query)
 		var userAuth user.UserAuth
-		if err := tx.Where("user_id = ? AND is_email_verified = ? AND account_status = ?",
+		// Serialize key creation per user. A plain count in a transaction still
+		// allows two concurrent requests to both observe two active keys.
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND is_email_verified = ? AND account_status = ?",
 			userID, true, user.AccountStatusActive).First(&userAuth).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				logger.Logger.Warn("User not found or not eligible for API key creation",
@@ -86,7 +95,7 @@ func (r *APIKeyRepository) CreateAPIKey(userID string, req dto.CreateAPIKeyReque
 		// 2. Check for duplicate name and count limit in one query
 		var existingKeys []user.APIKey
 		if err := tx.Where("user_id = ? AND is_active = ? AND deleted_at IS NULL", userID, true).
-			Find(&existingKeys).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			Find(&existingKeys).Error; err != nil {
 			logger.Logger.Error("Failed to fetch existing API keys",
 				"user_id", userID, "error", err.Error())
 			return apperrors.ErrAPIKeyFailedFetching
@@ -263,7 +272,7 @@ func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) 
 	}
 
 	// Build the query for fetching API keys
-	q := tx.Where("deleted_at IS NULL")
+	q := tx.Where("id = ? AND deleted_at IS NULL", id.ID)
 	if user.Role != "admin" {
 		q = q.Where("user_id = ?", userID)
 	}
@@ -279,20 +288,25 @@ func (r *APIKeyRepository) GetAPIKeyByID(id dto.APIKeyIDRequest, userID string) 
 		return dto.APIKeyResponse{}, apperrors.ErrAPIKeyFailedFetching
 	}
 
-	return dto.APIKeyResponse{
-		ID:          apiKey.ID,
-		Name:        apiKey.Name,
-		KeyPreview:  auth.GetKeyPreview(apiKey.Key),
-		LastUsedAt:  apiKey.LastUsedAt,
-		ExpiresAt:   apiKey.ExpiresAt,
-		IsActive:    apiKey.IsActive,
-		Permissions: []string(apiKey.Permissions),
-		CreatedAt:   apiKey.CreatedAt,
-	}, nil
+	return mapAPIKeyToResponse(&apiKey), nil
 }
 
-// ValidateAPIKey validates an API key and returns the associated user
+// ValidateAPIKey validates an API key and reserves one use for callers that
+// do not have separate permission and rate-limit middleware.
 func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.User, *user.APIKey, error) {
+	account, apiKey, err := r.AuthenticateAPIKey(fullAPIKey, ip)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := r.ReserveAPIKeyUsage(apiKey, ip); err != nil {
+		return nil, nil, err
+	}
+	return account, apiKey, nil
+}
+
+// AuthenticateAPIKey verifies the credential and account without spending the
+// key's total-use quota. API routes reserve a use after permission and rate checks.
+func (r *APIKeyRepository) AuthenticateAPIKey(fullAPIKey string, ip string) (*user.User, *user.APIKey, error) {
 	logger.Logger.Info("Validating API key", "key_preview", auth.GetKeyPreview(fullAPIKey))
 
 	// Parse the full API key (format: keyID.secretKey)
@@ -316,17 +330,13 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 	if err := r.db.Where("`key` = ? AND is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?)",
 		keyID, true, time.Now()).First(&apiKey).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			logger.Logger.Warn("API key not found", "key_id", keyID)
-			return nil, nil, apperrors.ErrAPIKeyNotFound
+			// Match the work done for a present key so an unknown key ID does not
+			// have a cheaper, distinguishable authentication path.
+			_ = auth.ValidateAPISecretKey(secretKey, dummyAPIKeyHash)
+			return nil, nil, apperrors.ErrAPIKeyUnauthorized
 		}
 		logger.Logger.Error("Database error while validating API key", "error", err.Error())
 		return nil, nil, apperrors.ErrAPIKeyValidationFailed
-	}
-
-	// validate usage limit
-	if apiKey.LimitUsage != nil && apiKey.UsageCount >= *apiKey.LimitUsage {
-		logger.Logger.Warn("API key usage limit reached", "key_id", keyID)
-		return nil, nil, apperrors.ErrAPIKeyRateLimitExceeded
 	}
 
 	// validate IP restrictions
@@ -347,7 +357,7 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 	// Validate the secret key against stored hash
 	if !auth.ValidateAPISecretKey(secretKey, apiKey.KeyHash) {
 		logger.Logger.Warn("Invalid secret key for API key", "key_id", keyID, "user_id", apiKey.UserID)
-		return nil, nil, apperrors.ErrAPIKeyInvalidFormat
+		return nil, nil, apperrors.ErrAPIKeyUnauthorized
 	}
 
 	// Get the associated user
@@ -361,17 +371,6 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 		return nil, nil, apperrors.ErrUserAccountDeactivated
 	}
 
-	// Update last used timestamp and increment usage count asynchronously and get last IP Used
-	go func() {
-		if err := r.db.Model(&apiKey).Updates(map[string]interface{}{
-			"last_used_at": time.Now(),
-			"usage_count":  gorm.Expr("usage_count + ?", 1),
-			"last_ip_used": ip,
-		}).Error; err != nil {
-			logger.Logger.Error("Failed to update usage stats for API key", "key_id", keyID, "error", err.Error())
-		}
-	}()
-
 	logger.Logger.Info("API key validated successfully",
 		"user_id", account.ID,
 		"key_id", keyID,
@@ -379,6 +378,45 @@ func (r *APIKeyRepository) ValidateAPIKey(fullAPIKey string, ip string) (*user.U
 	)
 
 	return &account, &apiKey, nil
+}
+
+// ReserveAPIKeyUsage atomically spends one use after the request passes the
+// permission and account rate-limit checks.
+func (r *APIKeyRepository) ReserveAPIKeyUsage(apiKey *user.APIKey, ip string) error {
+	if apiKey == nil {
+		return apperrors.ErrAPIKeyUnauthorized
+	}
+	return r.reserveAPIKeyUsage(apiKey, apiKey.Key, ip)
+}
+
+func (r *APIKeyRepository) reserveAPIKeyUsage(apiKey *user.APIKey, keyID, ip string) error {
+	// The quota predicate and increment execute in one database UPDATE. MySQL
+	// locks this row while updating, so concurrent requests cannot spend the
+	// same remaining use. The predicate also prevents a concurrent revoke,
+	// deactivate, rotation, or expiration from admitting a request.
+	result := r.db.Model(&user.APIKey{}).
+		Where("id = ? AND `key` = ? AND key_hash = ? AND is_active = ? AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > ?) AND (limit_usage IS NULL OR usage_count < limit_usage)",
+			apiKey.ID, keyID, apiKey.KeyHash, true, time.Now()).
+		Updates(map[string]interface{}{
+			"last_used_at": time.Now(),
+			"usage_count":  gorm.Expr("usage_count + ?", 1),
+			"last_ip_used": ip,
+		})
+	if result.Error != nil {
+		logger.Logger.Error("Failed to reserve API key usage", "key_id", keyID, "error", result.Error)
+		return apperrors.ErrAPIKeyValidationFailed
+	}
+	if result.RowsAffected != 1 {
+		// A concurrent rotation or deactivation may also remove the row from
+		// the conditional UPDATE. Do not report a quota failure in that case.
+		var current user.APIKey
+		if err := r.db.Select("id", "key", "key_hash", "is_active", "expires_at", "deleted_at").Where("id = ?", apiKey.ID).First(&current).Error; err != nil || current.Key != keyID || current.KeyHash != apiKey.KeyHash || !current.IsActive || current.DeletedAt != nil || (current.ExpiresAt != nil && !current.ExpiresAt.After(time.Now())) {
+			return apperrors.ErrAPIKeyUnauthorized
+		}
+		return apperrors.ErrAPIKeyRateLimitExceeded
+	}
+	apiKey.UsageCount++
+	return nil
 }
 
 // repositories/api-key-repo.go - Add these methods
@@ -565,7 +603,12 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 			updates["is_active"] = *req.IsActive
 		}
 
-		if req.LimitUsage != nil {
+		if req.ClearLimitUsage && req.LimitUsage != nil {
+			return apperrors.ErrAPIKeyInvalidLimitUsage
+		}
+		if req.ClearLimitUsage {
+			updates["limit_usage"] = nil
+		} else if req.LimitUsage != nil {
 			if *req.LimitUsage < 0 {
 				return apperrors.ErrAPIKeyInvalidLimitUsage
 			}
@@ -720,70 +763,12 @@ func (r *APIKeyRepository) GetAPIKeyStats(userID string) (*dto.APIKeyStatsRespon
 	return stats, nil
 }
 
-// CreateAPIKeyWithCustomPrefix creates a new API key with custom prefix
+// CreateAPIKeyWithCustomPrefix shares the same active-key limit and user lock
+// as normal key creation.
 func (r *APIKeyRepository) CreateAPIKeyWithCustomPrefix(userID, name, prefix string, expiresAt *time.Time, permissions []string) (*dto.CreateAPIKeyResponse, error) {
-	// Generate API key pair with custom prefix
-	keyID, secretKey, secretKeyHash, keyPreview, err := auth.GenerateAPIKeyPair(prefix)
-	if err != nil {
-		return nil, apperrors.ErrGenerateAPIKeyFailed
-	}
-
-	logger.Logger.Info("Creating custom prefix API key",
-		"user_id", userID,
-		"key_name", name,
-		"key_preview", keyPreview,
-		"prefix", prefix,
-	)
-
-	apiKey := &user.APIKey{
-		ID:          identifier.NewUUIDV7(),
-		UserID:      userID,
-		Name:        name,
-		Key:         keyID,
-		KeyHash:     secretKeyHash,
-		ExpiresAt:   expiresAt,
-		IsActive:    true,
-		Permissions: user.PermissionsList(permissions),
-	}
-
-	if err := r.db.Create(apiKey).Error; err != nil {
-		logger.Logger.Error("Failed to create custom prefix API key",
-			"user_id", userID,
-			"key_name", name,
-			"prefix", prefix,
-			"error", err.Error(),
-		)
-		return nil, apperrors.ErrAPIKeyCreateFailed
-	}
-
-	logger.Logger.Info("Custom prefix API key created successfully",
-		"user_id", userID,
-		"key_id", apiKey.ID,
-		"key_name", name,
-		"key_preview", keyPreview,
-		"prefix", prefix,
-	)
-
-	// Build the full secret key (keyID.secretKey format)
-	fullAPIKey := keyID + "." + secretKey
-
-	// Return DTO response with full key
-	response := &dto.CreateAPIKeyResponse{
-		ID:          apiKey.ID,
-		Name:        apiKey.Name,
-		CreatedAt:   apiKey.CreatedAt,
-		ExpiresAt:   apiKey.ExpiresAt,
-		Permissions: []string(apiKey.Permissions),
-		BlockedIPs:  []string{},
-		AllowedIPs:  []string{},
-		LimitUsage:  apiKey.LimitUsage,
-		UsageCount:  apiKey.UsageCount,
-		IsActive:    apiKey.IsActive,
-		Key:         fullAPIKey,
-		Warning:     "This is your API key. Please save it somewhere safe. You won't be able to see it again!",
-	}
-
-	return response, nil
+	return r.createAPIKeyWithPrefix(userID, dto.CreateAPIKeyRequest{
+		Name: name, ExpiresAt: expiresAt, Permissions: permissions,
+	}, prefix)
 }
 
 // RegenerateAPIKey regenerates an existing API key (creates new key, updates record)

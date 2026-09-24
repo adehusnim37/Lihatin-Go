@@ -26,6 +26,12 @@ func RegisterNotificationRoutes(
 		protected.GET("/preferences", controller.GetPreferences)
 		protected.PATCH("/preferences", controller.UpdatePreferences)
 	}
+	inApp := rg.Group("/notifications/in-app")
+	inApp.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
+	{
+		inApp.GET("", controller.PendingInAppAnnouncements)
+		inApp.POST("/:id/read", controller.MarkInAppAnnouncementRead)
+	}
 
 	admin := rg.Group("/auth/admin/promotional-campaigns")
 	admin.Use(middleware.AuthMiddleware(userRepo, userAuthRepo), middleware.AdminAuth(), middleware.RequireEmailVerification())

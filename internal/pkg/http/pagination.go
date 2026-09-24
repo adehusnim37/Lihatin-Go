@@ -75,6 +75,46 @@ func PaginateValidate(pageStr, limitStr, sort, orderBy string, role Role) (page,
 	return p, l, sort, orderBy, nil
 }
 
+// PaginateValidateViews validates pagination for short-link view history.
+func PaginateValidateViews(pageStr, limitStr, sort, orderBy string) (page, limit int, outSort, outOrder string, errs map[string]string) {
+	errs = map[string]string{}
+
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	if limitStr == "" {
+		limitStr = "10"
+	}
+	if sort == "" {
+		sort = "clicked_at"
+	}
+	if orderBy == "" {
+		orderBy = "desc"
+	}
+
+	pageValue, err := strconv.Atoi(pageStr)
+	if err != nil || pageValue < 1 {
+		errs["page"] = "Page must be a positive integer"
+	}
+
+	limitValue, err := strconv.Atoi(limitStr)
+	if err != nil || limitValue < 1 || limitValue > 100 {
+		errs["limit"] = "Limit must be between 1 and 100"
+	}
+
+	if sort != "clicked_at" {
+		errs["sort"] = "Sort must be clicked_at"
+	}
+	if orderBy != "asc" && orderBy != "desc" {
+		errs["order_by"] = "Order by must be either 'asc' or 'desc'"
+	}
+
+	if len(errs) > 0 {
+		return 0, 0, "", "", errs
+	}
+	return pageValue, limitValue, sort, orderBy, nil
+}
+
 // PaginateValidateAdminUsers validates pagination and the dedicated sort
 // columns supported by the admin users directory.
 func PaginateValidateAdminUsers(pageStr, limitStr, sort, orderBy string) (page, limit int, outSort, outOrder string, errs map[string]string) {

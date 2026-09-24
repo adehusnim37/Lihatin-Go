@@ -3,17 +3,18 @@ package dto
 import "time"
 
 type UpdateAPIKeyRequest struct {
-	Name        *string    `json:"name,omitempty" binding:"omitempty,min=3,max=100,no_special"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=CreatedAt"` // Must be in the future
-	Permissions []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
-	IsActive    *bool      `json:"is_active,omitempty"`
-	BlockedIPs  []string   `json:"blocked_ips,omitempty" binding:"dive,ip"`
-	AllowedIPs  []string   `json:"allowed_ips,omitempty" binding:"dive,ip"`
-	LimitUsage  *int64     `json:"limit_usage,omitempty" binding:"omitempty,gte=0"` // nil means unlimited
+	Name            *string    `json:"name,omitempty" binding:"omitempty,min=3,max=100,no_special"`
+	ExpiresAt       *time.Time `json:"expires_at,omitempty" binding:"omitempty,gtfield=CreatedAt"` // Must be in the future
+	Permissions     []string   `json:"permissions,omitempty" binding:"dive,oneof=read write delete update"`
+	IsActive        *bool      `json:"is_active,omitempty"`
+	BlockedIPs      []string   `json:"blocked_ips,omitempty" binding:"dive,ip"`
+	AllowedIPs      []string   `json:"allowed_ips,omitempty" binding:"dive,ip"`
+	LimitUsage      *int64     `json:"limit_usage,omitempty" binding:"omitempty,gte=0"` // nil leaves existing cap unchanged
+	ClearLimitUsage bool       `json:"clear_limit_usage,omitempty"`
 }
 
 type APIKeyIDRequest struct {
-	ID string `json:"id" binding:"required,uuid4" uri:"id"`
+	ID string `json:"id" binding:"required,uuid" uri:"id"`
 }
 
 type ActivateAccountRequest struct {

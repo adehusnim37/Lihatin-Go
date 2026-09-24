@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -87,5 +88,30 @@ func TestCORSRejectsUntrustedPreflight(t *testing.T) {
 	}
 	if recorder.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatal("untrusted preflight received Access-Control-Allow-Origin")
+	}
+}
+
+func TestCORSAllowsAPIKeyHeaderForTrustedOrigin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("ENV", "production")
+	t.Setenv("ALLOWED_ORIGINS", "https://app.example.com")
+
+	router := gin.New()
+	router.Use(CORSMiddleware())
+	request := httptest.NewRequest(http.MethodOptions, "https://api.example.com/v1/api/short", nil)
+	request.Header.Set("Origin", "https://app.example.com")
+	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	request.Header.Set("Access-Control-Request-Headers", "X-API-Key, Content-Type")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("preflight status = %d", recorder.Code)
+	}
+	if recorder.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" {
+		t.Fatal("trusted frontend origin was not allowed")
+	}
+	allowed := strings.ToLower(recorder.Header().Get("Access-Control-Allow-Headers"))
+	if !strings.Contains(allowed, "x-api-key") {
+		t.Fatalf("X-API-Key missing from preflight allowed headers: %s", allowed)
 	}
 }
