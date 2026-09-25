@@ -11,8 +11,8 @@ type TOTPRequest struct {
 
 // TOTPResponse represents a response containing the TOTP
 type TOTPResponse struct {
-	TOTP     string    `json:"totp"`
-	Expires  time.Time `json:"expires"`
+	TOTP    string    `json:"totp"`
+	Expires time.Time `json:"expires"`
 }
 
 type DisableTOTPRequest struct {

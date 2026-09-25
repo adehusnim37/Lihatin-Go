@@ -3,9 +3,9 @@ package totp
 import (
 	"net/http"
 
+	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"github.com/gin-gonic/gin"
 )
 

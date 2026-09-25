@@ -21,9 +21,9 @@ func (c *Controller) LoginAttemptsStats(ctx *gin.Context) {
 	}
 
 	// Authorization check: non-admin users can only view their own stats
-		role := ctx.GetString("role")
-		isAdmin := strings.EqualFold(role, "admin")
-		
+	role := ctx.GetString("role")
+	isAdmin := strings.EqualFold(role, "admin")
+
 	if !isAdmin {
 		userEmail := ctx.GetString("username")
 		if req.EmailOrUsername != userEmail {

@@ -8,8 +8,8 @@ import (
 // Controller handles email-related authentication operations
 type Controller struct {
 	*controllers.BaseController
-	repo         *authrepo.AuthRepository
-	historyRepo  *authrepo.HistoryUserRepository
+	repo        *authrepo.AuthRepository
+	historyRepo *authrepo.HistoryUserRepository
 }
 
 // NewHistoryUserController creates a new email authentication controller

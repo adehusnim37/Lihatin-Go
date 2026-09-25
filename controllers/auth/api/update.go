@@ -34,6 +34,5 @@ func (c *Controller) UpdateAPIKey(ctx *gin.Context) {
 		return
 	}
 
-
 	http.SendOKResponse(ctx, updatedKey, "API key updated successfully")
 }

@@ -21,7 +21,7 @@ type UserHistoryRequest struct {
 }
 
 type UserHistoryResponse struct {
-	ID            int `json:"id"`
+	ID            int    `json:"id"`
 	UserID        string `json:"user_id"`
 	ActionType    string `json:"action_type"`
 	OldValue      string `json:"old_value"`

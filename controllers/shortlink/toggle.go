@@ -20,7 +20,7 @@ func (c *Controller) SwitchActiveInActiveShort(ctx *gin.Context) {
 	if err := c.repo.ToggleActiveInActiveShort(codeData.Code, userID, role); err != nil {
 		http.HandleError(ctx, err, userID)
 		return
-	}	
+	}
 
 	http.SendOKResponse(ctx, nil, "Short link toggled successfully")
 }
