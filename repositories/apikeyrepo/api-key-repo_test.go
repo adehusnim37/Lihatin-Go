@@ -167,3 +167,22 @@ func TestCreateAPIKeyStopsAtThreeIncludingCustomPrefix(t *testing.T) {
 		t.Fatalf("fourth key: got %v", err)
 	}
 }
+
+func TestActivateAPIKeyCannotExceedThreeActiveKeys(t *testing.T) {
+	repo := testRepository(t)
+	for _, query := range []string{
+		`INSERT INTO user_auth (id, user_id, is_email_verified, account_status) VALUES ('auth', 'owner', 1, 'active')`,
+		`INSERT INTO api_keys (id, user_id, name, key, key_hash, is_active) VALUES ('one', 'owner', 'one', 'k1', 'hash', 1), ('two', 'owner', 'two', 'k2', 'hash', 1), ('three', 'owner', 'three', 'k3', 'hash', 1), ('four', 'owner', 'four', 'k4', 'hash', 0)`,
+	} {
+		if err := repo.db.Exec(query).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := repo.ActivateAPIKey(dto.APIKeyIDRequest{ID: "four"}, "owner", "user"); err != apperrors.ErrAPIKeyLimitReached {
+		t.Fatalf("activating a fourth key: %v", err)
+	}
+	var active bool
+	if err := repo.db.Raw(`SELECT is_active FROM api_keys WHERE id = 'four'`).Scan(&active).Error; err != nil || active {
+		t.Fatalf("fourth key active=%v error=%v", active, err)
+	}
+}

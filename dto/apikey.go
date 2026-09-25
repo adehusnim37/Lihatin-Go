@@ -23,6 +23,7 @@ type ActivateAccountRequest struct {
 // APIKeyResponse represents the API key response (without sensitive data)
 type APIKeyResponse struct {
 	ID          string     `json:"id"`
+	UserID      string     `json:"user_id"`
 	Name        string     `json:"name"`
 	KeyPreview  string     `json:"key_preview"` // Only first 8 characters + "..."
 	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
@@ -32,6 +33,8 @@ type APIKeyResponse struct {
 	LastIPUsed  *string    `json:"last_ip_used,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	Permissions []string   `json:"permissions"`
+	BlockedIPs  []string   `json:"blocked_ips,omitempty"`
+	AllowedIPs  []string   `json:"allowed_ips,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }

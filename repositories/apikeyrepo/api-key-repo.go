@@ -34,6 +34,7 @@ func NewAPIKeyRepository(db *gorm.DB) *APIKeyRepository {
 func mapAPIKeyToResponse(apiKey *user.APIKey) dto.APIKeyResponse {
 	return dto.APIKeyResponse{
 		ID:          apiKey.ID,
+		UserID:      apiKey.UserID,
 		Name:        apiKey.Name,
 		KeyPreview:  auth.GetKeyPreview(apiKey.Key),
 		LastUsedAt:  apiKey.LastUsedAt,
@@ -41,6 +42,8 @@ func mapAPIKeyToResponse(apiKey *user.APIKey) dto.APIKeyResponse {
 		ExpiresAt:   apiKey.ExpiresAt,
 		IsActive:    apiKey.IsActive,
 		Permissions: []string(apiKey.Permissions),
+		BlockedIPs:  []string(apiKey.BlockedIPs),
+		AllowedIPs:  []string(apiKey.AllowedIPs),
 		LimitUsage:  apiKey.LimitUsage,
 		UsageCount:  apiKey.UsageCount,
 		CreatedAt:   apiKey.CreatedAt,
@@ -615,6 +618,14 @@ func (r *APIKeyRepository) UpdateAPIKey(keyID dto.APIKeyIDRequest, userID string
 			updates["limit_usage"] = req.LimitUsage
 		}
 
+		if req.AllowedIPs != nil {
+			updates["allowed_ips"] = user.IPList(req.AllowedIPs)
+		}
+
+		if req.BlockedIPs != nil {
+			updates["blocked_ips"] = user.IPList(req.BlockedIPs)
+		}
+
 		// Always update timestamp
 		updates["updated_at"] = time.Now()
 
@@ -869,38 +880,48 @@ ActivateAPIKey activates a deactivated API key
 */
 func (r *APIKeyRepository) ActivateAPIKey(keyID dto.APIKeyIDRequest, userID string, userRole string) (*dto.APIKeyResponse, error) {
 	var apiKey user.APIKey
-
-	// Start a transaction
-	tx := r.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Build the query for fetching API keys
-	q := tx.Where("id = ? AND deleted_at IS NULL", keyID.ID)
+	var target user.APIKey
+	q := r.db.Select("id", "user_id").Where("id = ? AND deleted_at IS NULL", keyID.ID)
 	if userRole != "admin" {
 		q = q.Where("user_id = ?", userID)
 	}
-
-	// Fetch the API key
-	if err := q.First(&apiKey).Error; err != nil {
-		tx.Rollback()
+	if err := q.First(&target).Error; err != nil {
 		return nil, apperrors.ErrAPIKeyNotFound
 	}
 
-	// Update the API key to set is_active to true
-	if err := tx.Model(&apiKey).Updates(map[string]any{
-		"is_active":  true,
-		"updated_at": time.Now(),
-	}).Error; err != nil {
-		tx.Rollback()
-		return nil, apperrors.ErrAPIKeyActivateFailed
-	}
-	// Commit the transaction
-	if err := tx.Commit().Error; err != nil {
-		return nil, apperrors.ErrAPIKeyFailedFetching
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		// Creation takes this same lock, so reactivation cannot race a new key
+		// past the three-active-key limit.
+		var ownerAuth user.UserAuth
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", target.UserID).First(&ownerAuth).Error; err != nil {
+			return apperrors.ErrAPIKeyActivateFailed
+		}
+		keyQuery := tx.Where("id = ? AND deleted_at IS NULL", keyID.ID)
+		if userRole != "admin" {
+			keyQuery = keyQuery.Where("user_id = ?", userID)
+		}
+		if err := keyQuery.First(&apiKey).Error; err != nil {
+			return apperrors.ErrAPIKeyNotFound
+		}
+		if apiKey.IsActive {
+			return nil
+		}
+		var activeCount int64
+		if err := tx.Model(&user.APIKey{}).Where("user_id = ? AND is_active = ? AND deleted_at IS NULL", apiKey.UserID, true).Count(&activeCount).Error; err != nil {
+			return apperrors.ErrAPIKeyActivateFailed
+		}
+		if activeCount >= 3 {
+			return apperrors.ErrAPIKeyLimitReached
+		}
+		if err := tx.Model(&apiKey).Updates(map[string]any{
+			"is_active": true, "updated_at": time.Now(),
+		}).Error; err != nil {
+			return apperrors.ErrAPIKeyActivateFailed
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	logger.Logger.Info("API key activated successfully",
 		"user_id", userID,
