@@ -24,6 +24,7 @@ For same-host deployment with split compose projects:
 - DB user/password in `DATABASE_URL` must match `MARIADB_USER`/`MARIADB_PASSWORD` from db stack
 - `REDIS_ADDR` should target `lihatin-valkey:6379`
 - `SHORT_CODE_PERMUTATION_SECRET` must contain at least 32 characters and remain unchanged after codes have been allocated
+- Set `TRUSTED_PROXY_CIDRS` to the exact IP/CIDR of the reverse proxy as seen by the API container. Without it, forwarded IP headers are ignored and every request through that proxy shares its IP-based authentication guard. Do not use a broad public CIDR.
 
 ### Using Doppler on the VPS
 

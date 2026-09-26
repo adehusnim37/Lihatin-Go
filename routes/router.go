@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/auth"
@@ -64,6 +65,18 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 func SetupRouter(validate *validator.Validate) *gin.Engine {
 	// Use gin.New and attach middleware once to avoid duplicate default middleware warnings.
 	r := gin.New()
+	// Gin otherwise trusts forwarded IP headers from every peer. Only explicitly
+	// configured reverse proxies may supply the client IP used by auth limits.
+	proxyCIDRs := strings.TrimSpace(config.GetEnvOrDefault("TRUSTED_PROXY_CIDRS", ""))
+	var trustedProxies []string
+	if proxyCIDRs != "" {
+		for _, cidr := range strings.Split(proxyCIDRs, ",") {
+			trustedProxies = append(trustedProxies, strings.TrimSpace(cidr))
+		}
+	}
+	if err := r.SetTrustedProxies(trustedProxies); err != nil {
+		panic("Invalid TRUSTED_PROXY_CIDRS: " + err.Error())
+	}
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.BlockSensitivePaths())

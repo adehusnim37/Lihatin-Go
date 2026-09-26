@@ -41,3 +41,18 @@ func TestLegacyAndMalformedAPIKeyHashes(t *testing.T) {
 		}
 	}
 }
+
+// BenchmarkValidateAPISecretKey quantifies CPU cost of an authentication
+// attempt so the pre-auth throttle can be tuned against real hardware.
+func BenchmarkValidateAPISecretKey(b *testing.B) {
+	_, secret, stored, _, err := GenerateAPIKeyPair("")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if ValidateAPISecretKey(secret+"wrong", stored) {
+			b.Fatal("wrong secret accepted")
+		}
+	}
+}

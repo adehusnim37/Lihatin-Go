@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	apperrors "github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/session"
@@ -604,9 +605,41 @@ func CheckPermissionAPIKey(authRepo *authrepo.AuthRepository, requiredPermission
 // AuthRepositoryAPIKeyMiddleware authenticates without spending a use; the
 // route reserves usage after permission and rate-limit checks.
 func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.HandlerFunc {
+	return authRepositoryAPIKeyMiddleware(authRepo, newAPIKeyAuthThrottle)
+}
+
+func authRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository, loadThrottle func() (*apiKeyAuthThrottle, error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
+		ip := c.ClientIP()
+		throttle, err := loadThrottle()
+		if err != nil {
+			rejectAPIKeyAuthLimiterUnavailable(c, err)
+			return
+		}
+		allowed, retryAfter, err := throttle.check(c.Request.Context(), ip, apiKey)
+		if err != nil {
+			rejectAPIKeyAuthLimiterUnavailable(c, err)
+			return
+		}
+		if !allowed {
+			rejectAPIKeyAuthThrottle(c, retryAfter)
+			return
+		}
+		if len(apiKey) > maxAPIKeyHeaderLength {
+			if err := throttle.recordFailure(c.Request.Context(), ip, apiKey); err != nil {
+				rejectAPIKeyAuthLimiterUnavailable(c, err)
+				return
+			}
+			c.JSON(http.StatusBadRequest, common.APIResponse{Success: false, Message: "Invalid API key format"})
+			c.Abort()
+			return
+		}
 		if apiKey == "" {
+			if err := throttle.recordFailure(c.Request.Context(), ip, apiKey); err != nil {
+				rejectAPIKeyAuthLimiterUnavailable(c, err)
+				return
+			}
 			c.JSON(http.StatusUnauthorized, common.APIResponse{
 				Success: false,
 				Data:    nil,
@@ -617,12 +650,15 @@ func AuthRepositoryAPIKeyMiddleware(authRepo *authrepo.AuthRepository) gin.Handl
 			return
 		}
 
-		// Extract client IP
-		ip := c.ClientIP()
-
 		// Validate API key using the auth repository
 		user, apiKeyRecord, err := authRepo.GetAPIKeyRepository().AuthenticateAPIKey(apiKey, ip)
 		if err != nil {
+			if err != apperrors.ErrAPIKeyValidationFailed && err != apperrors.ErrUserNotFound {
+				if recordErr := throttle.recordFailure(c.Request.Context(), ip, apiKey); recordErr != nil {
+					rejectAPIKeyAuthLimiterUnavailable(c, recordErr)
+					return
+				}
+			}
 			logger.Logger.Warn("API key validation failed",
 				"key_preview", auth.GetKeyPreview(apiKey),
 				"error", err.Error(),
