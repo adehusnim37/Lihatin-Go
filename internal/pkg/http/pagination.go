@@ -2,6 +2,7 @@ package http
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 )
@@ -13,7 +14,7 @@ const (
 	RoleUser  Role = "user"
 )
 
-func PaginateValidate(pageStr, limitStr, sort, orderBy string, role Role) (page, limit int, outSort, outOrder string, errs map[string]string) {
+func PaginateValidate(pageStr, limitStr, sort, orderBy string, role Role, sortOptions ...string) (page, limit int, outSort, outOrder string, errs map[string]string) {
 	errs = map[string]string{}
 
 	// defaults
@@ -45,23 +46,19 @@ func PaginateValidate(pageStr, limitStr, sort, orderBy string, role Role) (page,
 	}
 
 	// whitelist sort
-	validSorts := map[string]bool{
-		"created_at": true,
-		"updated_at": true,
-		"short_code": true,
-		"title":      true,
+	validSorts := map[string]bool{}
+	validSortNames := sortOptions
+	if len(sortOptions) == 0 {
+		validSortNames = []string{"created_at", "updated_at", "short_code", "title"}
+		if role == RoleAdmin {
+			validSortNames = append(validSortNames, "original_url", "is_active", "user_id")
+		}
 	}
-	if role == RoleAdmin {
-		validSorts["original_url"] = true
-		validSorts["is_active"] = true
-		validSorts["user_id"] = true
+	for _, sortName := range validSortNames {
+		validSorts[sortName] = true
 	}
 	if !validSorts[sort] {
-		opts := "created_at, updated_at, short_code, title"
-		if role == RoleAdmin {
-			opts += ", original_url, is_active, user_id"
-		}
-		errs["sort"] = "Sort must be one of: " + opts
+		errs["sort"] = "Sort must be one of: " + strings.Join(validSortNames, ", ")
 	}
 
 	// order_by
@@ -73,46 +70,6 @@ func PaginateValidate(pageStr, limitStr, sort, orderBy string, role Role) (page,
 		return 0, 0, "", "", errs
 	}
 	return p, l, sort, orderBy, nil
-}
-
-// PaginateValidateViews validates pagination for short-link view history.
-func PaginateValidateViews(pageStr, limitStr, sort, orderBy string) (page, limit int, outSort, outOrder string, errs map[string]string) {
-	errs = map[string]string{}
-
-	if pageStr == "" {
-		pageStr = "1"
-	}
-	if limitStr == "" {
-		limitStr = "10"
-	}
-	if sort == "" {
-		sort = "clicked_at"
-	}
-	if orderBy == "" {
-		orderBy = "desc"
-	}
-
-	pageValue, err := strconv.Atoi(pageStr)
-	if err != nil || pageValue < 1 {
-		errs["page"] = "Page must be a positive integer"
-	}
-
-	limitValue, err := strconv.Atoi(limitStr)
-	if err != nil || limitValue < 1 || limitValue > 100 {
-		errs["limit"] = "Limit must be between 1 and 100"
-	}
-
-	if sort != "clicked_at" {
-		errs["sort"] = "Sort must be clicked_at"
-	}
-	if orderBy != "asc" && orderBy != "desc" {
-		errs["order_by"] = "Order by must be either 'asc' or 'desc'"
-	}
-
-	if len(errs) > 0 {
-		return 0, 0, "", "", errs
-	}
-	return pageValue, limitValue, sort, orderBy, nil
 }
 
 // PaginateValidateAdminUsers validates pagination and the dedicated sort

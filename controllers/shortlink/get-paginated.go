@@ -45,7 +45,7 @@ func (c *Controller) GetShortLinkViewsPaginated(ctx *gin.Context) {
 	orderByStr := ctx.DefaultQuery("order_by", "desc")
 
 	// Validate pagination parameters for views
-	page, limit, sort, orderBy, vErrs := httputil.PaginateValidateViews(pageStr, limitStr, sortStr, orderByStr)
+	page, limit, sort, orderBy, vErrs := httputil.PaginateValidate(pageStr, limitStr, sortStr, orderByStr, httputil.RoleUser, "clicked_at")
 	if vErrs != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
