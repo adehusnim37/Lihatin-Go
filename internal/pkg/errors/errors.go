@@ -1212,4 +1212,52 @@ var (
 		http.StatusInternalServerError,
 		"attachment",
 	)
+	ErrAnnouncementNotFound = NewAppError(
+		"ANNOUNCEMENT_NOT_FOUND",
+		"Announcement not found",
+		http.StatusNotFound,
+		"announcement",
+	)
+	ErrAnnouncementFindFailed = NewAppError(
+		"ANNOUNCEMENT_FIND_FAILED",
+		"Failed to find announcement",
+		http.StatusInternalServerError,
+		"announcement",
+	)
+	ErrAnnouncementListFailed = NewAppError(
+		"ANNOUNCEMENT_LIST_FAILED",
+		"Failed to list announcements",
+		http.StatusInternalServerError,
+		"announcements",
+	)
+	ErrAnnouncementCreateFailed = NewAppError(
+		"ANNOUNCEMENT_CREATE_FAILED",
+		"Failed to create announcement",
+		http.StatusInternalServerError,
+		"announcement",
+	)
+	ErrAnnouncementUpdateFailed = NewAppError(
+		"ANNOUNCEMENT_UPDATE_FAILED",
+		"Failed to update announcement",
+		http.StatusInternalServerError,
+		"announcement",
+	)
+	ErrAnnouncementDeleteFailed = NewAppError(
+		"ANNOUNCEMENT_DELETE_FAILED",
+		"Failed to delete announcement",
+		http.StatusInternalServerError,
+		"announcement",
+	)
+	ErrAnnouncementArchiveFailed = NewAppError(
+		"ANNOUNCEMENT_ARCHIVE_FAILED",
+		"Failed to archive announcement",
+		http.StatusInternalServerError,
+		"announcement",
+	)
+	ErrAnnouncementReadFailed = NewAppError(
+		"ANNOUNCEMENT_READ_FAILED",
+		"Failed to mark announcement as read",
+		http.StatusInternalServerError,
+		"announcement",
+	)
 )

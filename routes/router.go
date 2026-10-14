@@ -15,6 +15,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/internal/pkg/csrf"
 	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
+	"github.com/adehusnim37/lihatin-go/repositories/announcementrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/loggerrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
@@ -26,7 +27,7 @@ import (
 
 func csrfTokenSkipRules() []csrf.SkipRule {
 	return []csrf.SkipRule{
-		// Public auth bootstrap. Origin/Referer validation still applies.
+		// Authentication bootstrap routes still enforce origin validation.
 		{Method: http.MethodPost, Path: "/v1/auth/login"},
 		{Method: http.MethodPost, Path: "/v1/auth/oauth/google/start"},
 		{Method: http.MethodPost, Path: "/v1/auth/oauth/google/callback"},
@@ -39,11 +40,10 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 		{Method: http.MethodPost, Path: "/v1/auth/forgot-password"},
 		{Method: http.MethodPost, Path: "/v1/auth/reset-password"},
 		{Method: http.MethodPost, Path: "/v1/auth/verify-totp-login"},
-		// Signed one-click email endpoint. It does not use cookies and must also
-		// accept server-to-server POST requests from email providers.
+		// Signed one-click email endpoint; it does not use browser cookies.
 		{Method: http.MethodPost, Path: "/v1/notifications/unsubscribe", SkipOriginCheck: true},
 
-		// Public support access & conversation.
+		// Public support access and conversation routes.
 		{Method: http.MethodPost, Path: "/v1/support/tickets"},
 		{Method: http.MethodPost, Path: "/v1/support/access/request-otp"},
 		{Method: http.MethodPost, Path: "/v1/support/access/resend-otp"},
@@ -54,8 +54,7 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/attachments/:attachmentID"},
 		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/access/logout"},
 
-		// API-key clients do not use browser cookies and are not CSRF targets.
-		// Their route middleware still validates the API key after this bypass.
+		// API-key clients do not use browser cookies or require CSRF protection.
 		{Method: http.MethodPost, Path: "/v1/api/short", SkipOriginCheck: true},
 		{Method: http.MethodPut, Path: "/v1/api/short/:code", SkipOriginCheck: true},
 		{Method: http.MethodDelete, Path: "/v1/api/short/:code", SkipOriginCheck: true},
@@ -63,10 +62,9 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 }
 
 func SetupRouter(validate *validator.Validate) *gin.Engine {
-	// Use gin.New and attach middleware once to avoid duplicate default middleware warnings.
 	r := gin.New()
-	// Gin otherwise trusts forwarded IP headers from every peer. Only explicitly
-	// configured reverse proxies may supply the client IP used by auth limits.
+
+	// Trust forwarded client IPs only from explicitly configured proxies.
 	proxyCIDRs := strings.TrimSpace(config.GetEnvOrDefault("TRUSTED_PROXY_CIDRS", ""))
 	var trustedProxies []string
 	if proxyCIDRs != "" {
@@ -77,59 +75,62 @@ func SetupRouter(validate *validator.Validate) *gin.Engine {
 	if err := r.SetTrustedProxies(trustedProxies); err != nil {
 		panic("Invalid TRUSTED_PROXY_CIDRS: " + err.Error())
 	}
+	// Global middleware.
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.BlockSensitivePaths())
-
-	// Apply CORS middleware first
 	r.Use(pkgauth.CORSMiddleware())
 
-	// Keep CSRF enabled in every environment so development and CI exercise
-	// the same browser-security contract as production.
+	// Keep CSRF enabled in every environment.
 	csrfOpts := csrf.DefaultOptions()
 	csrfOpts.SkipRules = csrfTokenSkipRules()
 	r.Use(csrf.Middleware(csrfOpts))
 
-	// Initialize GORM for new auth repositories
+	// Database and base controller.
 	dsn := config.GetRequiredEnv(config.EnvDatabaseURL)
 	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("Failed to connect to database with GORM: " + err.Error())
 	}
 
-	// Create base controller with GORM for auth
 	baseController := controllers.NewBaseControllerWithGorm(gormDB, validate)
 
-	// Inisialisasi controller spesifik
+	// Controllers.
 	authController := auth.NewAuthController(baseController)
 	loggerController := logger.NewController(baseController)
 	shortController := shortlink.NewController(baseController)
 	emailController := email.NewController(baseController)
 	totpController := totp.NewController(baseController, authController)
 
-	// Setup repositories for middleware
+	// Repositories used by middleware and route registration.
 	loggerRepo := loggerrepo.NewLoggerRepository(gormDB)
-	userRepo := userrepo.NewUserRepository(gormDB) // Changed to use GORM
+	userRepo := userrepo.NewUserRepository(gormDB)
 	userAuthRepo := authrepo.NewUserAuthRepository(gormDB)
 	loginAttemptRepo := authrepo.NewLoginAttemptRepository(gormDB)
-	authRepo := authrepo.NewAuthRepository(gormDB) // Add auth repository for API key middleware
+	authRepo := authrepo.NewAuthRepository(gormDB)
+	announcementRepo := announcementrepo.NewInAppRepository(gormDB)
 
-	// Apply global middleware for activity logging
+	// Activity logging must run after its repository is initialized.
 	r.Use(middleware.ActivityLogger(loggerRepo))
 
-	// Definisikan route untuk user, auth, dan logger
 	v1 := r.Group("/v1")
-
-	// CSRF Token endpoint (untuk SPA fetch token)
 	v1.GET("/csrf-token", csrfTokenHandler)
 
-	RegisterAuthRoutes(v1, authController, userRepo, userAuthRepo, *loginAttemptRepo, emailController, totpController, baseController)
+	RegisterAuthRoutes(
+		v1,
+		authController,
+		userRepo,
+		userAuthRepo,
+		*loginAttemptRepo,
+		emailController,
+		totpController,
+		baseController,
+	)
 	RegisterSupportRoutes(v1, userRepo, userAuthRepo, baseController)
 	RegisterLoggerRoutes(v1, userRepo, userAuthRepo, loggerController)
 	RegisterShortRoutes(v1, shortController, userRepo, userAuthRepo, authRepo)
-	RegisterNotificationRoutes(v1, baseController, userRepo, userAuthRepo)
+	RegisterNotificationRoutes(v1, baseController, userRepo, userAuthRepo, announcementRepo)
 
-	// Route health check
 	v1.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, common.APIResponse{
 			Success: true,

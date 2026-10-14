@@ -4,6 +4,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/notification"
 	"github.com/adehusnim37/lihatin-go/middleware"
+	"github.com/adehusnim37/lihatin-go/repositories/announcementrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"github.com/gin-gonic/gin"
@@ -14,8 +15,9 @@ func RegisterNotificationRoutes(
 	baseController *controllers.BaseController,
 	userRepo userrepo.UserRepository,
 	userAuthRepo *authrepo.UserAuthRepository,
+	announcementRepo *announcementrepo.InAppRepository,
 ) {
-	controller := notification.NewController(baseController)
+	controller := notification.NewController(baseController, announcementRepo)
 
 	rg.GET("/notifications/unsubscribe", controller.Unsubscribe)
 	rg.POST("/notifications/unsubscribe", controller.Unsubscribe)
@@ -45,5 +47,15 @@ func RegisterNotificationRoutes(
 		admin.POST("/:id/schedule", controller.ScheduleCampaign)
 		admin.POST("/:id/cancel", controller.CancelCampaign)
 		admin.DELETE("/:id", controller.DeleteCampaign)
+	}
+
+	adminInApp := rg.Group("/auth/admin/in-app-announcements")
+	adminInApp.Use(
+		middleware.AuthMiddleware(userRepo, userAuthRepo),
+		middleware.AdminAuth(),
+		middleware.RequireEmailVerification(),
+	)
+	{
+		adminInApp.POST("", controller.CreateInAppAnnouncement)
 	}
 }
