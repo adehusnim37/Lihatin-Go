@@ -32,7 +32,11 @@ func RegisterNotificationRoutes(
 	inApp.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
 	{
 		inApp.GET("", controller.PendingInAppAnnouncements)
+		inApp.GET("/inbox", controller.ListInAppAnnouncementInbox)
+		inApp.GET("/unread-count", controller.InAppAnnouncementUnreadCount)
+		inApp.POST("/read-all", controller.MarkAllInAppAnnouncementsRead)
 		inApp.POST("/:id/read", controller.MarkInAppAnnouncementRead)
+		inApp.POST("/:id/unread", controller.MarkInAppAnnouncementUnread)
 	}
 
 	admin := rg.Group("/auth/admin/promotional-campaigns")
@@ -56,6 +60,13 @@ func RegisterNotificationRoutes(
 		middleware.RequireEmailVerification(),
 	)
 	{
+		adminInApp.GET("", controller.ListInAppAnnouncements)
 		adminInApp.POST("", controller.CreateInAppAnnouncement)
+		adminInApp.GET("/:id", controller.GetInAppAnnouncement)
+		adminInApp.GET("/:id/audience", controller.ListInAppAnnouncementAudience)
+		adminInApp.PUT("/:id", controller.UpdateInAppAnnouncement)
+		adminInApp.DELETE("/:id", controller.DeleteInAppAnnouncement)
+		adminInApp.POST("/:id/publish", controller.PublishInAppAnnouncement)
+		adminInApp.POST("/:id/archive", controller.ArchiveInAppAnnouncement)
 	}
 }

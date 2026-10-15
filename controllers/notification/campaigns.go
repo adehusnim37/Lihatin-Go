@@ -64,6 +64,15 @@ func (c *Controller) CreateCampaign(ctx *gin.Context) {
 }
 
 func (c *Controller) ListCampaigns(ctx *gin.Context) {
+	status := strings.ToLower(strings.TrimSpace(ctx.Query("status")))
+	switch user.PromotionalCampaignStatus(status) {
+	case "", user.PromotionalCampaignDraft, user.PromotionalCampaignScheduled,
+		user.PromotionalCampaignSending, user.PromotionalCampaignCompleted,
+		user.PromotionalCampaignCancelled, user.PromotionalCampaignFailed:
+	default:
+		httputil.SendErrorResponse(ctx, http.StatusBadRequest, "INVALID_CAMPAIGN_STATUS", "Unknown campaign status", "status")
+		return
+	}
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
 	if page < 1 {
@@ -76,14 +85,18 @@ func (c *Controller) ListCampaigns(ctx *gin.Context) {
 		limit = 100
 	}
 
+	query := c.GormDB.WithContext(ctx).Model(&user.PromotionalCampaign{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
 	var total int64
-	if err := c.GormDB.WithContext(ctx).Model(&user.PromotionalCampaign{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "CAMPAIGNS_READ_FAILED", "Failed to retrieve promotional campaigns", "campaigns")
 		return
 	}
 
 	var campaigns []user.PromotionalCampaign
-	if err := c.GormDB.WithContext(ctx).
+	if err := query.
 		Order("created_at DESC").
 		Limit(limit).
 		Offset((page - 1) * limit).
@@ -91,14 +104,28 @@ func (c *Controller) ListCampaigns(ctx *gin.Context) {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "CAMPAIGNS_READ_FAILED", "Failed to retrieve promotional campaigns", "campaigns")
 		return
 	}
+	var grouped []struct {
+		Status string
+		Count  int64
+	}
+	if err := c.GormDB.WithContext(ctx).Model(&user.PromotionalCampaign{}).
+		Select("status, COUNT(*) AS count").Group("status").Scan(&grouped).Error; err != nil {
+		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "CAMPAIGNS_READ_FAILED", "Failed to retrieve campaign counts", "campaigns")
+		return
+	}
+	counts := make(map[string]int64, len(grouped))
+	for _, row := range grouped {
+		counts[row.Status] = row.Count
+	}
 
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 	httputil.SendOKResponse(ctx, gin.H{
-		"campaigns":   campaigns,
-		"page":        page,
-		"limit":       limit,
-		"total":       total,
-		"total_pages": totalPages,
+		"campaigns":     campaigns,
+		"page":          page,
+		"limit":         limit,
+		"total":         total,
+		"total_pages":   totalPages,
+		"status_counts": counts,
 	}, "Promotional campaigns retrieved successfully")
 }
 

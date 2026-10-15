@@ -3,11 +3,12 @@ package announcements
 import "time"
 
 type InAppAnnouncementRead struct {
-	ID             string    `json:"id" gorm:"primaryKey"`
-	AnnouncementID string    `json:"announcement_id" gorm:"uniqueIndex:idx_announcements_in_app_reads_user_announcement,priority:2"`
-	UserID         string    `json:"user_id" gorm:"uniqueIndex:idx_announcements_in_app_reads_user_announcement,priority:1"`
-	IsRead         bool      `json:"is_read" gorm:"default:false"`
-	CreatedAt      time.Time `json:"created_at" gorm:"autoCreateTime"`
+	ID             string     `json:"id" gorm:"primaryKey"`
+	AnnouncementID string     `json:"announcement_id" gorm:"uniqueIndex:idx_announcements_in_app_reads_user_announcement,priority:2"`
+	UserID         string     `json:"user_id" gorm:"uniqueIndex:idx_announcements_in_app_reads_user_announcement,priority:1"`
+	IsRead         bool       `json:"is_read" gorm:"default:false"`
+	ReadAt         *time.Time `json:"read_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at" gorm:"autoCreateTime"`
 }
 
 type InAppAnnouncement struct {
