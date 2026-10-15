@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/adehusnim37/lihatin-go/models/user"
+	"github.com/adehusnim37/lihatin-go/models/announcements"
+	"github.com/adehusnim37/lihatin-go/repositories/announcementrepo"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -15,28 +16,35 @@ func TestInAppAnnouncementReadIsPerAccountAndIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&user.InAppAnnouncementRead{}); err != nil {
+	if err := db.AutoMigrate(&announcements.InAppAnnouncement{}, &announcements.InAppAnnouncementRead{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&announcements.InAppAnnouncement{
+		ID: APIRateLimitAnnouncementID, Title: "API request limits have changed",
+		Body: "API limits changed", Href: "/main/api-integrations/docs", Status: "published",
+	}).Error; err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	initial, err := PendingInAppAnnouncements(ctx, db, "first")
+	service := NewInAppAnnouncementService(announcementrepo.NewInAppRepository(db))
+	initial, err := service.Pending(ctx, "first")
 	if err != nil || len(initial) != 1 || initial[0].ID != APIRateLimitAnnouncementID {
 		t.Fatalf("initial announcements=%+v error=%v", initial, err)
 	}
 	for range 2 {
-		if err := MarkInAppAnnouncementRead(ctx, db, "first", APIRateLimitAnnouncementID); err != nil {
+		if err := service.MarkRead(ctx, "first", APIRateLimitAnnouncementID); err != nil {
 			t.Fatal(err)
 		}
 	}
-	first, err := PendingInAppAnnouncements(ctx, db, "first")
+	first, err := service.Pending(ctx, "first")
 	if err != nil || len(first) != 0 {
 		t.Fatalf("read announcement still pending=%+v error=%v", first, err)
 	}
-	second, err := PendingInAppAnnouncements(ctx, db, "second")
+	second, err := service.Pending(ctx, "second")
 	if err != nil || len(second) != 1 {
 		t.Fatalf("other account announcement=%+v error=%v", second, err)
 	}
-	if err := MarkInAppAnnouncementRead(ctx, db, "first", "unknown"); !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := service.MarkRead(ctx, "first", "unknown"); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("unknown announcement error=%v", err)
 	}
 }

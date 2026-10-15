@@ -4,6 +4,7 @@ import (
 	"github.com/adehusnim37/lihatin-go/controllers"
 	"github.com/adehusnim37/lihatin-go/controllers/notification"
 	"github.com/adehusnim37/lihatin-go/middleware"
+	"github.com/adehusnim37/lihatin-go/repositories/announcementrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/authrepo"
 	"github.com/adehusnim37/lihatin-go/repositories/userrepo"
 	"github.com/gin-gonic/gin"
@@ -14,8 +15,9 @@ func RegisterNotificationRoutes(
 	baseController *controllers.BaseController,
 	userRepo userrepo.UserRepository,
 	userAuthRepo *authrepo.UserAuthRepository,
+	announcementRepo *announcementrepo.InAppRepository,
 ) {
-	controller := notification.NewController(baseController)
+	controller := notification.NewController(baseController, announcementRepo)
 
 	rg.GET("/notifications/unsubscribe", controller.Unsubscribe)
 	rg.POST("/notifications/unsubscribe", controller.Unsubscribe)
@@ -30,7 +32,11 @@ func RegisterNotificationRoutes(
 	inApp.Use(middleware.AuthMiddleware(userRepo, userAuthRepo))
 	{
 		inApp.GET("", controller.PendingInAppAnnouncements)
+		inApp.GET("/inbox", controller.ListInAppAnnouncementInbox)
+		inApp.GET("/unread-count", controller.InAppAnnouncementUnreadCount)
+		inApp.POST("/read-all", controller.MarkAllInAppAnnouncementsRead)
 		inApp.POST("/:id/read", controller.MarkInAppAnnouncementRead)
+		inApp.POST("/:id/unread", controller.MarkInAppAnnouncementUnread)
 	}
 
 	admin := rg.Group("/auth/admin/promotional-campaigns")
@@ -45,5 +51,22 @@ func RegisterNotificationRoutes(
 		admin.POST("/:id/schedule", controller.ScheduleCampaign)
 		admin.POST("/:id/cancel", controller.CancelCampaign)
 		admin.DELETE("/:id", controller.DeleteCampaign)
+	}
+
+	adminInApp := rg.Group("/auth/admin/in-app-announcements")
+	adminInApp.Use(
+		middleware.AuthMiddleware(userRepo, userAuthRepo),
+		middleware.AdminAuth(),
+		middleware.RequireEmailVerification(),
+	)
+	{
+		adminInApp.GET("", controller.ListInAppAnnouncements)
+		adminInApp.POST("", controller.CreateInAppAnnouncement)
+		adminInApp.GET("/:id", controller.GetInAppAnnouncement)
+		adminInApp.GET("/:id/audience", controller.ListInAppAnnouncementAudience)
+		adminInApp.PUT("/:id", controller.UpdateInAppAnnouncement)
+		adminInApp.DELETE("/:id", controller.DeleteInAppAnnouncement)
+		adminInApp.POST("/:id/publish", controller.PublishInAppAnnouncement)
+		adminInApp.POST("/:id/archive", controller.ArchiveInAppAnnouncement)
 	}
 }
