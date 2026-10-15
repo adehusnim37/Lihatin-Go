@@ -11,7 +11,7 @@ const (
 
 type CreateInAppAnnouncementRequest struct {
 	Title       string     `json:"title" binding:"required,max=100"`
-	Body        string     `json:"body" binding:"required,max=150"`
+	Body        string     `json:"body" binding:"required,max=300"`
 	Href        string     `json:"href" binding:"omitempty,url,max=150"`
 	Status      string     `json:"status" binding:"required,oneof=draft published archived"`
 	EndsAt      *time.Time `json:"ends_at" binding:"omitempty,gtfield=StartAt"`
@@ -23,7 +23,7 @@ type CreateInAppAnnouncementRequest struct {
 // The lifecycle state is changed through the dedicated publish and archive endpoints.
 type UpdateInAppAnnouncementRequest struct {
 	Title   string     `json:"title" binding:"required,max=100"`
-	Body    string     `json:"body" binding:"required,max=150"`
+	Body    string     `json:"body" binding:"required,max=300"`
 	Href    string     `json:"href" binding:"omitempty,url,max=150"`
 	StartAt *time.Time `json:"start_at" binding:"omitempty"`
 	EndsAt  *time.Time `json:"ends_at" binding:"omitempty,gtfield=StartAt"`

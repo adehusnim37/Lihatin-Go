@@ -14,7 +14,7 @@ type InAppAnnouncementRead struct {
 type InAppAnnouncement struct {
 	ID          string     `json:"id" gorm:"primaryKey,index:idx_announcements_in_app_status_start_at_ends_at,priority:1,sort:desc"`
 	Title       string     `json:"title" gorm:"type:varchar(100);not null"`
-	Body        string     `json:"body" gorm:"type:varchar(150);not null"`
+	Body        string     `json:"body" gorm:"type:varchar(300);not null"`
 	Href        string     `json:"href" gorm:"type:varchar(255);not null"`
 	Status      string     `json:"status" gorm:"oneof:('draft','published','archived');default:'draft'"`
 	StartAt     *time.Time `json:"start_at,omitempty"`
