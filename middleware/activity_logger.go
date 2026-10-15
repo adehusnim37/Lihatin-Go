@@ -158,7 +158,10 @@ func ActivityLogger(loggerRepo *loggerrepo.LoggerRepository) gin.HandlerFunc {
 
 		headersInfo := extractHeadersInfo(c)
 		apiKeyValue := extractAPIKey(c)
-		apiKeyID := extractIDApiKey(apiKeyValue)
+		var apiKeyID *string
+		if apiKeyValue != "" {
+			apiKeyID = extractIDApiKey(apiKeyValue)
+		}
 
 		// Convert API key to pointer if not empty
 

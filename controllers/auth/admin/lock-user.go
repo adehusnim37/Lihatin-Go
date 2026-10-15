@@ -2,12 +2,13 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 
 	"github.com/adehusnim37/lihatin-go/dto"
-	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,6 +32,15 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		httputil.HandleError(ctx, err, userID)
 		return
 	}
+	
+	logger.Logger.Info("Chcecking if user can be locked", "user_id", userID, "role", user.Role)
+
+	// Admin accounts cannot be locked.
+	role := strings.ToLower(strings.TrimSpace(user.Role))
+	if role == "admin" || role == "super_admin" {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "CANNOT_LOCK_ADMIN", "Cannot lock an admin or super_admin account", "user_id", userID)
+		return
+	}
 
 	// Check if user is already locked
 	if user.IsAccountLocked() {
@@ -44,8 +54,6 @@ func (c *Controller) LockUser(ctx *gin.Context) {
 		httputil.SendErrorResponse(ctx, http.StatusInternalServerError, "LOCK_USER_FAILED", "Failed to lock user account, please try again later", "user_id", userID)
 		return
 	}
-
-	logger.Logger.Info("User locked successfully", "user_id", userID, "reason", req.Reason)
 
 	httputil.SendOKResponse(ctx, nil, "User account locked successfully")
 }

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
@@ -27,6 +28,11 @@ func (c *Controller) UnlockUser(ctx *gin.Context) {
 	user, err := c.repo.GetUserRepository().GetUserByID(userID)
 	if err != nil {
 		httputil.SendErrorResponse(ctx, http.StatusNotFound, "USER_NOT_FOUND", "User not found", "user_id", userID)
+		return
+	}
+	role := strings.ToLower(strings.TrimSpace(user.Role))
+	if role == "admin" || role == "super_admin" {
+		httputil.SendErrorResponse(ctx, http.StatusForbidden, "CANNOT_UNLOCK_ADMIN", "Cannot unlock an admin or super_admin account", "user_id", userID)
 		return
 	}
 
