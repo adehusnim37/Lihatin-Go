@@ -114,7 +114,8 @@ type PendingEmailOTPResponse struct {
 // VerifyTOTPLoginRequest represents the request to verify TOTP during login
 type VerifyTOTPLoginRequest struct {
 	PendingAuthToken string `json:"pending_auth_token" binding:"required" label:"Token Autentikasi"`
-	TOTPCode         string `json:"totp_code" binding:"required,len=6,numeric" label:"Kode TOTP"`
+	TOTPCode         string `json:"totp_code" binding:"required_without=RecoveryCode,omitempty,len=6,numeric" label:"Kode TOTP"`
+	RecoveryCode     string `json:"recovery_code" binding:"required_without=TOTPCode,omitempty,min=8,max=9" label:"Recovery code"`
 }
 
 // VerifyEmailOTPLoginRequest validates login email OTP challenge.

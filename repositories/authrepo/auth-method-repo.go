@@ -1,20 +1,57 @@
 package authrepo
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	pkgauth "github.com/adehusnim37/lihatin-go/internal/pkg/auth"
 	"time"
 
 	"github.com/adehusnim37/lihatin-go/internal/pkg/errors"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // AuthMethodRepository handles AuthMethod database operations
 type AuthMethodRepository struct {
 	db *gorm.DB
+}
+
+// ConsumeRecoveryCode serializes verification and removal so a code can complete only one login.
+func (r *AuthMethodRepository) ConsumeRecoveryCode(ctx context.Context, userAuthID, code string) (bool, error) {
+	code = pkgauth.NormalizeRecoveryCode(code)
+	if code == "" {
+		return false, nil
+	}
+	valid := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var method user.AuthMethod
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_auth_id = ? AND type = ? AND is_enabled = ? AND is_verified = ? AND deleted_at IS NULL", userAuthID, user.AuthMethodTypeTOTP, true, true).First(&method).Error; err != nil {
+			return err
+		}
+		var hashes []string
+		if err := json.Unmarshal(method.RecoveryCodes, &hashes); err != nil {
+			return err
+		}
+		for i, hash := range hashes {
+			if pkgauth.CheckPassword(hash, code) == nil {
+				remaining, err := json.Marshal(append(hashes[:i], hashes[i+1:]...))
+				if err != nil {
+					return err
+				}
+				if err := tx.Model(&method).Update("recovery_codes", remaining).Error; err != nil {
+					return err
+				}
+				valid = true
+				break
+			}
+		}
+		return nil
+	})
+	return valid, err
 }
 
 // NewAuthMethodRepository creates a new AuthMethod repository

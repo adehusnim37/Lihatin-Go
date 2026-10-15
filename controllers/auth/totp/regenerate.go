@@ -5,6 +5,7 @@ import (
 
 	"github.com/adehusnim37/lihatin-go/dto"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/auth"
+	"github.com/adehusnim37/lihatin-go/middleware"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/gin-gonic/gin"
 )
@@ -13,14 +14,17 @@ import (
 func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	userID := ctx.GetString("user_id")
 
-	var req dto.PasswordGenericRequest
+	var req struct {
+		dto.DisableTOTPRequest
+		VerificationToken string `json:"verification_token"`
+	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, common.APIResponse{
 			Success: false,
 			Data:    nil,
 			Message: "Invalid input",
-			Error:   map[string]string{"input": "Password confirmation is required"},
+			Error:   map[string]string{"input": "Identity verification is required"},
 		})
 		return
 	}
@@ -37,13 +41,25 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 		return
 	}
 
-	// Verify password
-	if err := auth.CheckPassword(userAuth.PasswordHash, req.Password); err != nil {
+	// Require a recent verified action or a current authenticator code.
+	valid := false
+	if manager := middleware.GetSessionManager(); manager != nil {
+		valid = auth.ConsumeSecurityGrant(ctx.Request.Context(), manager.GetRedisClient(), userID, ctx.GetString("session_id"), req.VerificationToken)
+	}
+	if !valid && req.TOTPCode != "" {
+		encrypted, e := c.repo.GetAuthMethodRepository().GetTOTPSecret(userAuth.ID)
+		if e == nil {
+			secret, e := auth.DecryptTOTPSecret(encrypted)
+			valid = e == nil && auth.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1)
+		}
+	}
+
+	if !valid {
 		ctx.JSON(http.StatusUnauthorized, common.APIResponse{
 			Success: false,
 			Data:    nil,
-			Message: "Invalid password",
-			Error:   map[string]string{"password": "Password is incorrect"},
+			Message: "Identity verification failed. Verify your identity again.",
+			Error:   map[string]string{"auth": "A current authenticator code or recent verification is required"},
 		})
 		return
 	}
@@ -61,7 +77,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 	}
 
 	// Generate new recovery codes
-	recoveryCodes, err := auth.GenerateRecoveryCodes(8)
+	recoveryCodes, err := auth.GenerateRecoveryCodes(9)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, common.APIResponse{
 			Success: false,
@@ -86,6 +102,7 @@ func (c *Controller) RegenerateRecoveryCodes(ctx *gin.Context) {
 		return
 	}
 
+	ctx.Header("Cache-Control", "no-store")
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: map[string]interface{}{

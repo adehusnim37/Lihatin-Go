@@ -6,9 +6,11 @@ import "time"
 type LoginMethod string
 
 const (
-	LoginMethodEmailOTP    LoginMethod = "email_otp"
-	LoginMethodTOTP        LoginMethod = "totp"
-	LoginMethodGoogleOAuth LoginMethod = "google_oauth"
+	LoginMethodEmailOTP     LoginMethod = "email_otp"
+	LoginMethodTOTP         LoginMethod = "totp"
+	LoginMethodRecoveryCode LoginMethod = "recovery_code"
+	LoginMethodPasskey      LoginMethod = "passkey"
+	LoginMethodGoogleOAuth  LoginMethod = "google_oauth"
 )
 
 // LoginEvent is an immutable record of a completed authentication.

@@ -185,7 +185,18 @@ func IncrementPendingAuthAttempts(ctx context.Context, token string) (int, error
 
 // ConsumePendingAuthToken removes pending auth token after successful TOTP verification.
 func ConsumePendingAuthToken(ctx context.Context, token string) error {
-	return DeletePendingAuthToken(ctx, token)
+	if pendingAuthRedisClient == nil {
+		return apperrors.ErrServerInternalPendingAuth
+	}
+	script := redis.NewScript(`if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end; redis.call('DEL', KEYS[1], KEYS[2]); return 1`)
+	consumed, err := script.Run(ctx, pendingAuthRedisClient, []string{PendingAuthPrefix + token, PendingAuthAttemptsPrefix + token}).Int()
+	if err != nil {
+		return err
+	}
+	if consumed != 1 {
+		return apperrors.ErrPendingAuthDeleteFailed
+	}
+	return nil
 }
 
 // DeletePendingAuthToken manually deletes a pending auth token and its attempts counter.

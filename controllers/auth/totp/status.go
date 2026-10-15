@@ -56,6 +56,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 				"verified":            totpMethod.IsVerified,
 				"friendly_name":       totpMethod.FriendlyName,
 				"last_used":           totpMethod.LastUsedAt,
+				"verified_at":         totpMethod.VerifiedAt,
 				"recovery_codes_left": len(recoveryCodes),
 			}
 		}
@@ -65,6 +66,7 @@ func (c *Controller) GetTOTPStatus(ctx *gin.Context) {
 		}
 	}
 
+	ctx.Header("Cache-Control", "no-store")
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data:    totpData,

@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base32"
 	"fmt"
 	"net/url"
@@ -85,14 +84,25 @@ func GenerateRecoveryCodes(count int) ([]string, error) {
 }
 
 // ValidateRecoveryCode validates a recovery code against stored hashed codes
+func NormalizeRecoveryCode(code string) string {
+	code = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(code), "-", ""))
+	if len(code) != 8 {
+		return ""
+	}
+	for _, ch := range code {
+		if !(ch >= 'A' && ch <= 'Z') && !(ch >= '0' && ch <= '9') {
+			return ""
+		}
+	}
+	return code[:4] + "-" + code[4:]
+}
 func ValidateRecoveryCode(inputCode string, hashedCodes []string) bool {
-	inputHash, err := HashPassword(inputCode)
-	if err != nil {
+	inputCode = NormalizeRecoveryCode(inputCode)
+	if inputCode == "" {
 		return false
 	}
-
 	for _, hashedCode := range hashedCodes {
-		if subtle.ConstantTimeCompare([]byte(inputHash), []byte(hashedCode)) == 1 {
+		if CheckPassword(hashedCode, inputCode) == nil {
 			return true
 		}
 	}
@@ -159,15 +169,10 @@ func DecryptTOTPSecret(encryptedSecret string) (string, error) {
 
 // RemoveRecoveryCode removes a used recovery code from the slice
 func RemoveRecoveryCode(codes []string, usedCode string) []string {
-	usedHash, err := HashPassword(usedCode)
-	if err != nil {
-		return codes // Return original codes if hashing fails
-	}
-
+	usedCode = NormalizeRecoveryCode(usedCode)
 	var updatedCodes []string
-
 	for _, hashedCode := range codes {
-		if subtle.ConstantTimeCompare([]byte(usedHash), []byte(hashedCode)) != 1 {
+		if CheckPassword(hashedCode, usedCode) != nil {
 			updatedCodes = append(updatedCodes, hashedCode)
 		}
 	}

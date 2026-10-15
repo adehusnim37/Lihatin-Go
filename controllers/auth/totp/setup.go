@@ -94,5 +94,6 @@ func (c *Controller) SetupTOTP(ctx *gin.Context) {
 		"recovery_codes": recoveryCodes,
 	}
 
+	ctx.Header("Cache-Control", "no-store")
 	httputil.SendOKResponse(ctx, response, "TOTP setup initiated. Please scan QR code and verify to complete setup")
 }

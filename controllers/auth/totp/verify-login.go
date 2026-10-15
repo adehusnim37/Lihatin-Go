@@ -112,8 +112,18 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		return
 	}
 
-	// Validate TOTP code
-	if !auth.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1) {
+	// Recovery codes use the same pending login and risk guard as TOTP.
+	valid := auth.ValidateTOTPCodeWithWindow(secret, req.TOTPCode, 1)
+	method := usermodel.LoginMethodTOTP
+	if req.RecoveryCode != "" {
+		valid, err = c.repo.GetAuthMethodRepository().ConsumeRecoveryCode(ctx.Request.Context(), userAuth.ID, req.RecoveryCode)
+		if err != nil {
+			httputil.HandleError(ctx, err, userID)
+			return
+		}
+		method = usermodel.LoginMethodRecoveryCode
+	}
+	if !valid {
 		remainingAttempts, attemptErr := auth.IncrementPendingAuthAttempts(context.Background(), req.PendingAuthToken)
 		if attemptErr != nil {
 			logger.Logger.Warn("Failed to record pending auth attempt",
@@ -144,6 +154,8 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 			"user_id", userID,
 			"error", err.Error(),
 		)
+		httputil.SendErrorResponse(ctx, http.StatusUnauthorized, "INVALID_AUTH_TOKEN", "Please sign in again", "auth")
+		return
 	}
 
 	// Update TOTP auth method last_used_at
@@ -159,9 +171,15 @@ func (c *Controller) VerifyTOTPLogin(ctx *gin.Context) {
 		ctx,
 		user,
 		userAuth,
-		usermodel.LoginMethodTOTP,
+		method,
 		"Two-factor authentication successful. Welcome back!",
 	); err != nil {
 		return
 	}
+	if method == usermodel.LoginMethodRecoveryCode {
+		if err := c.repo.GetLoginAttemptRepository().RecordLoginAttempt(ctx.ClientIP(), ctx.GetHeader("User-Agent"), true, "Recovery code sign-in successful", user.Username); err != nil {
+			logger.Logger.Warn("Failed to record recovery-code login attempt", "error", err)
+		}
+	}
+
 }

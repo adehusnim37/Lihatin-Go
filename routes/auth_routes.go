@@ -51,6 +51,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		authGroup.POST("/login/email-otp/verify", middleware.RecordLoginAttempt(&loginAttemptRepo), middleware.RateLimitMiddleware(20, 0, 10), authController.VerifyLoginEmailOTP)
 		authGroup.POST("/login/email-otp/resend", middleware.RateLimitMiddleware(20, 0, 10), authController.ResendLoginEmailOTP)
 
+		authGroup.POST("/passkeys/login/begin", middleware.RateLimitMiddleware(30, 0, 10), authController.BeginPasskeyLogin)
+		authGroup.POST("/passkeys/login/finish", middleware.RateLimitMiddleware(30, 0, 10), authController.FinishPasskeyLogin)
+
 		// TOTP Login verification (no auth required - this IS the auth step)
 		authGroup.POST("/verify-totp-login", totpController.VerifyTOTPLogin)
 
@@ -74,6 +77,16 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 		// Get current user
 		protectedAuth.GET("/me", authController.GetCurrentUser)
 
+		protectedAuth.POST("/security/verify", middleware.RateLimitMiddleware(8, 0, 15), authController.VerifySecurityAction)
+		passkeys := protectedAuth.Group("/passkeys", middleware.RateLimitMiddleware(20, 0, 10))
+		passkeys.GET("", authController.ListPasskeys)
+		passkeys.POST("/register/begin", authController.BeginPasskeyRegistration)
+		passkeys.POST("/register/finish", authController.FinishPasskeyRegistration)
+		passkeys.POST("/reauth/begin", authController.BeginPasskeyReauth)
+		passkeys.POST("/reauth/finish", authController.FinishPasskeyReauth)
+		passkeys.PATCH("/:id", authController.RenamePasskey)
+		passkeys.DELETE("/:id", authController.DeletePasskey)
+
 		// Account management
 		protectedAuth.GET("/premium-access", authController.GetPremiumAccess)
 		protectedAuth.GET("/profile", authController.GetProfile)
@@ -93,7 +106,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup, authController *auth.Controller, us
 
 		// TOTP (Two-Factor Authentication) management
 		totpGroup := protectedAuth.Group("/totp")
+		totpGroup.Use(middleware.RateLimitMiddleware(20, 0, 10))
 		{
+			totpGroup.GET("/status", totpController.GetTOTPStatus)
 			totpGroup.GET("/recovery-codes", totpController.GetRecoveryCodes)
 			totpGroup.POST("/setup", totpController.SetupTOTP)
 			totpGroup.POST("/verify", totpController.VerifyTOTP)

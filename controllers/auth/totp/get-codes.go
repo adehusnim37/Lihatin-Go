@@ -3,6 +3,7 @@ package totp
 import (
 	"net/http"
 
+	"encoding/json"
 	"github.com/adehusnim37/lihatin-go/models/common"
 	"github.com/adehusnim37/lihatin-go/models/user"
 	"github.com/gin-gonic/gin"
@@ -46,11 +47,16 @@ func (c *Controller) GetRecoveryCodes(ctx *gin.Context) {
 		return
 	}
 
+	var codes []string
+	if err := json.Unmarshal(authMethod.RecoveryCodes, &codes); err != nil {
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	ctx.Header("Cache-Control", "no-store")
 	ctx.JSON(http.StatusOK, common.APIResponse{
 		Success: true,
 		Data: gin.H{
-			"recovery_codes": authMethod.RecoveryCodes,
-			"codes_count":    len(authMethod.RecoveryCodes),
+			"codes_count": len(codes),
 		},
 		Message: "Recovery codes retrieved successfully",
 		Error:   nil,

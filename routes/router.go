@@ -40,6 +40,8 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 		{Method: http.MethodPost, Path: "/v1/auth/forgot-password"},
 		{Method: http.MethodPost, Path: "/v1/auth/reset-password"},
 		{Method: http.MethodPost, Path: "/v1/auth/verify-totp-login"},
+		{Method: http.MethodPost, Path: "/v1/auth/passkeys/login/begin"},
+		{Method: http.MethodPost, Path: "/v1/auth/passkeys/login/finish"},
 		// Signed one-click email endpoint; it does not use browser cookies.
 		{Method: http.MethodPost, Path: "/v1/notifications/unsubscribe", SkipOriginCheck: true},
 
