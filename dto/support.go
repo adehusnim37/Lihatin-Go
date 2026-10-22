@@ -1,6 +1,9 @@
 package dto
 
-import "time"
+import (
+	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
+	"time"
+)
 
 type CreateSupportTicketRequest struct {
 	Email        string `json:"email" binding:"required,email,max=255"`
@@ -46,20 +49,22 @@ type AdminSupportTicketItem struct {
 }
 
 type AdminSupportTicketDetailResponse struct {
-	ID          string     `json:"id"`
-	TicketCode  string     `json:"ticket_code"`
-	Email       string     `json:"email"`
-	Category    string     `json:"category"`
-	Subject     string     `json:"subject"`
-	Description string     `json:"description"`
-	Status      string     `json:"status"`
-	Priority    string     `json:"priority"`
-	UserID      *string    `json:"user_id,omitempty"`
-	AdminNotes  *string    `json:"admin_notes,omitempty"`
-	ResolvedBy  *string    `json:"resolved_by,omitempty"`
-	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	RequesterVerifiedAt *time.Time                    `json:"requester_verified_at,omitempty"`
+	CredentialReset     *supportmodel.CredentialReset `json:"credential_reset,omitempty"`
+	ID                  string                        `json:"id"`
+	TicketCode          string                        `json:"ticket_code"`
+	Email               string                        `json:"email"`
+	Category            string                        `json:"category"`
+	Subject             string                        `json:"subject"`
+	Description         string                        `json:"description"`
+	Status              string                        `json:"status"`
+	Priority            string                        `json:"priority"`
+	UserID              *string                       `json:"user_id,omitempty"`
+	AdminNotes          *string                       `json:"admin_notes,omitempty"`
+	ResolvedBy          *string                       `json:"resolved_by,omitempty"`
+	ResolvedAt          *time.Time                    `json:"resolved_at,omitempty"`
+	CreatedAt           time.Time                     `json:"created_at"`
+	UpdatedAt           time.Time                     `json:"updated_at"`
 }
 
 type AdminUpdateSupportTicketRequest struct {
@@ -147,4 +152,13 @@ type UserListSupportTicketsResponse struct {
 	Page       int                      `json:"page"`
 	Limit      int                      `json:"limit"`
 	TotalPages int                      `json:"total_pages"`
+}
+
+// AdminResetSupportCredentialsRequest is deliberately separate from ticket updates.
+type AdminResetSupportCredentialsRequest struct {
+	Method            string `json:"method" binding:"required,oneof=totp passkeys all"`
+	Approved          bool   `json:"approved" binding:"required"`
+	Reason            string `json:"reason" binding:"required,min=20,max=1000,meaningful_text"`
+	TicketCode        string `json:"ticket_code" binding:"required,max=20"`
+	VerificationToken string `json:"verification_token" binding:"required,len=64"`
 }

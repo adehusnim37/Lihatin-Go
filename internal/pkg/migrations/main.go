@@ -122,6 +122,9 @@ func RunMigrations(db *gorm.DB) error {
 		return err
 	}
 
+	if err := db.AutoMigrate(&supportmodel.CredentialReset{}); err != nil {
+		return fmt.Errorf("migrate support credential resets: %w", err)
+	}
 	// Migrate Support models
 	if err := db.AutoMigrate(&supportmodel.SupportTicket{}); err != nil {
 		return fmt.Errorf("failed to migrate SupportTicket model: %w", err)

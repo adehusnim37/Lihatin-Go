@@ -43,5 +43,6 @@ func RegisterSupportRoutes(rg *gin.RouterGroup, userRepo userrepo.UserRepository
 		supportAdmin.POST("/tickets/:id/messages", supportController.SendAdminMessage)
 		supportAdmin.GET("/attachments/:attachmentID", supportController.DownloadAdminAttachment)
 		supportAdmin.PUT("/tickets/:id", supportController.UpdateTicket)
+		supportAdmin.POST("/tickets/:id/credential-reset", middleware.RateLimitMiddleware(5, 0, 15), supportController.ResetCredentials)
 	}
 }

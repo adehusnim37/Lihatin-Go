@@ -132,14 +132,17 @@ func (s *RedisStore) DeleteByUserID(ctx context.Context, userID string) error {
 
 		// Get session data
 		data, err := s.client.Get(ctx, key).Result()
-		if err != nil {
+		if err == redis.Nil {
 			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read session for revocation: %w", err)
 		}
 
 		// Check if session belongs to user
 		var session Session
 		if err := json.Unmarshal([]byte(data), &session); err != nil {
-			continue
+			return fmt.Errorf("decode session for revocation: %w", err)
 		}
 
 		if session.UserID == userID {

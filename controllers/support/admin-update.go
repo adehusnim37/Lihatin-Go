@@ -117,6 +117,9 @@ func (c *Controller) applyAdminAction(action string, ticket *supportmodel.Suppor
 	switch normalizedAction {
 	case "unlock_user":
 		reason := fmt.Sprintf("Unlocked from support ticket %s", ticket.TicketCode)
+		if targetAuth.AccountStatus != user.AccountStatusLocked {
+			return "", fmt.Errorf("user account is not in state locked")
+		}
 		if err := c.authRepo.GetUserAdminRepository().UnlockUser(targetUser.ID, reason, actorID); err != nil {
 			return "", fmt.Errorf("failed to unlock user account")
 		}
@@ -131,6 +134,9 @@ func (c *Controller) applyAdminAction(action string, ticket *supportmodel.Suppor
 			return "activate_user", nil
 		case user.AccountStatusLocked:
 			return "", fmt.Errorf("locked account must be unlocked with the unlock action")
+		}
+		if targetAuth.AccountStatus != user.AccountStatusDisabled {
+			return "", fmt.Errorf("user account is not in state inactive")
 		}
 		if err := c.authRepo.GetUserAuthRepository().ActivateAccount(targetUser.ID); err != nil {
 			return "", fmt.Errorf("failed to activate account")

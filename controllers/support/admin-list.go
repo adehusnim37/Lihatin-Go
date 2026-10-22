@@ -84,21 +84,28 @@ func (c *Controller) GetTicket(ctx *gin.Context) {
 		return
 	}
 
+	reset, err := c.repo.GetCredentialReset(ticket.ID)
+	if err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
 	response := dto.AdminSupportTicketDetailResponse{
-		ID:          ticket.ID,
-		TicketCode:  ticket.TicketCode,
-		Email:       ticket.Email,
-		Category:    ticket.Category,
-		Subject:     ticket.Subject,
-		Description: ticket.Description,
-		Status:      ticket.Status,
-		Priority:    ticket.Priority,
-		UserID:      ticket.UserID,
-		AdminNotes:  ticket.AdminNotes,
-		ResolvedBy:  ticket.ResolvedBy,
-		ResolvedAt:  ticket.ResolvedAt,
-		CreatedAt:   ticket.CreatedAt,
-		UpdatedAt:   ticket.UpdatedAt,
+		RequesterVerifiedAt: ticket.RequesterVerifiedAt,
+		CredentialReset:     reset,
+		ID:                  ticket.ID,
+		TicketCode:          ticket.TicketCode,
+		Email:               ticket.Email,
+		Category:            ticket.Category,
+		Subject:             ticket.Subject,
+		Description:         ticket.Description,
+		Status:              ticket.Status,
+		Priority:            ticket.Priority,
+		UserID:              ticket.UserID,
+		AdminNotes:          ticket.AdminNotes,
+		ResolvedBy:          ticket.ResolvedBy,
+		ResolvedAt:          ticket.ResolvedAt,
+		CreatedAt:           ticket.CreatedAt,
+		UpdatedAt:           ticket.UpdatedAt,
 	}
 
 	httputil.SendOKResponse(ctx, response, "Support ticket retrieved successfully")

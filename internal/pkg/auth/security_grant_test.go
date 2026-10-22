@@ -49,3 +49,32 @@ func TestPendingTOTPChallengeConsumedOnceConcurrently(t *testing.T) {
 		t.Fatalf("pending login consumed %d times", successes.Load())
 	}
 }
+
+func TestAdminRecoveryRequiresEnrolledMFAAndSingleUseSessionProof(t *testing.T) {
+	client := startOTPTestRedis(t)
+	ctx := context.Background()
+	token := strings.Repeat("b", 64)
+	for _, value := range []string{"admin:session", "admin:other:mfa", "other:session:mfa"} {
+		if err := client.Set(ctx, "security_grant:"+token, value, time.Minute).Err(); err != nil {
+			t.Fatal(err)
+		}
+		if ConsumeMFASecurityGrant(ctx, client, "admin", "session", token) {
+			t.Fatalf("accepted insufficient/mismatched proof %q", value)
+		}
+	}
+	if err := client.Set(ctx, "security_grant:"+token, "admin:session:mfa", time.Minute).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !ConsumeMFASecurityGrant(ctx, client, "admin", "session", token) || ConsumeMFASecurityGrant(ctx, client, "admin", "session", token) {
+		t.Fatal("MFA proof must be single use")
+	}
+	if err := client.Set(ctx, "security_grant:"+token, "admin:session:mfa", time.Minute).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !ConsumeSecurityGrant(ctx, client, "admin", "session", token) {
+		t.Fatal("MFA proof must still work for existing security actions")
+	}
+	if ConsumeMFASecurityGrant(ctx, client, "admin", "", token) || ConsumeMFASecurityGrant(ctx, nil, "admin", "session", token) {
+		t.Fatal("missing session/Redis must fail closed")
+	}
+}

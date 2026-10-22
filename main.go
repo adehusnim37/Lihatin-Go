@@ -101,6 +101,7 @@ func main() {
 	if err := scheduler.RegisterMany(
 		jobs.NewDeactivateExpiredLinksJob(gormDB),
 		jobs.NewCleanupLoginAttemptsJob(gormDB),
+		jobs.NewSupportResetNotificationsJob(gormDB),
 		jobs.NewRefreshDisposableDomainsJob(),
 		jobs.NewWeeklySummaryJob(gormDB),
 		jobs.NewPromotionalCampaignJob(gormDB),

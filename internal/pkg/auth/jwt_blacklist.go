@@ -160,13 +160,18 @@ func (m *RefreshTokenManager) DeleteAllUserRefreshTokens(ctx context.Context, us
 
 		// Get user_id from this refresh token
 		tokenUserID, err := m.redisClient.HGet(ctx, key, "user_id").Result()
-		if err != nil {
+		if err == redis.Nil {
 			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read refresh token owner: %w", err)
 		}
 
 		// Delete if it belongs to the user
 		if tokenUserID == userID {
-			m.redisClient.Del(ctx, key)
+			if err := m.redisClient.Del(ctx, key).Err(); err != nil {
+				return fmt.Errorf("delete refresh token: %w", err)
+			}
 		}
 	}
 
@@ -192,7 +197,9 @@ func (m *RefreshTokenManager) DeleteSessionRefreshTokens(ctx context.Context, se
 		}
 
 		if tokenSessionID == sessionID {
-			m.redisClient.Del(ctx, key)
+			if err := m.redisClient.Del(ctx, key).Err(); err != nil {
+				return fmt.Errorf("delete refresh token: %w", err)
+			}
 		}
 	}
 

@@ -34,6 +34,7 @@ type SupportTicket struct {
 	Description          string     `json:"description" gorm:"type:text;not null"`
 	Status               string     `json:"status" gorm:"type:varchar(20);default:'open';index"`
 	Priority             string     `json:"priority" gorm:"type:varchar(20);default:'normal'"`
+	RequesterVerifiedAt  *time.Time `json:"requester_verified_at,omitempty"`
 	UserID               *string    `json:"user_id,omitempty" gorm:"type:varchar(36);index"`
 	AdminNotes           *string    `json:"admin_notes,omitempty" gorm:"type:text"`
 	ResolvedBy           *string    `json:"resolved_by,omitempty" gorm:"type:varchar(36)"`

@@ -164,7 +164,7 @@ func (c *Controller) finishChallenge(ctx *gin.Context, kind string) (*passkeyCha
 	request.Body = io.NopCloser(bytes.NewReader(body.Credential))
 	return &value, request, nil
 }
-func (c *Controller) issueSecurityGrant(ctx *gin.Context) {
+func (c *Controller) issueSecurityGrant(ctx *gin.Context, mfa bool) {
 	client, err := securityRedis()
 	if err != nil {
 		securityError(ctx, 503, "Security service unavailable")
@@ -175,7 +175,11 @@ func (c *Controller) issueSecurityGrant(ctx *gin.Context) {
 		ctx.AbortWithStatus(500)
 		return
 	}
-	if err = client.Set(ctx.Request.Context(), "security_grant:"+token, ctx.GetString("user_id")+":"+ctx.GetString("session_id"), 5*time.Minute).Err(); err != nil {
+	value := ctx.GetString("user_id") + ":" + ctx.GetString("session_id")
+	if mfa {
+		value += ":mfa"
+	}
+	if err = client.Set(ctx.Request.Context(), "security_grant:"+token, value, 5*time.Minute).Err(); err != nil {
 		securityError(ctx, 503, "Security service unavailable")
 		return
 	}
@@ -216,7 +220,7 @@ func (c *Controller) VerifySecurityAction(ctx *gin.Context) {
 		securityError(ctx, 401, "Verification failed. Use your authenticator code, or your password if 2FA is off.")
 		return
 	}
-	c.issueSecurityGrant(ctx)
+	c.issueSecurityGrant(ctx, ua.HasEnabledTOTP())
 }
 func (c *Controller) ListPasskeys(ctx *gin.Context) {
 	var rows []user.Passkey
@@ -427,7 +431,7 @@ func (c *Controller) FinishPasskeyReauth(ctx *gin.Context) {
 		ctx.AbortWithStatus(401)
 		return
 	}
-	c.issueSecurityGrant(ctx)
+	c.issueSecurityGrant(ctx, true)
 }
 func (c *Controller) updatePasskeyCredential(userID string, credential *webauthn.Credential) error {
 	encoded, err := json.Marshal(credential)

@@ -270,6 +270,11 @@ func (c *Controller) VerifyAccessOTP(ctx *gin.Context) {
 		return
 	}
 
+	if err := c.repo.MarkRequesterVerified(ctx.Request.Context(), ticket.ID); err != nil {
+		c.handleAppError(ctx, err)
+		return
+	}
+
 	accessToken, _, err := auth.CreateSupportAccessToken(ctx.Request.Context(), ticket.ID, ticket.TicketCode, ticket.Email, ticket.PublicAccessCodeHash)
 	if err != nil {
 		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_ACCESS_TOKEN_FAILED", "Failed to create support access token", http.StatusInternalServerError, "ticket"), nil)
