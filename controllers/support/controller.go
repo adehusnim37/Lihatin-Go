@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -42,12 +43,20 @@ const (
 	supportAccessCodeVerifyWindow = 5 * time.Minute
 )
 
+// supportAttachmentStorage keeps object access behind authorization checks and
+// permits testing the HTTP policy without contacting external storage.
+type supportAttachmentStorage interface {
+	UploadAttachment(context.Context, string, string, string, []byte) (string, error)
+	DeleteAttachment(context.Context, string) error
+	OpenAttachment(context.Context, string) (io.ReadCloser, string, int64, error)
+}
+
 type Controller struct {
 	*controllers.BaseController
 	repo            *supportrepo.SupportTicketRepository
 	authRepo        *authrepo.AuthRepository
 	emailSvc        *mail.EmailService
-	attachmentStore *storage.S3SupportAttachmentStorage
+	attachmentStore supportAttachmentStorage
 	httpClient      *http.Client
 }
 
@@ -62,9 +71,12 @@ func NewController(base *controllers.BaseController) *Controller {
 		panic("GormDB is required for SupportController")
 	}
 
-	attachmentStore, attachmentStoreErr := storage.NewS3SupportAttachmentStorageFromEnv()
+	var attachmentStore supportAttachmentStorage
+	configuredStorage, attachmentStoreErr := storage.NewS3SupportAttachmentStorageFromEnv()
 	if attachmentStoreErr != nil {
 		logger.Logger.Warn("Support attachment storage is not configured", "error", attachmentStoreErr.Error())
+	} else {
+		attachmentStore = configuredStorage
 	}
 
 	return &Controller{

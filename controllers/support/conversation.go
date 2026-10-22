@@ -8,7 +8,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	httputil "github.com/adehusnim37/lihatin-go/internal/pkg/http"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/identifier"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/logger"
+	"github.com/adehusnim37/lihatin-go/internal/pkg/supportattachment"
 	"github.com/adehusnim37/lihatin-go/internal/pkg/validator"
 	supportmodel "github.com/adehusnim37/lihatin-go/models/support"
 	"github.com/adehusnim37/lihatin-go/repositories/supportrepo"
@@ -602,7 +602,7 @@ func (c *Controller) DownloadUserAttachment(ctx *gin.Context) {
 		return
 	}
 
-	attachment, err := c.repo.GetAttachmentByID(attachmentID)
+	attachment, err := c.repo.GetNonInternalAttachmentByID(attachmentID)
 	if err != nil {
 		c.handleAppError(ctx, err)
 		return
@@ -770,7 +770,7 @@ func (c *Controller) DownloadPublicAttachment(ctx *gin.Context) {
 		return
 	}
 
-	attachment, err := c.repo.GetAttachmentByID(attachmentID)
+	attachment, err := c.repo.GetNonInternalAttachmentByID(attachmentID)
 	if err != nil {
 		c.handleAppError(ctx, err)
 		return
@@ -934,7 +934,7 @@ func (c *Controller) toMessageResponse(message supportmodel.SupportMessage) dto.
 	for _, attachment := range message.Attachments {
 		attachments = append(attachments, dto.SupportAttachmentResponse{
 			ID:          attachment.ID,
-			FileName:    attachment.FileName,
+			FileName:    supportattachment.DownloadName(attachment.FileName, attachment.ContentType),
 			ContentType: attachment.ContentType,
 			SizeBytes:   attachment.SizeBytes,
 			CreatedAt:   attachment.CreatedAt,
@@ -1010,23 +1010,15 @@ func (c *Controller) collectSupportAttachments(ctx *gin.Context, ticketID, messa
 			return failAfterPartialUpload(fmt.Errorf("attachment file cannot be empty"))
 		}
 
-		contentType := http.DetectContentType(fileData)
-		switch contentType {
-		case "application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif":
-			// Supported support-ticket attachment.
-		default:
-			return failAfterPartialUpload(fmt.Errorf("only PDF and image files (JPG, PNG, WebP, GIF) are allowed"))
-		}
-		if len(contentType) > 100 {
-			contentType = contentType[:100]
+		fileName, contentType, err := supportattachment.ValidateUpload(header.Filename, fileData)
+		if err != nil {
+			return failAfterPartialUpload(err)
 		}
 
-		fileName := sanitizeSupportFileName(header.Filename)
 		objectKey, uploadErr := c.attachmentStore.UploadAttachment(
 			ctx.Request.Context(),
 			ticketID,
 			messageID,
-			fileName,
 			contentType,
 			fileData,
 		)
@@ -1085,25 +1077,13 @@ func (c *Controller) cleanupUploadedAttachments(ctx *gin.Context, attachments []
 	}
 }
 
-func sanitizeSupportFileName(raw string) string {
-	base := filepath.Base(strings.TrimSpace(raw))
-	base = strings.ReplaceAll(base, "\"", "")
-	if base == "" || base == "." || base == string(filepath.Separator) {
-		base = "attachment"
-	}
-	if len(base) > 180 {
-		base = base[:180]
-	}
-	return base
-}
-
 func (c *Controller) sendAttachment(ctx *gin.Context, attachment *supportmodel.SupportAttachment) {
-	if c == nil || c.attachmentStore == nil || strings.TrimSpace(attachment.ObjectKey) == "" {
+	if c == nil || attachment == nil || c.attachmentStore == nil || strings.TrimSpace(attachment.ObjectKey) == "" {
 		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_NOT_AVAILABLE", "Attachment file is not available", http.StatusNotFound, "attachment"), nil)
 		return
 	}
 
-	body, contentType, contentLength, err := c.attachmentStore.OpenAttachment(ctx.Request.Context(), attachment.ObjectKey)
+	body, _, contentLength, err := c.attachmentStore.OpenAttachment(ctx.Request.Context(), attachment.ObjectKey)
 	if err != nil {
 		logger.Logger.Error("Failed opening support attachment", "attachment_id", attachment.ID, "error", err.Error())
 		httputil.HandleError(ctx, apperrors.NewAppError("ATTACHMENT_DOWNLOAD_FAILED", "Failed to download attachment", http.StatusBadGateway, "attachment"), nil)
@@ -1111,15 +1091,14 @@ func (c *Controller) sendAttachment(ctx *gin.Context, attachment *supportmodel.S
 	}
 	defer body.Close()
 
-	if strings.TrimSpace(contentType) == "" {
+	contentType := attachment.ContentType
+	if _, ok := supportattachment.Extension(contentType); !ok {
 		contentType = "application/octet-stream"
 	}
+	fileName := supportattachment.DownloadName(attachment.FileName, contentType)
 	ctx.Header("Cache-Control", "private, no-store")
-	disposition := "attachment"
-	if ctx.Query("disposition") == "inline" &&
-		(contentType == "application/pdf" || contentType == "image/jpeg") {
-		disposition = "inline"
-	}
-	ctx.Header("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.FileName}))
+	ctx.Header("X-Content-Type-Options", "nosniff")
+	ctx.Header("Content-Security-Policy", "sandbox; default-src 'none'")
+	ctx.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": fileName}))
 	ctx.DataFromReader(http.StatusOK, contentLength, contentType, body, nil)
 }

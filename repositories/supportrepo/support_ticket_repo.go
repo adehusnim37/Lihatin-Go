@@ -272,6 +272,20 @@ func (r *SupportTicketRepository) GetAttachmentByID(id string) (*supportmodel.Su
 	return &item, nil
 }
 
+// GetNonInternalAttachmentByID enforces visibility through the parent message.
+// Internal, orphaned, and inconsistent ticket/message attachments fail closed.
+func (r *SupportTicketRepository) GetNonInternalAttachmentByID(id string) (*supportmodel.SupportAttachment, error) {
+	var item supportmodel.SupportAttachment
+	err := r.db.Select("support_attachments.*").
+		Joins("JOIN support_messages ON support_messages.id = support_attachments.message_id AND support_messages.ticket_id = support_attachments.ticket_id").
+		Where("support_attachments.id = ? AND support_messages.is_internal = ?", strings.TrimSpace(id), false).
+		First(&item).Error
+	if err != nil {
+		return nil, supportAttachmentNotFound(err)
+	}
+	return &item, nil
+}
+
 func (r *SupportTicketRepository) UpdateTicketStatus(id, status, priority string, adminNotes *string, resolvedBy *string, revokedAccessCodeHash string) error {
 	updates := map[string]any{
 		"status":      strings.TrimSpace(status),

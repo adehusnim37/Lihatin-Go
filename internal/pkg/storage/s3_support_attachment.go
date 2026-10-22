@@ -7,10 +7,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"mime"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/adehusnim37/lihatin-go/internal/pkg/supportattachment"
 
 	awsv2 "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -33,7 +33,6 @@ func (s *S3SupportAttachmentStorage) UploadAttachment(
 	ctx context.Context,
 	ticketID string,
 	messageID string,
-	fileName string,
 	contentType string,
 	data []byte,
 ) (objectKey string, err error) {
@@ -44,7 +43,10 @@ func (s *S3SupportAttachmentStorage) UploadAttachment(
 		return "", fmt.Errorf("empty attachment payload")
 	}
 
-	objectKey = s.buildObjectKey(ticketID, messageID, fileName, contentType)
+	objectKey, err = s.buildObjectKey(ticketID, messageID, contentType)
+	if err != nil {
+		return "", err
+	}
 	reader := bytes.NewReader(data)
 
 	_, err = s.base.client.PutObject(ctx, &s3.PutObjectInput{
@@ -103,15 +105,10 @@ func (s *S3SupportAttachmentStorage) OpenAttachment(ctx context.Context, objectK
 	return output.Body, awsv2.ToString(output.ContentType), awsv2.ToInt64(output.ContentLength), nil
 }
 
-func (s *S3SupportAttachmentStorage) buildObjectKey(ticketID, messageID, fileName, contentType string) string {
-	ext := strings.ToLower(filepath.Ext(strings.TrimSpace(fileName)))
-	if ext == "" {
-		if exts, err := mime.ExtensionsByType(strings.TrimSpace(contentType)); err == nil && len(exts) > 0 {
-			ext = exts[0]
-		}
-	}
-	if ext == "" {
-		ext = ".bin"
+func (s *S3SupportAttachmentStorage) buildObjectKey(ticketID, messageID, contentType string) (string, error) {
+	ext, ok := supportattachment.Extension(contentType)
+	if !ok {
+		return "", fmt.Errorf("unsupported support attachment content type")
 	}
 
 	randomSuffix := randomHex(8)
@@ -122,7 +119,7 @@ func (s *S3SupportAttachmentStorage) buildObjectKey(ticketID, messageID, fileNam
 		time.Now().UnixNano(),
 		randomSuffix,
 		ext,
-	)
+	), nil
 }
 
 func randomHex(byteLength int) string {
