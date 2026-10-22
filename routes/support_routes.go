@@ -22,6 +22,8 @@ func RegisterSupportRoutes(rg *gin.RouterGroup, userRepo userrepo.UserRepository
 		supportPublic.GET("/tickets/:ticketCode/messages", middleware.RateLimitMiddleware(40, 0, 1), supportController.ListPublicConversation)
 		supportPublic.POST("/tickets/:ticketCode/messages", middleware.RateLimitMiddleware(25, 0, 10), supportController.SendPublicMessage)
 		supportPublic.GET("/tickets/:ticketCode/attachments/:attachmentID", middleware.RateLimitMiddleware(60, 0, 1), supportController.DownloadPublicAttachment)
+		supportPublic.POST("/tickets/:ticketCode/recovery/otp", middleware.RateLimitMiddleware(5, 0, 15), supportController.RequestPublicRecoveryOTP)
+		supportPublic.POST("/tickets/:ticketCode/recovery/verify-otp", middleware.RateLimitMiddleware(20, 0, 10), supportController.VerifyPublicRecoveryOTP)
 		supportPublic.POST("/tickets/:ticketCode/access/logout", middleware.RateLimitMiddleware(30, 0, 10), supportController.RevokePublicAccess)
 	}
 
@@ -31,6 +33,8 @@ func RegisterSupportRoutes(rg *gin.RouterGroup, userRepo userrepo.UserRepository
 		supportUser.GET("/tickets", supportController.ListUserTickets)
 		supportUser.GET("/tickets/:id/messages", supportController.ListUserConversation)
 		supportUser.POST("/tickets/:id/messages", supportController.SendUserMessage)
+		supportUser.POST("/tickets/:id/recovery/otp", middleware.RateLimitMiddleware(5, 0, 15), supportController.RequestUserRecoveryOTP)
+		supportUser.POST("/tickets/:id/recovery/verify-otp", middleware.RateLimitMiddleware(20, 0, 10), supportController.VerifyUserRecoveryOTP)
 		supportUser.GET("/attachments/:attachmentID", supportController.DownloadUserAttachment)
 	}
 
@@ -43,6 +47,7 @@ func RegisterSupportRoutes(rg *gin.RouterGroup, userRepo userrepo.UserRepository
 		supportAdmin.POST("/tickets/:id/messages", supportController.SendAdminMessage)
 		supportAdmin.GET("/attachments/:attachmentID", supportController.DownloadAdminAttachment)
 		supportAdmin.PUT("/tickets/:id", supportController.UpdateTicket)
+		supportAdmin.POST("/tickets/:id/recovery/otp", middleware.RateLimitMiddleware(5, 0, 15), supportController.RequestAdminRecoveryOTP)
 		supportAdmin.POST("/tickets/:id/credential-reset", middleware.RateLimitMiddleware(5, 0, 15), supportController.ResetCredentials)
 	}
 }

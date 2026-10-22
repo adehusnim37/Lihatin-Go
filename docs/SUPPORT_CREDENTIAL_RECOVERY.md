@@ -6,20 +6,74 @@ The public support form never approves or executes a credential reset. Normal
 ## Review and approval
 
 1. The requester submits a `lost_2fa` ticket for their existing account.
-2. They verify the ticket through **email OTP** on the support access page. This
-   records mailbox ownership for that ticket for 24 hours. An access code alone
-   does not set this proof. Existing tickets must complete OTP verification again.
-3. An administrator reviews ownership evidence and moves the ticket to
-   **In Progress**. This status does not authorize recovery by itself.
-4. Under **User Management**, choose **Reset Authenticator (TOTP)** or **Remove
-   All Passkeys**. The confirmation also offers removal of both.
-5. Record the ownership verification reason, explicitly approve recovery, type the
-   ticket code, and reauthenticate using the administrator's own TOTP or passkey.
-   Password-only verification is insufficient.
+2. An administrator reviews the request, sets the ticket to **In Progress**, and
+   saves the update. This status never approves recovery by itself.
+3. Under **User Management → Account recovery verification**, the administrator
+   clicks **Send recovery OTP**. The code is sent to the linked account's stored,
+   verified email. No OTP or challenge token is returned to the administrator.
+4. The requester opens their existing protected ticket conversation using their
+   ticket access code (or their signed-in account). They enter the email code in
+   **Verify your recovery request** and confirm they requested account recovery.
+   No standalone public verification page or secret URL parameter is used.
+5. Successful verification records mailbox ownership for 24 hours. The admin
+   panel refreshes while waiting for verification; the reset buttons then unlock.
+6. The administrator selects **Reset Authenticator (TOTP)**, **Remove All
+   Passkeys**, or both, records a meaningful ownership verification reason
+   (20–1000 characters), explicitly approves, types the ticket code, and verifies
+   using their own TOTP or passkey. Password-only verification is insufficient.
+
+An existing successful support-access OTP remains valid as mailbox proof for
+24 hours. Opening a ticket using its access code alone does not create this proof.
 
 The admin must follow the organization's ownership review procedure. Mailbox
 possession and a submitted ticket are not a replacement for that human review.
 Never record passwords, OTPs, recovery codes, or identity documents in the reason.
+
+## Recovery OTP endpoints
+
+- Admin send: `POST /v1/auth/admin/support/tickets/:id/recovery/otp`.
+- Protected public ticket resend: `POST /v1/support/tickets/:ticketCode/recovery/otp`.
+- Protected public ticket verify: `POST /v1/support/tickets/:ticketCode/recovery/verify-otp`.
+- Signed-in owner resend/verify: the equivalent routes under
+  `/v1/auth/support/tickets/:id/recovery/`.
+
+The requester submits `{ "otp_code": "123456", "confirmed": true }` in the
+verification form. The server selects the active challenge for that exact ticket;
+requesters cannot supply a challenge token, email destination, or another target.
+
+Codes expire after 10 minutes, allow at most five incorrect attempts, and can be
+used once. Sending is limited to three times per ticket per hour, with a one-minute
+cooldown shared by admin sends and requester resends. Requesters can resend only
+after an administrator has initiated recovery verification. Additional route and
+verification attempt limits apply. All recovery endpoints fail closed when the
+required Redis state is unavailable.
+
+Verification requires an existing ticket-scoped support session or the linked
+user's authenticated session, even if someone knows the ticket URL. Public routes
+keep origin validation; authenticated routes also require the normal CSRF token.
+No OTP/challenge token is placed in a URL, response, conversation message, or audit
+note. Redis stores the hashed code with a separate `support_recovery` purpose;
+the database stores only the challenge token hash and request/expiry timestamps.
+A replacement challenge invalidates earlier codes for the ticket. Verification
+rechecks the category, In Progress status, target role, active status, matching
+email, challenge version, expiry, and absence of a completed reset.
+
+The email links to the protected conversation and tells the requester not to send
+the OTP to staff. Opening the link performs no verification or credential change.
+Both public and signed-in conversations expose an inline verification form;
+there is no admin-facing field for the requester's OTP. Request and verification
+are recorded as internal audit notes.
+
+While a visible Lost 2FA conversation is under review and lacks fresh mailbox
+proof, it refreshes every 15 seconds to discover verification requests. An admin
+detail awaiting a live challenge refreshes every 10 seconds. Polling stops after
+verification or when the ticket is resolved; admin polling also stops at code
+expiry. Normal tickets do not start recovery polling.
+
+Mailbox possession is not conclusive proof of identity, particularly if email is
+compromised. The original access code and the fresh OTP may both arrive through
+email; they are not independent MFA factors. Human ownership review and the
+administrator's enrolled MFA remain mandatory before any reset.
 
 ## Endpoint and server checks
 
@@ -69,8 +123,14 @@ there is no reusable preapproval flag or background auto-accept path.
 ## Delivery and deployment
 
 Apply the existing database migration flow before starting the updated backend.
-It adds `support_tickets.requester_verified_at` and `support_credential_resets`.
+It adds `support_tickets.requester_verified_at`,
+`recovery_verification_requested_at`, `recovery_verification_expires_at`,
+`recovery_verification_token_hash`, and `support_credential_resets`.
 Deploy the backend and UI together. No new environment variables are required.
+The backend also runs its existing AutoMigrate flow at startup. Recovery OTP email
+requires configured SMTP credentials; failed delivery clears the active challenge
+and returns an error rather than reporting success. `FRONTEND_URL` must use HTTPS
+in production.
 
 The registered scheduler job `support-reset-security-notifications` runs every
 minute. SMTP credentials must be configured. Missing credentials or delivery

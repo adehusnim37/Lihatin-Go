@@ -49,22 +49,24 @@ type AdminSupportTicketItem struct {
 }
 
 type AdminSupportTicketDetailResponse struct {
-	RequesterVerifiedAt *time.Time                    `json:"requester_verified_at,omitempty"`
-	CredentialReset     *supportmodel.CredentialReset `json:"credential_reset,omitempty"`
-	ID                  string                        `json:"id"`
-	TicketCode          string                        `json:"ticket_code"`
-	Email               string                        `json:"email"`
-	Category            string                        `json:"category"`
-	Subject             string                        `json:"subject"`
-	Description         string                        `json:"description"`
-	Status              string                        `json:"status"`
-	Priority            string                        `json:"priority"`
-	UserID              *string                       `json:"user_id,omitempty"`
-	AdminNotes          *string                       `json:"admin_notes,omitempty"`
-	ResolvedBy          *string                       `json:"resolved_by,omitempty"`
-	ResolvedAt          *time.Time                    `json:"resolved_at,omitempty"`
-	CreatedAt           time.Time                     `json:"created_at"`
-	UpdatedAt           time.Time                     `json:"updated_at"`
+	RecoveryVerificationRequestedAt *time.Time                    `json:"recovery_verification_requested_at,omitempty"`
+	RecoveryVerificationExpiresAt   *time.Time                    `json:"recovery_verification_expires_at,omitempty"`
+	RequesterVerifiedAt             *time.Time                    `json:"requester_verified_at,omitempty"`
+	CredentialReset                 *supportmodel.CredentialReset `json:"credential_reset,omitempty"`
+	ID                              string                        `json:"id"`
+	TicketCode                      string                        `json:"ticket_code"`
+	Email                           string                        `json:"email"`
+	Category                        string                        `json:"category"`
+	Subject                         string                        `json:"subject"`
+	Description                     string                        `json:"description"`
+	Status                          string                        `json:"status"`
+	Priority                        string                        `json:"priority"`
+	UserID                          *string                       `json:"user_id,omitempty"`
+	AdminNotes                      *string                       `json:"admin_notes,omitempty"`
+	ResolvedBy                      *string                       `json:"resolved_by,omitempty"`
+	ResolvedAt                      *time.Time                    `json:"resolved_at,omitempty"`
+	CreatedAt                       time.Time                     `json:"created_at"`
+	UpdatedAt                       time.Time                     `json:"updated_at"`
 }
 
 type AdminUpdateSupportTicketRequest struct {
@@ -136,14 +138,15 @@ type SupportMessageResponse struct {
 }
 
 type SupportConversationResponse struct {
-	TicketCode string                   `json:"ticket_code"`
-	TicketID   string                   `json:"ticket_id"`
-	Category   string                   `json:"category"`
-	Subject    string                   `json:"subject"`
-	Status     string                   `json:"status"`
-	CreatedAt  time.Time                `json:"created_at"`
-	UpdatedAt  time.Time                `json:"updated_at"`
-	Messages   []SupportMessageResponse `json:"messages"`
+	RecoveryVerification *SupportRecoveryVerificationStatus `json:"recovery_verification,omitempty"`
+	TicketCode           string                             `json:"ticket_code"`
+	TicketID             string                             `json:"ticket_id"`
+	Category             string                             `json:"category"`
+	Subject              string                             `json:"subject"`
+	Status               string                             `json:"status"`
+	CreatedAt            time.Time                          `json:"created_at"`
+	UpdatedAt            time.Time                          `json:"updated_at"`
+	Messages             []SupportMessageResponse           `json:"messages"`
 }
 
 type UserListSupportTicketsResponse struct {
@@ -161,4 +164,15 @@ type AdminResetSupportCredentialsRequest struct {
 	Reason            string `json:"reason" binding:"required,min=20,max=1000,meaningful_text"`
 	TicketCode        string `json:"ticket_code" binding:"required,max=20"`
 	VerificationToken string `json:"verification_token" binding:"required,len=64"`
+}
+
+// SupportRecoveryVerificationStatus contains no challenge tokens or OTP values.
+type SupportRecoveryVerificationStatus struct {
+	RequestedAt *time.Time `json:"requested_at,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	VerifiedAt  *time.Time `json:"verified_at,omitempty"`
+}
+type SupportVerifyRecoveryOTPRequest struct {
+	OTPCode   string `json:"otp_code" binding:"required,len=6,numeric"`
+	Confirmed bool   `json:"confirmed" binding:"required"`
 }

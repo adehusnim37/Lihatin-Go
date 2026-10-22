@@ -34,9 +34,10 @@ const (
 type EmailOTPPurpose string
 
 const (
-	EmailOTPPurposeSignup        EmailOTPPurpose = "signup"
-	EmailOTPPurposeLogin         EmailOTPPurpose = "login"
-	EmailOTPPurposeSupportAccess EmailOTPPurpose = "support_access"
+	EmailOTPPurposeSignup          EmailOTPPurpose = "signup"
+	EmailOTPPurposeLogin           EmailOTPPurpose = "login"
+	EmailOTPPurposeSupportAccess   EmailOTPPurpose = "support_access"
+	EmailOTPPurposeSupportRecovery EmailOTPPurpose = "support_recovery"
 )
 
 var (

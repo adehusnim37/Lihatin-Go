@@ -55,6 +55,9 @@ func csrfTokenSkipRules() []csrf.SkipRule {
 		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/messages"},
 		{Method: http.MethodGet, Path: "/v1/support/tickets/:ticketCode/attachments/:attachmentID"},
 		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/access/logout"},
+		// Recovery requires the ticket-scoped HttpOnly support session; origin checks remain enabled.
+		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/recovery/otp"},
+		{Method: http.MethodPost, Path: "/v1/support/tickets/:ticketCode/recovery/verify-otp"},
 
 		// API-key clients do not use browser cookies or require CSRF protection.
 		{Method: http.MethodPost, Path: "/v1/api/short", SkipOriginCheck: true},

@@ -904,6 +904,11 @@ func (c *Controller) toTrackResponse(ticket *supportmodel.SupportTicket) dto.Tra
 }
 
 func (c *Controller) toConversationResponse(ticket *supportmodel.SupportTicket, messages []supportmodel.SupportMessage) dto.SupportConversationResponse {
+	var recovery *dto.SupportRecoveryVerificationStatus
+	if ticket.Category == "lost_2fa" {
+		recovery = &dto.SupportRecoveryVerificationStatus{RequestedAt: ticket.RecoveryVerificationRequestedAt, ExpiresAt: ticket.RecoveryVerificationExpiresAt, VerifiedAt: ticket.RequesterVerifiedAt}
+	}
+
 	if len(messages) == 0 && strings.TrimSpace(ticket.Description) != "" {
 		email := strings.ToLower(strings.TrimSpace(ticket.Email))
 		messages = append(messages, supportmodel.SupportMessage{
@@ -923,14 +928,15 @@ func (c *Controller) toConversationResponse(ticket *supportmodel.SupportTicket, 
 	}
 
 	return dto.SupportConversationResponse{
-		TicketCode: ticket.TicketCode,
-		TicketID:   ticket.ID,
-		Category:   ticket.Category,
-		Subject:    ticket.Subject,
-		Status:     ticket.Status,
-		CreatedAt:  ticket.CreatedAt,
-		UpdatedAt:  ticket.UpdatedAt,
-		Messages:   mapped,
+		RecoveryVerification: recovery,
+		TicketCode:           ticket.TicketCode,
+		TicketID:             ticket.ID,
+		Category:             ticket.Category,
+		Subject:              ticket.Subject,
+		Status:               ticket.Status,
+		CreatedAt:            ticket.CreatedAt,
+		UpdatedAt:            ticket.UpdatedAt,
+		Messages:             mapped,
 	}
 }
 
