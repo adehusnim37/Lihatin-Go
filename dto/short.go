@@ -11,8 +11,8 @@ type CreateShortLinkRequest struct {
 	UserID      string     `json:"user_id,omitempty"`
 	Passcode    string     `json:"passcode,omitempty" label:"Kode Akses" binding:"omitempty,len=6,numeric,not_same_digit"`
 	OriginalURL string     `json:"original_url" label:"URL Asli" binding:"required,url"`
-	Title       string     `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255"`
-	Description string     `json:"description,omitempty" label:"Deskripsi" binding:"omitempty,max=1000"`
+	Title       string     `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255,meaningful_text"`
+	Description string     `json:"description,omitempty" label:"Deskripsi" binding:"omitempty,max=1000,meaningful_text"`
 	CustomCode  string     `json:"custom_code,omitempty" label:"Kode Kustom" binding:"omitempty,min=3,max=100,saveurlshort,no_space"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa"`
 	Limit       *int       `json:"limit,omitempty" label:"Limit" binding:"omitempty,numeric,min=1,max=1000000"`
@@ -178,8 +178,8 @@ type PaginatedShortLinkDetailWithStatsResponse struct {
 
 // UpdateShortLinkRequest represents request to update short link
 type UpdateShortLinkRequest struct {
-	Title        *string    `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255,min=3"`
-	Description  *string    `json:"description,omitempty" label:"Deskripsi" binding:"omitempty,max=1000,min=3"`
+	Title        *string    `json:"title,omitempty" label:"Judul" binding:"omitempty,max=255,min=3,meaningful_text"`
+	Description  *string    `json:"description,omitempty" label:"Deskripsi" binding:"omitempty,max=1000,min=3,meaningful_text"`
 	ShortCode    *string    `json:"short_code,omitempty" label:"Kode Pendek" binding:"omitempty,min=3,max=100,no_space,saveurlshort"`
 	IsActive     *bool      `json:"is_active,omitempty" label:"Status Aktif" binding:"omitempty"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty" label:"Tanggal Kadaluarsa" binding:"omitempty,gt=now"`

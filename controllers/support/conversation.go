@@ -369,8 +369,8 @@ func (c *Controller) SendPublicMessage(ctx *gin.Context) {
 	}
 
 	body := strings.TrimSpace(ctx.PostForm("body"))
-	if len(body) > maxSupportMessageBodyLength {
-		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
+	if err := validateSupportMessageBody(body); err != nil {
+		httputil.HandleError(ctx, err, nil)
 		return
 	}
 
@@ -516,8 +516,8 @@ func (c *Controller) SendUserMessage(ctx *gin.Context) {
 	}
 
 	body := strings.TrimSpace(ctx.PostForm("body"))
-	if len(body) > maxSupportMessageBodyLength {
-		httputil.HandleError(ctx, apperrors.NewAppError("SUPPORT_MESSAGE_TOO_LONG", "Message must be less than or equal to 5000 characters", http.StatusBadRequest, "body"), nil)
+	if err := validateSupportMessageBody(body); err != nil {
+		httputil.HandleError(ctx, err, nil)
 		return
 	}
 

@@ -113,16 +113,16 @@ func main() {
 	log.Println("✅ Scheduler started successfully!")
 	defer scheduler.Stop()
 
-	// Minimal validator instance untuk backward compatibility dengan controller lama
-	validate := validator.New()
-	if err := appvalidator.SetupCustomValidators(validate); err != nil {
+	// Register rules before either validator is used by concurrent requests.
+	validate, err := appvalidator.New()
+	if err != nil {
 		log.Printf("Failed to register custom validators: %v", err)
 		panic(err)
 	}
 
-	// ✅ TAMBAHKAN INI: Override Gin's default validator dengan custom validator
+	// Gin binding uses "binding" tags; the controller instance uses "validate" tags.
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		if err := appvalidator.SetupCustomValidators(v); err != nil {
+		if err := appvalidator.Register(v); err != nil {
 			log.Printf("Failed to register custom validators for Gin binding validator: %v", err)
 			panic(err)
 		}

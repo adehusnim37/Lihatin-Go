@@ -3,8 +3,6 @@ package validator
 import (
 	"strings"
 	"testing"
-
-	"github.com/go-playground/validator/v10"
 )
 
 type meaningfulTextFixture struct {
@@ -73,8 +71,8 @@ func TestValidateMeaningfulText(t *testing.T) {
 		{name: "Repeated technical-looking spam", value: "error asdfasdfasdfasdf", valid: false},
 	}
 
-	validate := validator.New()
-	if err := SetupCustomValidators(validate); err != nil {
+	validate, err := New()
+	if err != nil {
 		t.Fatalf("setup custom validators: %v", err)
 	}
 
